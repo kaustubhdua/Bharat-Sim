@@ -1,6 +1,6 @@
 # Reproducible Android emulator smoke test
 
-BharatSim includes a small, known-good Android fixture app and a GitHub Actions workflow that builds it, boots a disposable Android emulator, executes the repository's ADB smoke runner, and checks the resulting JSON evidence.
+BharatSim includes a small, known-good Android fixture app and a GitHub Actions workflow that builds it, boots a disposable Android emulator, starts a local FastAPI instance and authenticated worker with an ephemeral token, uploads the fixture through the API, verifies the queue/lease/ADB/result-callback path and saved report, then runs an Appium UI journey.
 
 ## What this proves
 
