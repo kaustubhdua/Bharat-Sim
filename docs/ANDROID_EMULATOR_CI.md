@@ -23,7 +23,7 @@ Open GitHub Actions, select Android emulator smoke evidence, and choose Run work
 
 - This is an isolated CI fixture, not physical-device validation.
 - The fixture has no external network requests; it does not prove netem shaping reaches emulator traffic.
-- It is a smoke test, not an Appium/UiAutomator2 journey with user-flow assertions.
+- The workflow also runs an Appium/UiAutomator2 journey that asserts the fixture title, taps the primary-action button, checks the resulting UI state, and saves a screenshot. This is a fixture-app journey, not a user journey for arbitrary uploaded apps.
 - It does not test RAM, storage, or CPU pressure.
 - It does not establish production multi-user auth, worker VM isolation, artifact storage, or public deployment readiness.
 - The emulator workflow is separate from fast CI to keep normal PR checks quick.
