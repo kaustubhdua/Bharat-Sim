@@ -14,7 +14,7 @@
 - Deterministic logcat signal analysis, failure fingerprints, evidence-linked findings, and a transparent heuristic BharatScore.
 - React/Vite dashboard with run history, worker heartbeat status, log analysis, and report inspection.
 - Docker Compose setup for local API/dashboard deployment, with a loopback-only web binding by default.
-- CI for backend tests, frontend production build, worker safety guards, and container builds. A separate Android emulator workflow builds a known-good fixture APK, runs the ADB smoke runner and an Appium UI assertion, and uploads short-lived evidence.
+- CI for backend tests, frontend production build, worker safety guards, and container builds. A separate Android emulator workflow builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, and uploads short-lived evidence.
 
 ## What is not complete
 
