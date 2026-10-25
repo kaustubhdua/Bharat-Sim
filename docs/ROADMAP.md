@@ -1,35 +1,56 @@
-# Reproducible Android emulator smoke test
+# Roadmap to a credible BharatSim release
 
-BharatSim includes a small, known-good Android fixture app and a GitHub Actions workflow that builds it, boots a disposable Android emulator, executes the repository's ADB smoke runner, and checks the resulting JSON evidence.
+## Implemented in the current draft
 
-## What this proves
+- [x] Repository scaffold and setup instructions.
+- [x] Four named persona definitions and deterministic risk-ranked test planning.
+- [x] APK upload size cap, ZIP/APK-like archive metadata checks, and SHA-256 fingerprint.
+- [x] SQLite persistence for run metadata and log analyses, with backward-compatible worker columns.
+- [x] Crash, ANR, memory, network, StrictMode and storage log markers; failure fingerprints and evidence-linked diagnostics.
+- [x] Transparent heuristic BharatScore with explicit limitations.
+- [x] Responsive dashboard for persona selection, run registration/history, log analysis, worker heartbeat status, and report inspection.
+- [x] Authenticated worker claim protocol, short-lived leases, heartbeat extension, authorized APK download, result callbacks, stale-result rejection, and bounded inline results.
+- [x] Polling worker agent using the Python standard library and a guarded ADB smoke runner.
+- [x] Backend API/security/worker protocol tests, frontend production build CI, and worker guard/compile checks.
+- [x] Local Docker Compose stack for API + dashboard, loopback-only port binding, persistent data volume, health checks, and container-build CI.
+- [x] Security model, worker setup, open-source references, and explicit feature/limitation documentation.
+- [x] Network shaper apply parses and compares `tc`-reported delay, jitter, loss and rate settings; end-to-end traffic-path validation remains open.
+- [x] Add a separate CI workflow that boots an Android emulator, starts a local API and authenticated worker, verifies upload → queue → ADB execution → result callback → persisted report, then checks an Appium primary-action journey with a screenshot artifact.
 
-When the Android emulator smoke evidence workflow passes, it demonstrates that the checked-in runner can, in that CI environment:
-1. Observe an online emulator.
-2. Read package metadata from a built APK.
-3. Install the APK.
-4. Launch its launcher activity.
-5. Collect logcat evidence.
-6. Emit a report with the APK SHA-256 and expected package name.
-7. Attempt uninstall cleanup.
+## Remaining before calling execution fully functional
 
-The workflow uploads API/worker logs, the structured saved-run report, the runner's device evidence, the Appium journey report and screenshot as a short-lived GitHub Actions artifact. It exercises a local CI API, not a production deployment, and does not prove arbitrary third-party apps work.
+### P0 — Prove real Android execution
 
-## Run it
+- [ ] Provision a disposable emulator worker with Android SDK platform-tools and build-tools.
+- [ ] Run a real, authorized APK end to end through the dashboard/API → queue → worker → ADB → callback → saved report.
+- [ ] Exercise install failure, launch failure, worker crash, timeout, stale lease, duplicate callback, and retry recovery on a real worker.
+- [ ] Verify worker heartbeats and run evidence survive API restarts.
+- [ ] Capture screenshots and structured crash/ANR/exit evidence; distinguish a completed smoke procedure from a passing app journey.
 
-Open GitHub Actions, select Android emulator smoke evidence, and choose Run workflow. It also runs on pull requests changing the runner, runner tests, smoke app, or this workflow. Inspect the run and download the bharatsim-android-emulator-smoke artifact.
+### P0 — Make constraints truthful
 
-## Explicit limitations
+- [ ] Implement Appium/UiAutomator2 journeys with explicit steps, assertions, screenshots, and repeatable checkpoints.
+- [ ] Wire network profiles to an isolated emulator traffic path and verify actual traffic traverses the shaper.
+- [ ] Run baseline, latency, bandwidth, packet-loss, outage, and recovery experiments; record requested vs verified conditions.
+- [ ] Add supported RAM/storage/CPU pressure controls or report those constraints as unsupported.
+- [ ] Validate at least one low-cost physical Android device before making real-device fidelity claims.
 
-- This is an isolated CI fixture, not physical-device validation.
-- The fixture has no external network requests; it does not prove netem shaping reaches emulator traffic.
-- The workflow also runs an Appium/UiAutomator2 journey that asserts the fixture title, taps the primary-action button, checks the resulting UI state, and saves a screenshot. This is a fixture-app journey, not a user journey for arbitrary uploaded apps.
-- It does not test RAM, storage, or CPU pressure.
-- It does not establish production multi-user auth, worker VM isolation, artifact storage, or public deployment readiness.
-- The emulator workflow is separate from fast CI to keep normal PR checks quick.
+### P0 — Secure public execution
 
-## Upstream projects
+- [ ] Implement real user identity and per-run ownership/authorization.
+- [ ] Run untrusted APKs in disposable, resource-limited VMs/containers with no production secrets and restricted egress.
+- [ ] Add quotas, concurrency limits, cancellation, artifact retention/deletion, private object storage, and audit logging.
+- [ ] Perform a threat-model review and security testing before public APK uploads.
 
-- Android Emulator / ADB: https://developer.android.com/studio/run/emulator-commandline
-- Appium UiAutomator2: https://appium.github.io/appium-uiautomator2-driver/latest/
-- Linux netem: https://www.man7.org/linux/man-pages/man8/netem.8.html
+### P1 — Production operations and quality
+
+- [ ] Move multi-worker production metadata to PostgreSQL and use durable queue semantics.
+- [ ] Add authenticated artifact downloads, durable log/screenshot storage, migrations/backups, and operational alerts.
+- [ ] Add browser E2E tests for upload → queued → running → report and all error states.
+- [ ] Deploy frontend/API/worker and verify a real public URL, health/readiness, TLS, persistence, and deployed commit SHA.
+- [ ] Add Sarvam translation only as an optional, consent-aware feature with server-side secrets, redaction, timeout, and fallback; it is not wired yet.
+- [ ] Review license obligations and record provenance for any adopted open-source code/models.
+
+## Demo truth policy
+
+Never label an uploaded APK as tested until a worker reports actual execution evidence. CI protocol fixtures are not emulator execution. Never fabricate crashes, network graphs, performance measurements, or population impact estimates. Distinguish measured facts, heuristic scores, simulations, and unsupported assumptions.
