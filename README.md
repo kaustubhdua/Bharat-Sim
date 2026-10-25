@@ -10,7 +10,7 @@
 - APK upload size limits, APK-like ZIP structure checks, bounded archive metadata, and SHA-256 fingerprinting.
 - FastAPI endpoints with SQLite persistence for run metadata and log analyses.
 - Worker queue with authenticated job claims, short-lived leases, heartbeats, lease-bound APK downloads, SHA-256 evidence matching, result callbacks, stale-result rejection, and bounded inline report JSON.
-- Optional polling worker that refuses credential-bearing HTTP redirects, verifies APK hashes, and runs an explicitly enabled ADB smoke test against a configured disposable Android device. APK-derived package names are validated before use in ADB shell commands, and the runner attempts package cleanup after execution.
+- Optional polling worker that refuses credential-bearing HTTP redirects, enforces same-origin `/internal/worker/` paths for job URLs, verifies APK hashes, and runs an explicitly enabled ADB smoke test against a configured disposable Android device. APK-derived package names are validated before use in ADB shell commands, and the runner attempts package cleanup after execution.
 - Deterministic logcat signal analysis, failure fingerprints, evidence-linked findings, and a transparent heuristic BharatScore.
 - React/Vite dashboard with run history, worker heartbeat status, log analysis, and report inspection.
 - Docker Compose setup for local API/dashboard deployment, with a loopback-only web binding by default.
