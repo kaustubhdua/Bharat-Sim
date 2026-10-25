@@ -39,6 +39,13 @@ class NetemParameterVerificationTests(unittest.TestCase):
             "latency_ms": 180.0, "jitter_ms": 30.0, "loss_pct": 2.0, "rate_kbit": 1200.0,
         }))
 
+    def test_zero_delay_and_loss_are_observed_as_zero(self):
+        observed = parse_netem_parameters("qdisc netem 8001: root limit 1000 rate 16Kbit")
+        self.assertEqual(observed["latency_ms"], 0.0)
+        self.assertEqual(observed["jitter_ms"], 0.0)
+        self.assertEqual(observed["loss_pct"], 0.0)
+        self.assertEqual(observed["rate_kbit"], 16.0)
+
     def test_non_netem_output_has_no_observed_values(self):
         observed = parse_netem_parameters("qdisc fq_codel 0: root")
         self.assertIsNone(observed["latency_ms"])
