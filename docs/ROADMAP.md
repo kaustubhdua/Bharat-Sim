@@ -15,6 +15,7 @@
 - [x] Local Docker Compose stack for API + dashboard, loopback-only port binding, persistent data volume, health checks, and container-build CI.
 - [x] Security model, worker setup, open-source references, and explicit feature/limitation documentation.
 - [x] Network shaper apply parses and compares `tc`-reported delay, jitter, loss and rate settings; end-to-end traffic-path validation remains open.
+- [x] Add a separate CI workflow that boots an Android emulator, builds a known-good fixture APK, runs the ADB smoke runner, and checks an Appium primary-action journey with a screenshot artifact.
 
 ## Remaining before calling execution fully functional
 
