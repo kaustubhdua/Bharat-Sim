@@ -20,6 +20,30 @@ import sys
 IFACE_RE = re.compile(r"^veth-bs-[a-z0-9]{1,12}$")
 
 
+def parse_netem_parameters(output: str) -> dict[str, float | None]:
+    """Parse observed tc text; absent settings are represented as zero only when qdisc exists."""
+    delay = re.search(r"\bdelay\s+([0-9.]+)(ns|us|ms|s)\b(?:\s+([0-9.]+)(ns|us|ms|s)\b)?", output)
+    loss = re.search(r"\bloss\s+([0-9.]+)%", output)
+    rate = re.search(r"\brate\s+([0-9.]+)(bit|Kbit|Mbit|Gbit)\b", output)
+    time_scale = {"ns": 0.000001, "us": 0.001, "ms": 1.0, "s": 1000.0}
+    rate_scale = {"bit": 0.001, "Kbit": 1.0, "Mbit": 1000.0, "Gbit": 1000000.0}
+    return {
+        "latency_ms": float(delay.group(1)) * time_scale[delay.group(2)] if delay else None,
+        "jitter_ms": float(delay.group(3)) * time_scale[delay.group(4)] if delay and delay.group(3) else (0.0 if delay else None),
+        "loss_pct": float(loss.group(1)) if loss else (0.0 if "netem" in output else None),
+        "rate_kbit": float(rate.group(1)) * rate_scale[rate.group(2)] if rate else None,
+    }
+
+
+def parameters_match(observed: dict[str, float | None], requested: dict[str, float]) -> bool:
+    """Use small tolerances for tc's unit conversion/formatting; missing values never match."""
+    tolerances = {"latency_ms": 0.1, "jitter_ms": 0.1, "loss_pct": 0.001, "rate_kbit": 0.1}
+    return all(
+        observed.get(key) is not None and abs(float(observed[key]) - value) <= tolerances[key]
+        for key, value in requested.items()
+    )
+
+
 def run(args: list[str], timeout: int = 10) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, capture_output=True, text=True, timeout=timeout, check=False)
 
@@ -81,18 +105,31 @@ def main() -> int:
     has_netem = "netem" in output
     expected = args.action != "clear"
     matched = (has_netem == expected)
+    requested = {"latency_ms": args.latency_ms, "jitter_ms": args.jitter_ms, "loss_pct": args.loss_pct, "rate_kbit": float(args.rate_kbit)} if args.action == "apply" else None
+    observed = parse_netem_parameters(output) if has_netem else None
+    parameters_verified = parameters_match(observed, requested) if observed is not None and requested is not None else None
+    if not matched:
+        status = "verification_mismatch"
+    elif args.action == "apply" and parameters_verified is True:
+        status = "parameters_match"
+    elif args.action == "apply":
+        status = "parameters_unverified" if observed is None or any(v is None for v in observed.values()) else "parameter_mismatch"
+    else:
+        status = "qdisc_present" if has_netem else "qdisc_absent"
     print(json.dumps({
-        "status": ("qdisc_present" if has_netem else "qdisc_absent") if matched else "verification_mismatch",
+        "status": status,
         "action": args.action,
         "interface": args.interface,
         "scope": "outbound interface traffic only",
-        "requested": {"latency_ms": args.latency_ms, "jitter_ms": args.jitter_ms, "loss_pct": args.loss_pct, "rate_kbit": args.rate_kbit} if args.action == "apply" else None,
+        "requested": requested,
+        "observed_parameters": observed,
         "observed_qdisc": output,
         "netem_present": has_netem,
-        "verification_scope": "Presence check only. Requested latency, jitter, loss and rate values are not parsed back from tc output.",
-        "warning": "This does not prove Android traffic traverses this interface; verify routing and a known endpoint separately.",
+        "parameters_verified": parameters_verified,
+        "verification_scope": "Apply parses the qdisc parameters reported by tc and compares them to requested values. This still does not prove test-device traffic traverses this interface.",
+        "warning": "Verify routing and a known endpoint independently; qdisc configuration is not end-to-end traffic evidence.",
     }, indent=2))
-    return 0 if matched else 2
+    return 0 if matched and (args.action != "apply" or parameters_verified is True) else 2
 
 
 if __name__ == "__main__":
