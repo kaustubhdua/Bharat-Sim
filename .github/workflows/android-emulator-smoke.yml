@@ -43,6 +43,8 @@ jobs:
           set -o pipefail
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
       - name: Build known-good test APK
         working-directory: smoke-android
         run: gradle --no-daemon assembleDebug
