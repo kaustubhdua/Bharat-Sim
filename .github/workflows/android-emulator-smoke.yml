@@ -76,7 +76,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           script: |
-            set -euo pipefail
+            set -eu
             adb wait-for-device
             adb shell getprop sys.boot_completed | grep -q 1
             export ANDROID_SERIAL=emulator-5554
