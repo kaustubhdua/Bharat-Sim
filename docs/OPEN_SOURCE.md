@@ -14,7 +14,7 @@ BharatSim is designed to compose existing tools rather than reimplement Android 
 
 ## Practical integration guidance
 
-- Android Emulator/ADB should run in a disposable worker, not inside the public API process.
+- Android Emulator/ADB should run in a disposable worker, not inside the public API process. BharatSim's separate emulator workflow uses the open-source ReactiveCircus Android Emulator Runner and a source-built fixture app; it is CI validation, not a public untrusted-APK service.
 - UI Automator/Appium should execute declared test flows and preserve step-level evidence; do not claim app journeys were tested when only an app launch was attempted.
 - Linux netem can shape a selected Linux egress interface, but emulator traffic must actually traverse that interface. Measure a known endpoint and preserve requested versus observed conditions separately.
 - Upload validation should be layered. Extension checks and archive metadata checks do not establish that an APK is safe to execute; isolation, quotas, restricted egress and cleanup remain essential.
