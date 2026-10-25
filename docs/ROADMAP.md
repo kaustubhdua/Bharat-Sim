@@ -14,6 +14,7 @@
 - [x] Backend API/security/worker protocol tests, frontend production build CI, and worker guard/compile checks.
 - [x] Local Docker Compose stack for API + dashboard, loopback-only port binding, persistent data volume, health checks, and container-build CI.
 - [x] Security model, worker setup, open-source references, and explicit feature/limitation documentation.
+- [x] Network shaper apply parses and compares `tc`-reported delay, jitter, loss and rate settings; end-to-end traffic-path validation remains open.
 
 ## Remaining before calling execution fully functional
 
