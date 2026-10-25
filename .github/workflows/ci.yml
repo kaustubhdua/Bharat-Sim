@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m unittest worker.tests.test_network_shaper worker.tests.test_runner worker.tests.test_agent
-      - run: python -m py_compile worker/agent.py worker/runner.py worker/network_shaper.py
+      - run: python -m py_compile worker/agent.py worker/runner.py worker/network_shaper.py worker/tests/appium_smoke_journey.py
 
   container-build:
     runs-on: ubuntu-latest
