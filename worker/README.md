@@ -42,7 +42,7 @@ Optional settings: BHARATSIM_POLL_SECONDS (1–60, default 5) and BHARATSIM_SMOK
 
 1. The worker authenticates and claims a queued run.
 2. The API leases the run to that worker and returns a short-lived lease token.
-3. The worker downloads only the APK attached to that leased run.
+3. The worker downloads only the APK attached to that leased run. Returned worker URLs must be relative `/internal/worker/` paths; absolute URLs, external hosts, fragments, and unrelated routes are rejected before credentials are attached.
 4. The runner checks bounded APK archive metadata, checks the device, installs and launches the APK, then captures bounded logcat evidence.
 5. The worker periodically renews its lease and submits a bounded report.
 6. The API accepts results only from the active lease and stores the result with the run.
