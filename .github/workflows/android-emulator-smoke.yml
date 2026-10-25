@@ -38,7 +38,9 @@ jobs:
           fi
           test -x "$SDKMANAGER"
           echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
       - name: Build known-good test APK
