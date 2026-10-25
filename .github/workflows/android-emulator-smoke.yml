@@ -89,10 +89,8 @@ jobs:
             export BHARATSIM_WORKER_TOKEN="$(python -c 'import secrets; print(secrets.token_hex(32))')"
             export BHARATSIM_DATA_DIR="$RUNNER_TEMP/bharatsim-api-data"
             mkdir -p artifacts
-            pushd backend
-            uvicorn app.main:app --host 127.0.0.1 --port 8000 > ../artifacts/api.log 2>&1 &
+            (cd backend && uvicorn app.main:app --host 127.0.0.1 --port 8000) > artifacts/api.log 2>&1 &
             API_PID=$!
-            popd
             trap 'kill "${WORKER_PID:-}" "${API_PID:-}" 2>/dev/null || true' EXIT
             python - <<'PY'
             import time
