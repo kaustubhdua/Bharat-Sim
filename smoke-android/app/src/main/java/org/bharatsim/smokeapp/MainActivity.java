@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Button;
 
 public final class MainActivity extends Activity {
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -25,8 +26,21 @@ public final class MainActivity extends Activity {
         detail.setTextColor(Color.DKGRAY);
         detail.setGravity(Gravity.CENTER);
         detail.setPadding(0, 24, 0, 0);
+        TextView status = new TextView(this);
+        status.setText("Ready");
+        status.setTextSize(16);
+        status.setTextColor(Color.rgb(30, 70, 45));
+        status.setGravity(Gravity.CENTER);
+        status.setContentDescription("journey-status");
+
+        Button action = new Button(this);
+        action.setText("Run primary action");
+        action.setOnClickListener(view -> status.setText("Primary action completed"));
+
         layout.addView(title);
         layout.addView(detail);
+        layout.addView(action);
+        layout.addView(status);
         setContentView(layout);
     }
 }
