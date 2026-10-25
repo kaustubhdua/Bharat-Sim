@@ -27,10 +27,11 @@ def parse_netem_parameters(output: str) -> dict[str, float | None]:
     rate = re.search(r"\brate\s+([0-9.]+)(bit|Kbit|Mbit|Gbit)\b", output)
     time_scale = {"ns": 0.000001, "us": 0.001, "ms": 1.0, "s": 1000.0}
     rate_scale = {"bit": 0.001, "Kbit": 1.0, "Mbit": 1000.0, "Gbit": 1000000.0}
+    has_netem = "netem" in output
     return {
-        "latency_ms": float(delay.group(1)) * time_scale[delay.group(2)] if delay else None,
-        "jitter_ms": float(delay.group(3)) * time_scale[delay.group(4)] if delay and delay.group(3) else (0.0 if delay else None),
-        "loss_pct": float(loss.group(1)) if loss else (0.0 if "netem" in output else None),
+        "latency_ms": float(delay.group(1)) * time_scale[delay.group(2)] if delay else (0.0 if has_netem else None),
+        "jitter_ms": float(delay.group(3)) * time_scale[delay.group(4)] if delay and delay.group(3) else (0.0 if has_netem else None),
+        "loss_pct": float(loss.group(1)) if loss else (0.0 if has_netem else None),
         "rate_kbit": float(rate.group(1)) * rate_scale[rate.group(2)] if rate else None,
     }
 
@@ -70,6 +71,8 @@ def main() -> int:
         parser.error("--latency-ms must be between 0 and 5000")
     if args.jitter_ms < 0 or args.jitter_ms > 2000:
         parser.error("--jitter-ms must be between 0 and 2000")
+    if args.latency_ms == 0 and args.jitter_ms > 0:
+        parser.error("--jitter-ms requires a positive --latency-ms so the requested profile can be applied")
     if not 0 <= args.loss_pct <= 30:
         parser.error("--loss-pct must be between 0 and 30")
     if not 16 <= args.rate_kbit <= 1000000:
