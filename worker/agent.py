@@ -43,10 +43,23 @@ def safe_urlopen(request: urllib.request.Request, timeout: int):
     return _SAFE_OPENER.open(request, timeout=timeout)
 
 
+def resolve_api_url(base_url: str, path: str) -> str:
+    """Accept only same-origin worker API paths; never send worker credentials to a job-supplied host."""
+    base = urllib.parse.urlsplit(base_url)
+    candidate = urllib.parse.urlsplit(path)
+    if base.scheme not in ("https", "http") or not base.hostname or base.username or base.password:
+        raise WorkerError("API base URL is invalid")
+    if candidate.scheme or candidate.netloc or candidate.username or candidate.password or candidate.fragment:
+        raise WorkerError("worker API URL must be a relative path, not an absolute or credential-bearing URL")
+    if not candidate.path.startswith("/internal/worker/") or candidate.path.startswith("//") or "\\\\" in candidate.path:
+        raise WorkerError("worker API URL is outside the permitted internal worker route")
+    return urllib.parse.urlunsplit((base.scheme, base.netloc, candidate.path, candidate.query, ""))
+
+
 def request_json(base_url: str, token: str, path: str, payload: dict[str, Any] | None = None, timeout: int = 30) -> dict[str, Any]:
     body = None if payload is None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/")),
+        resolve_api_url(base_url, path),
         data=body,
         headers={"X-BharatSim-Worker-Token": token, "Content-Type": "application/json", "Accept": "application/json"},
         method="GET" if payload is None else "POST",
@@ -64,7 +77,7 @@ def request_json(base_url: str, token: str, path: str, payload: dict[str, Any] |
 def download_apk(base_url: str, token: str, job: dict[str, Any], target: Path) -> None:
     path = str(job["apk_url"])
     req = urllib.request.Request(
-        urllib.parse.urljoin(base_url.rstrip("/") + "/", path.lstrip("/")),
+        resolve_api_url(base_url, path),
         headers={
             "X-BharatSim-Worker-Token": token,
             "X-BharatSim-Lease-Token": str(job["lease_token"]),
