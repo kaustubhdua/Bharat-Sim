@@ -25,6 +25,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install API dependencies
+        run: python -m pip install -r backend/requirements.txt
       - name: Install Appium and Android UIAutomator2 driver
         run: |
           npm install --global appium@3
@@ -76,25 +81,78 @@ jobs:
             adb shell getprop sys.boot_completed | grep -q 1
             export ANDROID_SERIAL=emulator-5554
             export BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true
+            export BHARATSIM_API_URL=http://127.0.0.1:8000
+            export BHARATSIM_ALLOW_INSECURE_HTTP=true
+            export BHARATSIM_WORKER_ID=ci-emulator-worker
+            export BHARATSIM_POLL_SECONDS=1
+            export BHARATSIM_SMOKE_DURATION_SECONDS=5
+            export BHARATSIM_WORKER_TOKEN="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+            export BHARATSIM_DATA_DIR="$RUNNER_TEMP/bharatsim-api-data"
             mkdir -p artifacts
-            python worker/runner.py smoke-android/app/build/outputs/apk/debug/app-debug.apk --duration 5 --out artifacts
+            pushd backend
+            uvicorn app.main:app --host 127.0.0.1 --port 8000 > ../artifacts/api.log 2>&1 &
+            API_PID=$!
+            popd
+            trap 'kill "${WORKER_PID:-}" "${API_PID:-}" 2>/dev/null || true' EXIT
+            python - <<'PY'
+            import time
+            import urllib.request
+            deadline = time.monotonic() + 60
+            while time.monotonic() < deadline:
+                try:
+                    urllib.request.urlopen("http://127.0.0.1:8000/health/ready", timeout=2).read()
+                    break
+                except Exception:
+                    time.sleep(1)
+            else:
+                raise SystemExit("BharatSim API did not become ready")
+            PY
+            python worker/agent.py > artifacts/worker.log 2>&1 &
+            WORKER_PID=$!
+            curl --fail --silent --show-error \
+              -F persona_id=baseline \
+              -F "apk=@smoke-android/app/build/outputs/apk/debug/app-debug.apk;type=application/vnd.android.package-archive" \
+              http://127.0.0.1:8000/api/v1/runs > artifacts/upload-response.json
             python - <<'PY'
             import json
+            import time
+            import urllib.request
             from pathlib import Path
-            reports = list(Path("artifacts").glob("*.report.json"))
-            assert len(reports) == 1, f"expected one runner report, got {len(reports)}"
-            report = json.loads(reports[0].read_text())
-            assert report["status"] == "completed", report
-            assert report["package_name"] == "org.bharatsim.smokeapp", report.get("package_name")
-            assert any(s["name"] == "install_apk" and s["return_code"] == 0 for s in report["steps"]), report["steps"]
-            assert any(s["name"] == "launch_app" and s["return_code"] == 0 for s in report["steps"]), report["steps"]
-            assert any(s["name"] == "collect_logcat" and s["return_code"] == 0 for s in report["steps"]), report["steps"]
-            print(json.dumps({"status": report["status"], "apk_sha256": report["apk_sha256"], "package_name": report["package_name"], "steps": [s["name"] for s in report["steps"]], "fatal_exception_marker": report["fatal_exception_marker"]}, indent=2))
+            uploaded = json.loads(Path("artifacts/upload-response.json").read_text())
+            run_id = uploaded["id"]
+            if uploaded["status"] != "queued":
+                raise SystemExit(f"APK was not queued: {uploaded}")
+            deadline = time.monotonic() + 300
+            final = None
+            while time.monotonic() < deadline:
+                with urllib.request.urlopen(f"http://127.0.0.1:8000/api/v1/runs/{run_id}", timeout=5) as response:
+                    final = json.load(response)
+                if final["status"] in ("completed", "failed"):
+                    break
+                time.sleep(2)
+            if not final or final["status"] != "completed":
+                raise SystemExit(f"End-to-end worker run did not complete: {final}")
+            result = final.get("result") or {}
+            assert result.get("apk_sha256") == uploaded["apk"]["sha256"], "APK evidence hash mismatch"
+            assert result.get("runner_return_code") == 0, result
+            assert result.get("package_name") == "org.bharatsim.smokeapp", result.get("package_name")
+            for step_name in ("install_apk", "launch_app", "collect_logcat"):
+                step = next((s for s in result.get("steps", []) if s.get("name") == step_name), None)
+                assert step and step.get("return_code") == 0, f"{step_name} failed: {step}"
+            Path("artifacts/api-run.report.json").write_text(json.dumps({
+                "status": final["status"],
+                "run_id": run_id,
+                "apk_sha256": uploaded["apk"]["sha256"],
+                "result_status": result.get("status"),
+                "steps": [s.get("name") for s in result.get("steps", [])],
+                "fatal_exception_marker": result.get("fatal_exception_marker"),
+                "api_saved_report": True,
+            }, indent=2))
+            print(Path("artifacts/api-run.report.json").read_text())
             PY
             adb install smoke-android/app/build/outputs/apk/debug/app-debug.apk
             appium --address 127.0.0.1 --port 4723 > /tmp/bharatsim-appium.log 2>&1 &
             APPIUM_PID=$!
-            trap 'kill "$APPIUM_PID" 2>/dev/null || true' EXIT
             python worker/tests/appium_smoke_journey.py --artifacts artifacts
       - name: Preserve emulator smoke evidence
         if: always()
