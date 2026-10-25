@@ -19,6 +19,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Appium and Android UIAutomator2 driver
+        run: |
+          npm install --global appium@3
+          appium driver install uiautomator2
       - uses: android-actions/setup-android@v3
       - name: Install Android SDK packages
         run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
@@ -62,6 +69,11 @@ jobs:
             assert any(s["name"] == "collect_logcat" and s["return_code"] == 0 for s in report["steps"]), report["steps"]
             print(json.dumps({"status": report["status"], "apk_sha256": report["apk_sha256"], "package_name": report["package_name"], "steps": [s["name"] for s in report["steps"]], "fatal_exception_marker": report["fatal_exception_marker"]}, indent=2))
             PY
+            adb install smoke-android/app/build/outputs/apk/debug/app-debug.apk
+            appium --address 127.0.0.1 --port 4723 > /tmp/bharatsim-appium.log 2>&1 &
+            APPIUM_PID=$!
+            trap 'kill "$APPIUM_PID" 2>/dev/null || true' EXIT
+            python worker/tests/appium_smoke_journey.py --artifacts artifacts
       - name: Preserve emulator smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
