@@ -11,7 +11,9 @@
 - [x] Responsive dashboard for persona selection, run registration/history, log analysis, worker heartbeat status, and report inspection.
 - [x] Authenticated worker claim protocol, short-lived leases, heartbeat extension, authorized APK download, result callbacks, stale-result rejection, and bounded inline results.
 - [x] Polling worker agent using the Python standard library and a guarded ADB smoke runner.
-- [x] Backend API/security/worker protocol tests, frontend production build CI, and worker guard/compile checks.
+- [x] Backend API/security/worker protocol tests, frontend production build CI, worker guard/compile checks, and automated Python/JavaScript dependency vulnerability audits.
+- [x] Process-level test proves run metadata remains available after the FastAPI process restarts against the same SQLite data directory; it intentionally does not claim worker-heartbeat or artifact durability.
+- [x] Protocol tests prove heartbeat lease renewal, expired-lease reclamation, stale lease-token rejection, duplicate callback rejection, and fail-closed behavior after the retry limit.
 - [x] Local Docker Compose stack for API + dashboard, loopback-only port binding, persistent data volume, health checks, and container-build CI.
 - [x] Security model, worker setup, open-source references, and explicit feature/limitation documentation.
 - [x] Network shaper apply parses and compares `tc`-reported delay, jitter, loss and rate settings.
@@ -28,7 +30,7 @@
 - [x] Execute a source-built, authorized fixture APK through local FastAPI upload → queue/lease → worker → ADB install/launch/logcat → result callback → persisted run report. The latest recorded workflow passed the API-to-ADB pipeline and fixture Appium assertion; this does not prove arbitrary APK correctness or production isolation.
 - [x] Pass the Appium/UiAutomator2 fixture primary-action UI assertion in the disposable emulator workflow; the workflow asserts that tapping the stable accessibility identifier changes the status text and preserves a screenshot. This is a fixture journey, not a suite for arbitrary apps.
 - [ ] Exercise install failure, launch failure, worker crash, timeout, stale lease, duplicate callback, and retry recovery on a real worker.
-- [ ] Verify worker heartbeats and run evidence survive API restarts.
+- [ ] Verify worker heartbeat state and full run evidence/artifacts survive API restarts. Only run metadata persistence is currently covered by a process-restart integration test.
 - [ ] Capture screenshots and structured crash/ANR/exit evidence; distinguish a completed smoke procedure from a passing app journey.
 
 ### P0 — Make constraints truthful
