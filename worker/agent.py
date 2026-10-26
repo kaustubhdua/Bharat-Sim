@@ -113,7 +113,21 @@ def annotate_execution_scope(report: dict[str, Any], job: dict[str, Any]) -> Non
     )
     report["requested_persona_id"] = str(job.get("persona_id") or "unknown")
     report["constraints_applied"] = False
-    report["constraint_verification"] = "unsupported_not_applied"
+    network_profile = report.get("network_profile")
+    control_plane = network_profile.get("control_plane", {}) if isinstance(network_profile, dict) else {}
+    if isinstance(control_plane, dict) and control_plane.get("status") == "verified":
+        report["network_constraints_applied"] = bool(network_profile.get("network_constraints_applied"))
+        report["constraint_verification"] = (
+            "partial_network_control_verified; active app traffic path, packet loss when requested, "
+            "CPU, RAM, storage, and battery-saver constraints are not verified"
+        )
+        report["result_interpretation"] = (
+            "Smoke procedure completed; emulator network delay/bandwidth controls were read back, "
+            "but active app traffic routing and overall app health are not proven."
+        )
+    else:
+        report["network_constraints_applied"] = False
+        report["constraint_verification"] = "network_control_unverified_or_unsupported"
 
 
 def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duration: int) -> None:
@@ -141,9 +155,22 @@ def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duratio
                 "BHARATSIM_ENABLE_LOCAL_APK_EXECUTION": "true",
                 "ANDROID_SERIAL": serial,
             })
+            runner_command = [
+                sys.executable, str(RUNNER), str(apk),
+                "--duration", str(duration), "--out", str(artifact_dir),
+            ]
+            profile = job.get("persona_profile")
+            if isinstance(profile, dict):
+                required_profile_values = ("latency_ms", "down_kbps", "up_kbps")
+                if all(isinstance(profile.get(key), (int, float)) for key in required_profile_values):
+                    runner_command.extend([
+                        "--network-latency-ms", str(int(profile["latency_ms"])),
+                        "--network-down-kbps", str(int(profile["down_kbps"])),
+                        "--network-up-kbps", str(int(profile["up_kbps"])),
+                        "--network-loss-pct", str(float(profile.get("packet_loss_pct", 0))),
+                    ])
             completed = subprocess.run(
-                [sys.executable, str(RUNNER), str(apk), "--duration", str(duration), "--out", str(artifact_dir)],
-                env=env, capture_output=True, text=True, timeout=360, check=False,
+                runner_command, env=env, capture_output=True, text=True, timeout=360, check=False,
             )
             reports = list(artifact_dir.glob("*.report.json"))
             if reports:
