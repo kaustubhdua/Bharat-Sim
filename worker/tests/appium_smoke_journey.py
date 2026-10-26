@@ -290,13 +290,13 @@ def main() -> int:
         report = {
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
-            "probe_endpoint": "http://10.0.2.2:8001/payload?bytes=2000000",
-            "probe_endpoint_scope": "local CI test server via Android Emulator host gateway; not public-internet evidence",
+            "probe_endpoint": "https://speed.cloudflare.com/__down?bytes=2000000",
+            "probe_endpoint_scope": "public Cloudflare HTTPS download endpoint; measures real external traffic through the Android Emulator network stack, not arbitrary uploaded-app traffic",
             "probe_payload_bytes": 2000000,
             "assertions": [
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe downloaded exactly 2,000,000 bytes from the controlled CI HTTP server through the emulator network stack",
+                "each probe downloaded exactly 2,000,000 bytes from the public Cloudflare HTTPS endpoint through the emulator network stack",
                 "per-request retry counts are captured in probe evidence",
                 "baseline, latency-only, and bandwidth-only probes used cellular/Ethernet transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
