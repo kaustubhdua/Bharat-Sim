@@ -154,3 +154,83 @@ def test_worker_cannot_submit_evidence_for_a_different_apk(monkeypatch, tmp_path
     )
     assert response.status_code == 422
     assert "SHA-256" in response.json()["detail"]
+
+
+
+def test_expired_worker_lease_is_reclaimed_and_old_token_is_rejected(monkeypatch, tmp_path):
+    client = prepare_isolated_db(monkeypatch, tmp_path)
+    headers = {"X-BharatSim-Worker-Token": os.environ["BHARATSIM_WORKER_TOKEN"]}
+    created = client.post(
+        "/api/v1/runs",
+        data={"persona_id": "baseline"},
+        files={"apk": ("retry.apk", apk_bytes(), "application/vnd.android.package-archive")},
+    )
+    run_id = created.json()["id"]
+
+    first = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "worker-before-crash"}
+    ).json()["job"]
+    with main.db() as conn:
+        conn.execute(
+            "UPDATE runs SET lease_until=? WHERE id=?",
+            ("2000-01-01T00:00:00+00:00", run_id),
+        )
+
+    second = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "worker-after-restart"}
+    ).json()["job"]
+    assert second["id"] == run_id
+    assert second["attempt"] == 2
+    assert second["lease_token"] != first["lease_token"]
+
+    stale_download = client.get(
+        f"/internal/worker/runs/{run_id}/apk",
+        headers={**headers, "X-BharatSim-Lease-Token": first["lease_token"]},
+    )
+    assert stale_download.status_code == 409
+
+    stale_result = client.post(
+        f"/internal/worker/runs/{run_id}/result",
+        headers=headers,
+        json={
+            "lease_token": first["lease_token"],
+            "status": "failed",
+            "result": {"status": "failed", "error": "late old-worker callback"},
+            "error": "late old-worker callback",
+        },
+    )
+    assert stale_result.status_code == 409
+    assert client.get(f"/api/v1/runs/{run_id}").json()["status"] == "leased"
+
+
+def test_run_fails_closed_after_three_expired_worker_leases(monkeypatch, tmp_path):
+    client = prepare_isolated_db(monkeypatch, tmp_path)
+    headers = {"X-BharatSim-Worker-Token": os.environ["BHARATSIM_WORKER_TOKEN"]}
+    created = client.post(
+        "/api/v1/runs",
+        data={"persona_id": "baseline"},
+        files={("apk"): ("never-finishes.apk", apk_bytes(), "application/vnd.android.package-archive")},
+    )
+    run_id = created.json()["id"]
+
+    for attempt in range(1, 4):
+        claimed = client.post(
+            "/internal/worker/claim", headers=headers, json={"worker_id": f"worker-{attempt}"}
+        ).json()["job"]
+        assert claimed["attempt"] == attempt
+        with main.db() as conn:
+            conn.execute(
+                "UPDATE runs SET lease_until=? WHERE id=?",
+                ("2000-01-01T00:00:00+00:00", run_id),
+            )
+
+    # A further claim performs expiry maintenance, marks exhausted work failed,
+    # and must not hand the abandoned run to a fourth worker attempt.
+    response = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "worker-4"}
+    )
+    assert response.status_code == 200
+    assert response.json()["job"] is None
+    final = client.get(f"/api/v1/runs/{run_id}").json()
+    assert final["status"] == "failed"
+    assert final["error"] == "Worker lease expired after maximum attempts"
