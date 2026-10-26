@@ -86,10 +86,10 @@ def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
         return int(match.group(1))
 
     observed = {
-        "minimum_latency_ms": read(r"minimum latency:\\s*(\\d+)\\s+ms"),
-        "maximum_latency_ms": read(r"maximum latency:\\s*(\\d+)\\s+ms"),
-        "download_bps": read(r"download speed:\\s*(\\d+)\\s+bits/s"),
-        "upload_bps": read(r"upload speed:\\s*(\\d+)\\s+bits/s"),
+        "minimum_latency_ms": read(r"minimum latency:\s*(\d+)\s+ms"),
+        "maximum_latency_ms": read(r"maximum latency:\s*(\d+)\s+ms"),
+        "download_bps": read(r"download speed:\s*(\d+)\s+bits/s"),
+        "upload_bps": read(r"upload speed:\s*(\d+)\s+bits/s"),
     }
     expected_latency = 0 if latency_ms is None else latency_ms
     matched = (
