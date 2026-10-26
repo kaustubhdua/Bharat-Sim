@@ -62,4 +62,4 @@ def test_readiness_returns_503_when_database_is_unavailable(monkeypatch, tmp_pat
 def test_run_registration_requires_an_apk():
     response = client.post("/api/v1/runs", data={"persona_id": "baseline"})
     assert response.status_code == 422
-    assert response.json()["detail"] == "An APK file is required to register a test run"
+    assert any(item.get("loc", [])[-1:] == ["apk"] for item in response.json()["detail"])
