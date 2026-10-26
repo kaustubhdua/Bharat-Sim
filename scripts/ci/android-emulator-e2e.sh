@@ -125,18 +125,9 @@ Path("artifacts/api-run.report.json").write_text(json.dumps(report, indent=2))
 print(json.dumps(report, indent=2))
 PY
 
-# Apply a fresh profile around the UI-driven real request, not just the worker
-# setup phase. Disable Wi-Fi so the probe must use the emulator's cellular
-# network (or fail rather than pretending the traffic path was shaped).
-adb -s emulator-5554 shell svc wifi disable
-adb -s emulator-5554 shell svc data enable
-adb -s emulator-5554 emu network delay 35
-adb -s emulator-5554 emu network speed 3000:12000
-adb -s emulator-5554 emu network status > artifacts/emulator-network-status.txt
-grep -Eq 'minimum latency:[[:space:]]+35 ms' artifacts/emulator-network-status.txt
-grep -Eq 'download speed:[[:space:]]+12000000 bits/s' artifacts/emulator-network-status.txt
-grep -Eq 'upload speed:[[:space:]]+3000000 bits/s' artifacts/emulator-network-status.txt
-
+# The Appium journey itself establishes a cellular baseline, applies a
+# measured latency profile, issues a second real HTTPS request, and resets
+# emulator settings in its finally block.
 adb install smoke-android/app/build/outputs/apk/debug/app-debug.apk
 appium --address 127.0.0.1 --port 4723 > artifacts/appium-server.log 2>&1 &
 APPIUM_PID=$!
