@@ -7,6 +7,7 @@ from worker.runner import (
     parse_emulator_network_status,
     parse_fixture_network_probe,
     reset_emulator_network_profile,
+    run_adb_with_retry,
     valid_package_name,
 )
 
@@ -33,6 +34,33 @@ class PackageNameValidationTests(unittest.TestCase):
                 self.assertFalse(valid_package_name(value))
 
 
+
+
+
+
+class AdbRetryTests(unittest.TestCase):
+    def test_retries_logcat_after_transient_device_offline_and_keeps_complete_result(self):
+        offline = CompletedProcess(args=[], returncode=255, stdout="partial log", stderr="")
+        wait_ok = CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+        state_ok = CompletedProcess(args=[], returncode=0, stdout="device\n", stderr="")
+        recovered = CompletedProcess(args=[], returncode=0, stdout="complete log", stderr="")
+        with patch("worker.runner.run_cmd", side_effect=[offline, wait_ok, state_ok, recovered]) as run:
+            result = run_adb_with_retry("emulator-5554", ["logcat", "-d"], timeout=10)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "complete log")
+        self.assertEqual(run.call_count, 4)
+        self.assertEqual(run.call_args_list[1].args[0][-1], "wait-for-device")
+
+    def test_does_not_turn_persistent_adb_failure_into_success(self):
+        offline = CompletedProcess(args=[], returncode=255, stdout="", stderr="device offline")
+        wait_ok = CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+        state_offline = CompletedProcess(args=[], returncode=1, stdout="", stderr="device offline")
+        with patch("worker.runner.run_cmd", side_effect=[
+            offline, wait_ok, state_offline, offline, wait_ok, state_offline, offline
+        ]):
+            result = run_adb_with_retry("emulator-5554", ["uninstall", "org.example.app"], attempts=3)
+        self.assertEqual(result.returncode, 255)
+        self.assertIn("device offline", result.stderr)
 
 
 
