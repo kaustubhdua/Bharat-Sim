@@ -1,10 +1,11 @@
 """Exercise persisted run metadata across real API process restarts.
 
-This is a persistence integration test, not an APK execution test. The run is
-registered without an APK and must remain awaiting_worker throughout.
+The APK bytes are a tiny APK-shaped test fixture accepted by the upload
+validator. This test does not install or execute the fixture.
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import socket
@@ -14,10 +15,38 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND = ROOT / "backend"
+
+
+def apk_fixture_bytes() -> bytes:
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("AndroidManifest.xml", b"manifest test fixture")
+        archive.writestr("classes.dex", b"dex test fixture")
+    return stream.getvalue()
+
+
+def multipart_run_request(base_url: str) -> urllib.request.Request:
+    boundary = "----BharatSimPersistenceBoundary"
+    apk = apk_fixture_bytes()
+    body = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="persona_id"\r\n\r\n'
+        "baseline\r\n"
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="apk"; filename="restart-test.apk"\r\n'
+        "Content-Type: application/vnd.android.package-archive\r\n\r\n"
+    ).encode() + apk + f"\r\n--{boundary}--\r\n".encode()
+    return urllib.request.Request(
+        base_url + "/api/v1/runs",
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
 
 
 def free_port() -> int:
@@ -96,19 +125,13 @@ def test_run_metadata_survives_api_process_restart(tmp_path: Path) -> None:
     first = start_api(data_dir, port, log_path)
     try:
         wait_ready(first, base_url, log_path)
-        payload = urllib.parse.urlencode({"persona_id": "baseline"}).encode()
-        request = urllib.request.Request(
-            base_url + "/api/v1/runs",
-            data=payload,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            method="POST",
-        )
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with urllib.request.urlopen(multipart_run_request(base_url), timeout=5) as response:
             created = json.loads(response.read().decode("utf-8"))
         run_id = created["id"]
         assert created["status"] == "awaiting_worker"
-        assert created["apk"]["uploaded"] is False
-        assert "no APK execution is claimed" in created["message"]
+        assert created["apk"]["uploaded"] is True
+        assert created["apk"]["sha256"]
+        assert "awaiting a worker" in created["message"]
 
         stop_api(first)
         first = None  # type: ignore[assignment]
@@ -121,11 +144,11 @@ def test_run_metadata_survives_api_process_restart(tmp_path: Path) -> None:
             assert persisted is not None, "run metadata disappeared after API restart"
             assert persisted["status"] == "awaiting_worker"
             assert persisted["persona_id"] == "baseline"
-            assert persisted["apk_sha256"] is None
+            assert persisted["apk_sha256"] == created["apk"]["sha256"]
             detail = get_json(base_url + "/api/v1/runs/" + run_id)
             assert detail["id"] == run_id
             assert detail["status"] == "awaiting_worker"
-            assert detail.get("result") is None
+            assert detail["apk"]["sha256"] == created["apk"]["sha256"]\n            assert detail.get("result") is None
         finally:
             stop_api(second)
     finally:
