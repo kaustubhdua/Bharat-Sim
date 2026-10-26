@@ -48,23 +48,31 @@ def adb(*args: str, timeout: int = 20) -> str:
     return output
 
 
-def set_network_profile(latency_ms: int | None) -> dict:
-    """Configure the emulator and require exact console readback."""
-    # Force the fixture onto the emulator network path with a deterministic
-    # host-local API endpoint (10.0.2.2 is the Android Emulator host alias).
-    # This avoids public DNS/CDN availability affecting the latency experiment.
+def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
+    """Configure emulator latency and throughput, then require exact console readback."""
+    # The fixture downloads a controlled-size payload from a real public endpoint.
+    # Explicit cellular service and disabled Wi-Fi ensure the request uses the
+    # emulator network path; profile readback is recorded separately from measured effect.
     adb("emu", "gsm", "voice", "home")
     adb("emu", "gsm", "data", "home")
     adb("shell", "svc", "wifi", "disable")
     adb("shell", "svc", "data", "enable")
-    if latency_ms is None:
-        adb("emu", "network", "delay", "none")
-        adb("emu", "network", "speed", "full")
-        expected = {"latency_ms": 0, "download_bps": 0, "upload_bps": 0}
+    latency = "none" if latency_ms is None else str(latency_ms)
+    adb("emu", "network", "delay", latency)
+    adb("emu", "network", "speed", speed)
+    if speed == "full":
+        upload_bps = download_bps = 0
     else:
-        adb("emu", "network", "delay", str(latency_ms))
-        adb("emu", "network", "speed", "3000:12000")
-        expected = {"latency_ms": latency_ms, "download_bps": 12000000, "upload_bps": 3000000}
+        parts = speed.split(":")
+        if len(parts) != 2 or not all(part.isdigit() for part in parts):
+            raise ValueError(f"Invalid emulator speed profile: {speed}")
+        upload_bps = int(parts[0]) * 1000
+        download_bps = int(parts[1]) * 1000
+    expected = {
+        "latency_ms": 0 if latency_ms is None else latency_ms,
+        "download_bps": download_bps,
+        "upload_bps": upload_bps,
+    }
     output = adb("emu", "network", "status")
     def read(pattern: str) -> int:
         match = re.search(pattern, output, re.I)
@@ -72,23 +80,18 @@ def set_network_profile(latency_ms: int | None) -> dict:
             raise RuntimeError(f"Could not parse emulator network status: {output}")
         return int(match.group(1))
     observed = {
-        "minimum_latency_ms": read(r"minimum latency:\s*(\d+)\s+ms"),
-        "maximum_latency_ms": read(r"maximum latency:\s*(\d+)\s+ms"),
-        "download_bps": read(r"download speed:\s*(\d+)\s+bits/s"),
-        "upload_bps": read(r"upload speed:\s*(\d+)\s+bits/s"),
+        "minimum_latency_ms": read(r"minimum latency:\\s*(\\d+)\\s+ms"),
+        "maximum_latency_ms": read(r"maximum latency:\\s*(\\d+)\\s+ms"),
+        "download_bps": read(r"download speed:\\s*(\\d+)\\s+bits/s"),
+        "upload_bps": read(r"upload speed:\\s*(\\d+)\\s+bits/s"),
     }
-    if latency_ms is None:
-        matched = (
-            observed["minimum_latency_ms"] == 0 and observed["maximum_latency_ms"] == 0
-            and observed["download_bps"] == 0 and observed["upload_bps"] == 0
-        )
-    else:
-        matched = (
-            observed["minimum_latency_ms"] == latency_ms
-            and observed["maximum_latency_ms"] == latency_ms
-            and observed["download_bps"] == expected["download_bps"]
-            and observed["upload_bps"] == expected["upload_bps"]
-        )
+    expected_latency = 0 if latency_ms is None else latency_ms
+    matched = (
+        observed["minimum_latency_ms"] == expected_latency
+        and observed["maximum_latency_ms"] == expected_latency
+        and observed["download_bps"] == expected["download_bps"]
+        and observed["upload_bps"] == expected["upload_bps"]
+    )
     if not matched:
         raise RuntimeError(f"Network profile readback mismatch: expected={expected}, observed={observed}")
     return {"requested": expected, "observed": observed, "status": "verified"}
@@ -173,7 +176,10 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
         last_text = str(request("GET", f"/session/{session}/element/{element_id}/text", timeout=5).get("value", ""))
         match = PROBE_RE.fullmatch(last_text)
         if match and int(match.group(3)) > after_sequence:
-            return {"duration_ms": int(match.group(1)), "transport": match.group(2), "sequence": int(match.group(3))}
+            bytes_read = int(match.group(4))
+            if bytes_read != 2000000:
+                raise RuntimeError(f"Fixture downloaded unexpected payload size: {bytes_read}")
+            return {"duration_ms": int(match.group(1)), "transport": match.group(2), "sequence": int(match.group(3)), "bytes_read": bytes_read}
         if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
             raise RuntimeError(f"Fixture network probe failed: {last_text}")
         time.sleep(0.5)
