@@ -87,8 +87,7 @@ def main() -> int:
         raise RuntimeError(f"Appium did not return a session id: {created}")
     base = f"/session/{session_id}"
     try:
-        title_id = find_element(session_id, "-android uiautomator",
-            'new UiSelector().text("BharatSim Android smoke test")')
+        title_id = find_element(session_id, "accessibility id", "fixture-title")
         action_id = find_element(session_id, "accessibility id", "primary-action")
         request("POST", base + f"/element/{action_id}/click", {})
         status_id = find_element(session_id, "accessibility id", "journey-status")
