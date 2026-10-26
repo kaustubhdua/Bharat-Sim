@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small W3C WebDriver journey against the known-good BharatSim fixture app."""
+"""W3C WebDriver journey against the known-good BharatSim fixture app."""
 from __future__ import annotations
 
 import argparse
@@ -11,6 +11,7 @@ import urllib.request
 from pathlib import Path
 
 BASE = "http://127.0.0.1:4723"
+ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
 
 
 def request(method: str, path: str, payload: dict | None = None, timeout: int = 30) -> dict:
@@ -20,8 +21,12 @@ def request(method: str, path: str, payload: dict | None = None, timeout: int = 
         headers={"Content-Type": "application/json", "Accept": "application/json"},
         method=method,
     )
-    with urllib.request.urlopen(req, timeout=timeout) as response:
-        result = json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"WebDriver HTTP {exc.code} for {path}: {body}") from exc
     if isinstance(result, dict) and isinstance(result.get("value"), dict) and result["value"].get("error"):
         raise RuntimeError(f"WebDriver error: {result['value']}")
     return result
@@ -38,6 +43,22 @@ def wait_for_server() -> None:
             last_error = exc
             time.sleep(2)
     raise RuntimeError(f"Appium server did not become ready: {last_error}")
+
+
+def find_element(session: str, using: str, value: str, timeout: int = 25) -> str:
+    deadline = time.monotonic() + timeout
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        try:
+            result = request("POST", f"/session/{session}/element", {"using": using, "value": value})
+            element_id = result.get("value", {}).get(ELEMENT_KEY)
+            if element_id:
+                return element_id
+            last_error = RuntimeError(f"Element response lacked W3C element id: {result}")
+        except Exception as exc:
+            last_error = exc
+        time.sleep(1)
+    raise RuntimeError(f"Could not find element ({using}={value}) within {timeout}s: {last_error}")
 
 
 def main() -> int:
@@ -66,28 +87,14 @@ def main() -> int:
         raise RuntimeError(f"Appium did not return a session id: {created}")
     base = f"/session/{session_id}"
     try:
-        title = request("POST", base + "/element", {
-            "using": "-android uiautomator",
-            "value": 'new UiSelector().text("BharatSim Android smoke test")',
-        })
-        title_id = title.get("value", {}).get("element-6066-11e4-a52e-4f735466cecf")
-        if not title_id:
-            raise RuntimeError(f"Fixture title was not found: {title}")
-        action = request("POST", base + "/element", {
-            "using": "-android uiautomator",
-            "value": 'new UiSelector().text("Run primary action")',
-        })
-        action_id = action.get("value", {}).get("element-6066-11e4-a52e-4f735466cecf")
-        if not action_id:
-            raise RuntimeError(f"Primary action button was not found: {action}")
+        title_id = find_element(session_id, "-android uiautomator",
+            'new UiSelector().text("BharatSim Android smoke test")')
+        action_id = find_element(session_id, "accessibility id", "primary-action")
         request("POST", base + f"/element/{action_id}/click", {})
-        status = request("POST", base + "/element", {
-            "using": "-android uiautomator",
-            "value": 'new UiSelector().text("Primary action completed")',
-        })
-        status_id = status.get("value", {}).get("element-6066-11e4-a52e-4f735466cecf")
-        if not status_id:
-            raise RuntimeError(f"Primary action state assertion failed: {status}")
+        status_id = find_element(session_id, "accessibility id", "journey-status")
+        status_text = request("GET", base + f"/element/{status_id}/text").get("value")
+        if status_text != "Primary action completed":
+            raise RuntimeError(f"Primary action state assertion failed: {status_text!r}")
         screenshot = request("GET", base + "/screenshot")
         image_data = screenshot.get("value")
         if not isinstance(image_data, str) or not image_data:
@@ -100,13 +107,27 @@ def main() -> int:
             "package_name": "org.bharatsim.smokeapp",
             "assertions": [
                 "fixture title is visible",
-                "primary action button is visible",
-                "click changes status to Primary action completed",
+                "primary action is located by stable accessibility identifier",
+                "tap changes the status text to Primary action completed",
             ],
             "screenshot": str(screenshot_path),
         }
         (args.artifacts / "appium-journey.report.json").write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))
+    except Exception:
+        try:
+            (args.artifacts / "appium-page-source.xml").write_text(
+                str(request("GET", base + "/source").get("value", ""))
+            )
+        except Exception as source_error:
+            (args.artifacts / "appium-page-source-error.txt").write_text(str(source_error))
+        try:
+            image_data = request("GET", base + "/screenshot").get("value")
+            if image_data:
+                (args.artifacts / "appium-failure.png").write_bytes(base64.b64decode(image_data, validate=True))
+        except Exception as screenshot_error:
+            (args.artifacts / "appium-screenshot-error.txt").write_text(str(screenshot_error))
+        raise
     finally:
         try:
             request("DELETE", base, timeout=15)
