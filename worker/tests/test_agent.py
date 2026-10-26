@@ -1,7 +1,7 @@
 import unittest
 import urllib.request
 
-from worker.agent import NoRedirectHandler, WorkerError, annotate_execution_scope, redact_report_text, redact_sensitive_text, resolve_api_url
+from worker.agent import NoRedirectHandler, WorkerError, annotate_execution_scope, persona_network_cli_args, redact_report_text, redact_sensitive_text, resolve_api_url
 
 
 class ExecutionScopeTruthfulnessTests(unittest.TestCase):
@@ -69,6 +69,44 @@ class WorkerApiUrlSecurityTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(WorkerError):
                 resolve_api_url("https://api.example", path)
 
+
+
+class PersonaNetworkArgumentTests(unittest.TestCase):
+    def test_translates_persona_targets_to_runner_arguments(self):
+        args = persona_network_cli_args({
+            "persona_id": "edge-village",
+            "persona_profile": {
+                "latency_ms": 450,
+                "down_kbps": 256,
+                "up_kbps": 96,
+                "packet_loss_pct": 8,
+            },
+        })
+        self.assertEqual(args, [
+            "--network-latency-ms", "450",
+            "--network-down-kbps", "256",
+            "--network-up-kbps", "96",
+            "--network-loss-pct", "8.0",
+        ])
+
+    def test_missing_profile_preserves_legacy_job_compatibility(self):
+        self.assertEqual(persona_network_cli_args({"persona_id": "legacy"}), [])
+        self.assertEqual(persona_network_cli_args({"persona_profile": {}}), [])
+
+    def test_rejects_invalid_or_out_of_range_network_targets(self):
+        invalid_profiles = [
+            {"latency_ms": 2001, "down_kbps": 1000, "up_kbps": 1000, "packet_loss_pct": 0},
+            {"latency_ms": 10, "down_kbps": 0, "up_kbps": 1000, "packet_loss_pct": 0},
+            {"latency_ms": 10, "down_kbps": 1000, "up_kbps": 1000, "packet_loss_pct": 101},
+            {"latency_ms": "invalid", "down_kbps": 1000, "up_kbps": 1000, "packet_loss_pct": 0},
+        ]
+        for profile in invalid_profiles:
+            with self.subTest(profile=profile), self.assertRaises(WorkerError):
+                persona_network_cli_args({"persona_profile": profile})
+
+    def test_rejects_non_object_profile(self):
+        with self.assertRaises(WorkerError):
+            persona_network_cli_args({"persona_profile": "edge-village"})
 
 
 class WorkerEvidenceRedactionTests(unittest.TestCase):
