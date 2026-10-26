@@ -62,7 +62,8 @@ def apply_emulator_network_profile(
             "upload_kbps": up_kbps, "packet_loss_pct": packet_loss_pct,
         },
         "supported_controls": ["network_latency", "download_bandwidth", "upload_bandwidth"],
-        "unsupported_controls": (["packet_loss"] if packet_loss_pct > 0 else []),
+        "unsupported_controls": ["cpu_pressure", "ram_pressure", "storage_pressure", "battery_saver"]
+        + (["packet_loss"] if packet_loss_pct > 0 else []),
         "traffic_path_verified": False,
         "note": (
             "Emulator console status verifies the emulator control plane only; it does not prove "
