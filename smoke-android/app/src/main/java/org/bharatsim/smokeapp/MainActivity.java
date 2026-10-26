@@ -77,7 +77,7 @@ public final class MainActivity extends Activity {
 
     private void performNetworkProbe(TextView target, int sequence) {
         String transport = activeTransport();
-        for (int attempt = 1; attempt <= 2; attempt++) {
+        for (int attempt = 1; attempt <= 4; attempt++) {
             long started = SystemClock.elapsedRealtime();
             int statusCode = -1;
             int bytesRead = 0;
@@ -110,15 +110,24 @@ public final class MainActivity extends Activity {
                         + " transport=" + transport + " probe=" + sequence
                         + " bytes_read=" + bytesRead + " attempts=" + attempt);
                 final String message = "HTTP 200 · " + duration + " ms · " + transport
-                        + " · probe " + sequence + " · bytes " + bytesRead;
+                        + " · probe " + sequence + " · bytes " + bytesRead + " · attempts " + attempt;
                 runOnUiThread(() -> target.setText(message));
                 return;
             } catch (Exception exception) {
-                // Public endpoints can transiently time out. Retry one I/O failure,
-                // but never hide a malformed payload or report a failed request as success.
-                if (exception instanceof java.io.IOException && attempt < 2) {
+                // Public DNS and routing can briefly fail in hosted CI. Retry bounded I/O
+                // failures with backoff; keep attempt counts in logcat and UI evidence.
+                // Malformed payloads are not retried, and a final failure is never a success.
+                if (exception instanceof java.io.IOException && attempt < 4) {
                     Log.w(TAG, "BHARATSIM_NETWORK_PROBE retrying sequence=" + sequence
-                            + " after=" + exception.getClass().getSimpleName(), exception);
+                            + " attempt=" + attempt + " after=" + exception.getClass().getSimpleName(), exception);
+                    try {
+                        Thread.sleep(attempt * 1000L);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        Log.e(TAG, "BHARATSIM_NETWORK_PROBE interrupted sequence=" + sequence, interrupted);
+                        runOnUiThread(() -> target.setText("Network probe failed: InterruptedException"));
+                        return;
+                    }
                     continue;
                 }
                 Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport
