@@ -345,7 +345,7 @@ def main() -> int:
             "assertions": [
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe transferred exactly 250,000 bytes from the public IPv4-only PLUTEX HTTPS test file through the Android Emulator network stack",
+                "each probe transferred exactly 250,000 bytes from the controlled CI-host payload through the Android Emulator network stack",
                 "per-request retry counts are captured in probe evidence",
                 "baseline, latency-only, and bandwidth-only probes used cellular/Ethernet transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
