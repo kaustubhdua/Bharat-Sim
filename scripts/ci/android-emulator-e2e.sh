@@ -26,85 +26,13 @@ export BHARATSIM_DATA_DIR="$RUNNER_TEMP/bharatsim-api-data"
 
 mkdir -p artifacts
 
-# Serve a bounded, deterministic payload on the CI host. The Android Emulator
-# reaches the host via 10.0.2.2; emulator console shaping then affects actual
-# bytes transferred through the emulator network stack without relying on an
-# external CDN, DNS, IPv6 routing, or remote range-request behavior.
-cat > artifacts/probe_server.py <<'PYPROBE'
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
-
-MAX_BYTES = 250_000
-
-class ProbeHandler(BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"
-
-    def do_GET(self):
-        parsed = urlparse(self.path)
-        if parsed.path != "/payload":
-            self.send_error(404)
-            return
-        try:
-            size = int(parse_qs(parsed.query).get("bytes", [str(MAX_BYTES)])[0])
-        except (TypeError, ValueError):
-            self.send_error(400, "invalid bytes parameter")
-            return
-        if size < 1 or size > MAX_BYTES:
-            self.send_error(400, "bytes must be between 1 and 250000")
-            return
-        # Deterministic fixture bytes, generated at request time; these are
-        # test payload bytes, not customer data or a synthetic test result.
-        payload = bytes(i % 251 for i in range(size))
-        range_header = self.headers.get("Range", "")
-        if range_header:
-            try:
-                unit, spec = range_header.split("=", 1)
-                first, last = spec.split("-", 1)
-                start = int(first or 0)
-                end = min(int(last) if last else size - 1, size - 1)
-                if unit != "bytes" or start < 0 or end < start or start >= size:
-                    raise ValueError("invalid range")
-            except (ValueError, TypeError):
-                self.send_error(416, "invalid byte range")
-                return
-            body = payload[start:end + 1]
-            self.send_response(206)
-            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
-        else:
-            body = payload
-            self.send_response(200)
-        self.send_header("Content-Type", "application/octet-stream")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(body)
-        self.close_connection = True
-
-    def log_message(self, fmt, *args):
-        print("%s - %s" % (self.address_string(), fmt % args), flush=True)
-
-ThreadingHTTPServer(("0.0.0.0", 8001), ProbeHandler).serve_forever()
-PYPROBE
-python -u artifacts/probe_server.py > artifacts/probe-server.log 2>&1 &
-PROBE_PID=$!
-for attempt in $(seq 1 30); do
-  if curl --fail --silent --show-error --range 0-249999 -o /dev/null \
-      "http://127.0.0.1:8001/payload?bytes=250000"; then
-    break
-  fi
-  if [ "$attempt" -eq 30 ]; then
-    cat artifacts/probe-server.log >&2 || true
-    echo "Controlled emulator probe server did not start" >&2
-    exit 1
-  fi
-  sleep 1
-done
+# The Android fixture uses a real public HTTPS payload endpoint. DNS is configured
+# by the emulator workflow; a remote endpoint is required to verify the emulator's
+# actual routed traffic shaping rather than only local host-alias traffic.
 (cd backend && exec uvicorn app.main:app --host 0.0.0.0 --port 8000) > artifacts/api.log 2>&1 &
 API_PID=$!
 WORKER_PID=
 APPIUM_PID=
-PROBE_PID=$PROBE_PID
 cleanup() {
   # Always restore network controls, even when Appium assertions fail.
   adb -s emulator-5554 emu network delay none >/dev/null 2>&1 || true
@@ -112,7 +40,6 @@ cleanup() {
   adb -s emulator-5554 shell svc wifi enable >/dev/null 2>&1 || true
   adb -s emulator-5554 shell svc data enable >/dev/null 2>&1 || true
   [ -z "$APPIUM_PID" ] || kill "$APPIUM_PID" 2>/dev/null || true
-  [ -z "$PROBE_PID" ] || kill "$PROBE_PID" 2>/dev/null || true
   [ -z "$WORKER_PID" ] || kill "$WORKER_PID" 2>/dev/null || true
   [ -z "$API_PID" ] || kill "$API_PID" 2>/dev/null || true
 }
