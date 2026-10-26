@@ -66,9 +66,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
+      - name: Resolve public probe IPv4 on the host runner
+        shell: bash
+        run: |
+          PROBE_IP="$(getent ahostsv4 example.com | awk 'NR == 1 { print $1; exit }')"
+          python - "$PROBE_IP" <<'PY'
+          import ipaddress, sys
+          address = ipaddress.ip_address(sys.argv[1])
+          if address.version != 4 or address.is_private or address.is_loopback or address.is_link_local:
+              raise SystemExit(f"Expected a public IPv4 endpoint, got {address}")
+          print(f"Pinned public probe endpoint: {address}")
+          PY
+          echo "BHARATSIM_PROBE_IP=$PROBE_IP" >> "$GITHUB_ENV"
       - name: Build known-good test APK
         working-directory: smoke-android
-        run: gradle --no-daemon assembleDebug
+        run: gradle --no-daemon -PprobeIp="$BHARATSIM_PROBE_IP" assembleDebug
       - name: Add Android build-tools to PATH
         shell: bash
         run: |
@@ -90,8 +102,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          # Explicit DNS keeps external HTTPS probes resolvable when the fixture switches to simulated cellular data.
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -dns-server 8.8.8.8,8.8.4.4
+          # The fixture pins a public IPv4 endpoint resolved by the host runner, so guest DNS is not a dependency.
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           script: bash scripts/ci/android-emulator-e2e.sh
       - name: Preserve emulator smoke evidence
         if: always()
