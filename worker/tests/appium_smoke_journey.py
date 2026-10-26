@@ -275,6 +275,15 @@ def main() -> int:
         baseline_probes, last_sequence = take_samples("baseline", last_sequence)
         evidence["baseline_probes"] = baseline_probes
 
+        # Test bandwidth immediately after baseline to isolate whether the
+        # speed control itself breaks the next real HTTPS transfer.
+        phase = "configure_bandwidth_profile"
+        bandwidth_profile = set_network_profile(None, "10000:10000")
+        evidence["bandwidth_profile"] = bandwidth_profile
+        phase = "bandwidth_samples"
+        bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
+        evidence["bandwidth_probes"] = bandwidth_probes
+
         # Isolate latency from throughput: full bandwidth, fixed 150 ms delay.
         phase = "configure_latency_profile"
         latency_profile = set_network_profile(150, "full")
@@ -282,14 +291,6 @@ def main() -> int:
         phase = "latency_samples"
         latency_probes, last_sequence = take_samples("latency-only", last_sequence)
         evidence["latency_probes"] = latency_probes
-
-        # Isolate bandwidth from latency: no delay, 10 Mbps upload/download.
-        phase = "configure_bandwidth_profile"
-        bandwidth_profile = set_network_profile(None, "10000:10000")
-        evidence["bandwidth_profile"] = bandwidth_profile
-        phase = "bandwidth_samples"
-        bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
-        evidence["bandwidth_probes"] = bandwidth_probes
 
         baseline_median_ms = statistics.median(p["duration_ms"] for p in baseline_probes)
         latency_median_ms = statistics.median(p["duration_ms"] for p in latency_probes)
