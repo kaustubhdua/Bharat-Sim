@@ -94,11 +94,15 @@ assert result.get("constraints_applied") is False, result
 network_profile = result.get("network_profile") or {}
 assert network_profile.get("control_plane", {}).get("status") == "verified", network_profile
 assert network_profile.get("network_constraints_applied") is True, network_profile
-# The worker smoke report verifies emulator control-plane settings and reset.
-# App traffic-path verification is performed separately below, while the
-# profile is active and the fixture makes a real HTTP request.
-assert network_profile.get("traffic_path_verified") is False, network_profile
-assert str(result.get("constraint_verification", "")).startswith("partial_network_control_verified"), result
+# The worker report may claim traffic-path verification only if its own
+# logcat probe observed the required transport and latency. Otherwise it must
+# remain explicitly partial; the separate Appium journey below verifies a
+# real request while a fresh profile is active.
+if network_profile.get("traffic_path_verified") is True:
+    assert str(result.get("constraint_verification", "")).startswith("fixture_network_path_verified"), result
+else:
+    assert network_profile.get("traffic_path_verified") is False, network_profile
+    assert str(result.get("constraint_verification", "")).startswith("partial_network_control_verified"), result
 assert network_profile.get("reset", {}).get("status") == "verified", network_profile
 for step_name in ("install_apk", "launch_app", "collect_logcat"):
     step = next((s for s in result.get("steps", []) if s.get("name") == step_name), None)
