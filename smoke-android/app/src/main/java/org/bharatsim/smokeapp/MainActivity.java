@@ -109,7 +109,7 @@ public final class MainActivity extends Activity {
             String statusLine = reader.readLine();
             if (statusLine != null) {
                 java.util.regex.Matcher matcher = java.util.regex.Pattern
-                        .compile("^HTTP/1\\\\.[01] (\\\\d{3})(?:\\\\s.*)?$")
+                        .compile("^HTTP/1\\.[01] (\\d{3})(?:\\s.*)?$")
                         .matcher(statusLine);
                 if (matcher.matches()) statusCode = Integer.parseInt(matcher.group(1));
             }
