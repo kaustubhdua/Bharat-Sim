@@ -140,6 +140,10 @@ def reset_emulator_network_profile(serial: str) -> dict[str, object]:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("apk", type=Path)
     parser.add_argument("--duration", type=int, default=20, help="seconds to observe the launched app (1–120)")
+    parser.add_argument("--network-latency-ms", type=int)
+    parser.add_argument("--network-down-kbps", type=int)
+    parser.add_argument("--network-up-kbps", type=int)
+    parser.add_argument("--network-loss-pct", type=float, default=0.0)
     parser.add_argument("--out", type=Path, default=Path("artifacts"))
     args = parser.parse_args()
 
@@ -150,6 +154,17 @@ def reset_emulator_network_profile(serial: str) -> dict[str, object]:
         parser.error("ANDROID_SERIAL must explicitly identify the disposable test device")
     if not 1 <= args.duration <= 120:
         parser.error("--duration must be between 1 and 120 seconds")
+    network_values = (args.network_latency_ms, args.network_down_kbps, args.network_up_kbps)
+    if any(value is not None for value in network_values) and any(value is None for value in network_values):
+        parser.error("network profile requires latency, download and upload values together")
+    if args.network_latency_ms is not None and not 0 <= args.network_latency_ms <= 2000:
+        parser.error("--network-latency-ms must be between 0 and 2000")
+    if args.network_down_kbps is not None and not 1 <= args.network_down_kbps <= 1_000_000:
+        parser.error("--network-down-kbps must be between 1 and 1000000")
+    if args.network_up_kbps is not None and not 1 <= args.network_up_kbps <= 1_000_000:
+        parser.error("--network-up-kbps must be between 1 and 1000000")
+    if not 0 <= args.network_loss_pct <= 100:
+        parser.error("--network-loss-pct must be between 0 and 100")
     apk = args.apk.resolve()
     if not apk.is_file() or apk.suffix.lower() != ".apk":
         parser.error("APK path must be an existing .apk file")
@@ -192,6 +207,9 @@ def reset_emulator_network_profile(serial: str) -> dict[str, object]:
         "apk_sha256": digest,
         "device_serial": serial,
         "status": "failed",
+        "network_profile": None,
+        "constraints_applied": False,
+        "constraint_verification": "unsupported_not_applied",
         "steps": [],
         "limitations": [
             "Smoke test only; no app-specific interaction flow is automated.",
@@ -226,6 +244,17 @@ def reset_emulator_network_profile(serial: str) -> dict[str, object]:
         if not valid_package_name(package_name):
             raise RuntimeError("APK contains an invalid Android package name")
         report["package_name"] = package_name
+
+        if args.network_latency_ms is not None:
+            report["network_profile"] = apply_emulator_network_profile(
+                serial, args.network_latency_ms, args.network_down_kbps,
+                args.network_up_kbps, args.network_loss_pct
+            )
+            if report["network_profile"].get("network_constraints_applied"):
+                report["constraint_verification"] = (
+                    "partial_network_control_verified; active app traffic path and resource constraints unverified"
+                )
+
 
         t = time.monotonic()
         clear = run_cmd(["adb", "-s", serial, "logcat", "-c"], timeout=10)
@@ -273,6 +302,15 @@ def reset_emulator_network_profile(serial: str) -> dict[str, object]:
         record("cleanup_uninstall", uninstall, time.monotonic() - t)
         if uninstall.returncode != 0 and "Unknown package" not in (uninstall.stdout + uninstall.stderr):
             report["cleanup_warning"] = "Could not uninstall the test package; reset or discard this emulator before another job."
+            if report["status"] == "completed":
+                report["status"] = "failed"
+                report["error"] = report["cleanup_warning"]
+    if args.network_latency_ms is not None and re.fullmatch(r"emulator-\d+", serial):
+        reset_evidence = reset_emulator_network_profile(serial)
+        if isinstance(report.get("network_profile"), dict):
+            report["network_profile"]["reset"] = reset_evidence
+        if reset_evidence.get("status") != "verified":
+            report["cleanup_warning"] = "Could not verify restoration of emulator network settings; discard or reset this emulator before reuse."
             if report["status"] == "completed":
                 report["status"] = "failed"
                 report["error"] = report["cleanup_warning"]
