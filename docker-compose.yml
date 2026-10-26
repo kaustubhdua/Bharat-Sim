@@ -34,6 +34,9 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+    environment:
+      BHARATSIM_API_KEY: ${BHARATSIM_API_KEY:-}
+      NGINX_ENVSUBST_FILTER: ^BHARATSIM_API_KEY$
     ports:
       - "127.0.0.1:${BHARATSIM_PORT:-8080}:80"
     depends_on:
