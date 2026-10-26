@@ -192,10 +192,8 @@ def main() -> int:
     args = parser.parse_args()
     args.artifacts.mkdir(parents=True, exist_ok=True)
     session_id = None
-    page_source = ""
     try:
-        # Establish an unshaped baseline on cellular before the controlled run.
-        baseline_profile = set_network_profile(None)
+        baseline_profile = set_network_profile(None, "full")
         wait_for_server()
         created = request("POST", "/session", {
             "capabilities": {
@@ -221,57 +219,63 @@ def main() -> int:
         action_id = find_element(session_id, "accessibility id", "primary-action")
         status_id = find_element(session_id, "accessibility id", "journey-status")
         probe_id = find_element(session_id, "accessibility id", "network-probe-status")
-
         status_text = request("GET", base + f"/element/{status_id}/text").get("value")
         if status_text != "Ready":
             raise RuntimeError(f"Fixture did not start in the expected Ready state: {status_text!r}")
 
-        # Warm up DNS/TLS once; exclude this cold-start request from timing.
+        def take_samples(label: str, previous_sequence: int) -> tuple[list[dict], int]:
+            samples = []
+            last_sequence = previous_sequence
+            for _ in range(3):
+                request("POST", base + f"/element/{action_id}/click", {})
+                status = request("GET", base + f"/element/{status_id}/text").get("value")
+                if status != "Primary action completed":
+                    raise RuntimeError(f"Primary action state assertion failed during {label}: {status!r}")
+                probe = wait_for_probe(session_id, probe_id, after_sequence=last_sequence)
+                if probe["transport"] not in ("CELLULAR", "ETHERNET"):
+                    raise RuntimeError(f"{label} request used unsupported transport: {probe}")
+                samples.append(probe)
+                last_sequence = probe["sequence"]
+            return samples, last_sequence
+
+        # Exclude one cold-start download from all timing comparisons.
         request("POST", base + f"/element/{action_id}/click", {})
         warmup_probe = wait_for_probe(session_id, probe_id, after_sequence=0)
         if warmup_probe["transport"] not in ("CELLULAR", "ETHERNET"):
             raise RuntimeError(f"Warm-up request used unsupported transport: {warmup_probe}")
-
-        baseline_probes = []
         last_sequence = warmup_probe["sequence"]
-        for _ in range(3):
-            request("POST", base + f"/element/{action_id}/click", {})
-            status_text = request("GET", base + f"/element/{status_id}/text").get("value")
-            if status_text != "Primary action completed":
-                raise RuntimeError(f"Primary action state assertion failed: {status_text!r}")
-            probe = wait_for_probe(session_id, probe_id, after_sequence=last_sequence)
-            if probe["transport"] not in ("CELLULAR", "ETHERNET"):
-                raise RuntimeError(f"Baseline request used unsupported transport: {probe}")
-            baseline_probes.append(probe)
-            last_sequence = probe["sequence"]
 
-        # Use repeated requests and compare medians so unrelated jitter in one
-        # HTTP request cannot masquerade as a verified network impairment.
-        shaped_profile = set_network_profile(150)
-        shaped_probes = []
-        for _ in range(3):
-            request("POST", base + f"/element/{action_id}/click", {})
-            probe = wait_for_probe(session_id, probe_id, after_sequence=last_sequence)
-            if probe["transport"] not in ("CELLULAR", "ETHERNET"):
-                raise RuntimeError(f"Shaped request used unsupported transport: {probe}")
-            shaped_probes.append(probe)
-            last_sequence = probe["sequence"]
+        baseline_probes, last_sequence = take_samples("baseline", last_sequence)
+
+        # Isolate latency from throughput: full bandwidth, fixed 150 ms delay.
+        latency_profile = set_network_profile(150, "full")
+        latency_probes, last_sequence = take_samples("latency-only", last_sequence)
+
+        # Isolate bandwidth from latency: no delay, 3 Mbps upload/download.
+        bandwidth_profile = set_network_profile(None, "3000:3000")
+        bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
 
         baseline_median_ms = statistics.median(p["duration_ms"] for p in baseline_probes)
-        shaped_median_ms = statistics.median(p["duration_ms"] for p in shaped_probes)
-        delta_ms = shaped_median_ms - baseline_median_ms
-        # Require a repeatable effect above ordinary timing noise, but do not
-        # require the measured HTTP duration delta to equal the emulator console
-        # delay exactly: request timing also includes endpoint/network variance.
-        # Three-sample medians plus a 50 ms minimum make this an observed effect,
-        # not a claim that the full configured delay is visible in app timing.
-        minimum_observed_delta_ms = 50
-        if delta_ms < minimum_observed_delta_ms:
+        latency_median_ms = statistics.median(p["duration_ms"] for p in latency_probes)
+        bandwidth_median_ms = statistics.median(p["duration_ms"] for p in bandwidth_probes)
+        latency_delta_ms = latency_median_ms - baseline_median_ms
+        bandwidth_delta_ms = bandwidth_median_ms - baseline_median_ms
+        minimum_latency_delta_ms = 50
+        minimum_bandwidth_delta_ms = 500
+
+        if latency_delta_ms < minimum_latency_delta_ms:
             raise RuntimeError(
-                "Emulator delay was configured but not causally observed in repeated fixture requests: "
-                f"baseline={baseline_probes}, shaped={shaped_probes}, "
-                f"baseline_median_ms={baseline_median_ms}, shaped_median_ms={shaped_median_ms}, "
-                f"delta_ms={delta_ms}, minimum_required_delta_ms={minimum_observed_delta_ms}"
+                "Configured latency was not observed in repeated fixture downloads: "
+                f"baseline={baseline_probes}, latency_only={latency_probes}, "
+                f"baseline_median_ms={baseline_median_ms}, latency_median_ms={latency_median_ms}, "
+                f"delta_ms={latency_delta_ms}, minimum_required_delta_ms={minimum_latency_delta_ms}"
+            )
+        if bandwidth_delta_ms < minimum_bandwidth_delta_ms:
+            raise RuntimeError(
+                "Configured bandwidth cap was not observed in repeated fixture downloads: "
+                f"baseline={baseline_probes}, bandwidth_only={bandwidth_probes}, "
+                f"baseline_median_ms={baseline_median_ms}, bandwidth_median_ms={bandwidth_median_ms}, "
+                f"delta_ms={bandwidth_delta_ms}, minimum_required_delta_ms={minimum_bandwidth_delta_ms}"
             )
 
         reset_evidence = reset_network()
@@ -287,25 +291,33 @@ def main() -> int:
         report = {
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
+            "probe_endpoint": "https://speed.cloudflare.com/__down?bytes=2000000",
+            "probe_payload_bytes": 2000000,
             "assertions": [
                 "fixture title is visible",
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "baseline and shaped requests return real HTTP 200 responses from the local API health endpoint via 10.0.2.2:8000",
-                "both requests use cellular/Ethernet transport to reach the controlled local API endpoint",
-                "emulator network console readback matches the configured profile",
-                "one cold-start warm-up was excluded, then three baseline and three shaped requests were measured on the same cellular/Ethernet transport",
-                "median shaped request is at least 50ms slower than median baseline (minimum signal threshold; not an exact-delay claim)",
+                "each probe downloaded exactly 2,000,000 bytes from the real public endpoint",
+                "baseline, latency-only, and bandwidth-only probes used cellular/Ethernet transport",
+                "latency-only median duration exceeded baseline by at least 50 ms",
+                "bandwidth-only median duration exceeded baseline by at least 500 ms",
+                "emulator network console readback matched each requested profile",
+                "emulator network settings were reset and read back at defaults",
             ],
             "baseline_profile": baseline_profile,
-            "shaped_profile": shaped_profile,
+            "latency_profile": latency_profile,
+            "bandwidth_profile": bandwidth_profile,
             "warmup_probe": warmup_probe,
             "baseline_probes": baseline_probes,
-            "shaped_probes": shaped_probes,
+            "latency_probes": latency_probes,
+            "bandwidth_probes": bandwidth_probes,
             "baseline_median_ms": baseline_median_ms,
-            "shaped_median_ms": shaped_median_ms,
-            "observed_delta_ms": delta_ms,
-            "minimum_required_delta_ms": minimum_observed_delta_ms,
+            "latency_median_ms": latency_median_ms,
+            "bandwidth_median_ms": bandwidth_median_ms,
+            "observed_latency_delta_ms": latency_delta_ms,
+            "observed_bandwidth_delta_ms": bandwidth_delta_ms,
+            "minimum_required_latency_delta_ms": minimum_latency_delta_ms,
+            "minimum_required_bandwidth_delta_ms": minimum_bandwidth_delta_ms,
             "traffic_path_verified": True,
             "reset_profile": reset_evidence,
             "screenshot": str(screenshot_path),
