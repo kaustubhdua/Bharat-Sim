@@ -96,7 +96,7 @@ public final class MainActivity extends Activity {
         for (int attempt = 1; attempt <= 4; attempt++) {
             long started = SystemClock.elapsedRealtime();
             try {
-                ProbeResult result = performPinnedHttpsProbe(PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES);
+                ProbeResult result = performPinnedHttpsProbe(PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started);
                 long duration = SystemClock.elapsedRealtime() - started;
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + result.statusCode + " duration_ms=" + duration
                         + " transport=" + transport + " probe=" + sequence
@@ -129,7 +129,7 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private static ProbeResult performPinnedHttpsProbe(String urlText, String pinnedIp, int expectedBytes) throws IOException {
+    private static ProbeResult performPinnedHttpsProbe(String urlText, String pinnedIp, int expectedBytes, long startedAt) throws IOException {
         URL url = new URL(urlText);
         if (!"https".equalsIgnoreCase(url.getProtocol()) || pinnedIp.equals("0.0.0.0")) {
             throw new IOException("HTTPS probe URL and pinned IPv4 address are required");
@@ -140,12 +140,14 @@ public final class MainActivity extends Activity {
 
         // Connect to the CI-resolved numeric IP directly. Layer TLS using the
         // hostname so SNI and the normal certificate hostname verifier remain active.
+        Log.i(TAG, "BHARATSIM_NETWORK_PROBE request_started endpoint_host=" + host + " endpoint_ip=" + pinnedIp);
         try (Socket raw = new Socket()) {
             raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), 5000);
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
                 tls.setSoTimeout(30000);
                 tls.startHandshake();
+                Log.i(TAG, "BHARATSIM_NETWORK_PROBE tls_handshake_completed endpoint_host=" + host);
                 if (!HttpsURLConnection.getDefaultHostnameVerifier().verify(host, tls.getSession())) {
                     throw new SSLPeerUnverifiedException("TLS certificate does not match " + host);
                 }
@@ -176,6 +178,7 @@ public final class MainActivity extends Activity {
                     throw new IOException("Unexpected HTTP status " + statusCode);
                 }
 
+                Log.i(TAG, "BHARATSIM_NETWORK_PROBE response_headers_received status=HTTP_" + statusCode);
                 Map<String, String> headers = new HashMap<>();
                 String headerLine;
                 while (!(headerLine = readHttpLine(input)).isEmpty()) {
@@ -197,8 +200,8 @@ public final class MainActivity extends Activity {
                     }
                 }
                 int bytesRead = transferEncoding.contains("chunked")
-                        ? readChunkedBody(input, expectedBytes)
-                        : readFixedBody(input, expectedBytes);
+                        ? readChunkedBody(input, expectedBytes, startedAt)
+                        : readFixedBody(input, expectedBytes, startedAt);
                 if (bytesRead != expectedBytes) {
                     throw new IOException("Expected " + expectedBytes + " probe bytes, received " + bytesRead);
                 }
@@ -207,18 +210,19 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private static int readFixedBody(InputStream input, int expectedBytes) throws IOException {
+    private static int readFixedBody(InputStream input, int expectedBytes, long startedAt) throws IOException {
         byte[] buffer = new byte[8192];
         int total = 0;
         while (total < expectedBytes) {
             int count = input.read(buffer, 0, Math.min(buffer.length, expectedBytes - total));
             if (count < 0) break;
             total += count;
+            logTransferProgress(total, expectedBytes, startedAt);
         }
         return total;
     }
 
-    private static int readChunkedBody(InputStream input, int expectedBytes) throws IOException {
+    private static int readChunkedBody(InputStream input, int expectedBytes, long startedAt) throws IOException {
         int total = 0;
         byte[] buffer = new byte[8192];
         while (total < expectedBytes) {
@@ -243,12 +247,22 @@ public final class MainActivity extends Activity {
                 chunkRead += count;
             }
             total += chunkRead;
+            logTransferProgress(total, expectedBytes, startedAt);
             if (chunkRead < chunkSize || total == expectedBytes) break;
             if (!readHttpLine(input).isEmpty()) {
                 throw new IOException("Malformed HTTP chunk terminator");
             }
         }
         return total;
+    }
+
+    private static void logTransferProgress(int bytesRead, int expectedBytes, long startedAt) {
+        if (bytesRead < expectedBytes && bytesRead % 250_000 >= 8192) return;
+        long elapsedMs = Math.max(1, SystemClock.elapsedRealtime() - startedAt);
+        long bytesPerSecond = (long) bytesRead * 1000 / elapsedMs;
+        Log.i(TAG, "BHARATSIM_NETWORK_PROBE transfer_progress bytes_read=" + bytesRead
+                + " expected_bytes=" + expectedBytes + " elapsed_ms=" + elapsedMs
+                + " throughput_bytes_per_second=" + bytesPerSecond);
     }
 
     private static String readHttpLine(InputStream input) throws IOException {
