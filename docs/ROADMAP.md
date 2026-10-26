@@ -14,7 +14,8 @@
 - [x] Backend API/security/worker protocol tests, frontend production build CI, and worker guard/compile checks.
 - [x] Local Docker Compose stack for API + dashboard, loopback-only port binding, persistent data volume, health checks, and container-build CI.
 - [x] Security model, worker setup, open-source references, and explicit feature/limitation documentation.
-- [x] Network shaper apply parses and compares `tc`-reported delay, jitter, loss and rate settings; end-to-end traffic-path validation remains open.
+- [x] Network shaper apply parses and compares `tc`-reported delay, jitter, loss and rate settings.
+- [x] CI creates a disposable Linux network namespace and veth pair, measures actual ping RTT before and after shaping, requires the configured delay to be observable, and verifies qdisc cleanup. This proves the Linux prototype on that veth only.
 - [x] Add a separate CI workflow that boots an Android emulator, starts a local API and authenticated worker, verifies upload → queue → ADB execution → result callback → persisted report, then checks an Appium primary-action journey with a screenshot artifact.
 
 ## Remaining before calling execution fully functional
@@ -32,7 +33,7 @@
 
 - [x] Implement and pass the Appium/UiAutomator2 fixture journey with explicit steps, assertions, screenshots, and repeatable checkpoints.
 - [ ] Add app-specific journey authoring, broader assertions, and error-state coverage for arbitrary uploaded applications.
-- [ ] Wire network profiles to an isolated emulator traffic path and verify actual traffic traverses the shaper.
+- [ ] Wire network profiles to an isolated Android-emulator traffic path and verify actual emulator requests traverse the shaper. The current CI measurement proves only a dedicated Linux veth path, not emulator routing.
 - [ ] Run baseline, latency, bandwidth, packet-loss, outage, and recovery experiments; record requested vs verified conditions. The current runner now explicitly reports `constraints_applied=false` rather than implying persona constraints were enforced.
 - [ ] Add supported RAM/storage/CPU pressure controls or report those constraints as unsupported.
 - [ ] Validate at least one low-cost physical Android device before making real-device fidelity claims.
