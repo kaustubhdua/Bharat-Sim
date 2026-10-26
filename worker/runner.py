@@ -136,7 +136,8 @@ def reset_emulator_network_profile(serial: str) -> dict[str, object]:
         "commands_return_codes": [delay.returncode, speed.returncode, status_result.returncode],
     }
 
-\ndef main() -> int:
+
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("apk", type=Path)
     parser.add_argument("--duration", type=int, default=20, help="seconds to observe the launched app (1–120)")
