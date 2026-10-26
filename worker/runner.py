@@ -145,7 +145,7 @@ def parse_fixture_network_probe(log_text: str) -> dict[str, object] | None:
     )
     if not match:
         return None
-    return {"http_status": 200, "duration_ms": int(match.group(1)), "transport": match.group(2)}
+    return {"http_status": int(match.group(1)), "duration_ms": int(match.group(2)), "transport": match.group(3)}
 
 
 
