@@ -363,7 +363,7 @@ def main() -> int:
         report["fatal_exception_marker"] = bool(re.search(r"FATAL EXCEPTION|Fatal signal|SIGSEGV", logs.stdout, re.I))
         log_signals = extract_logcat_signals(logs.stdout)
         report["log_signals"] = log_signals
-        report["log_signals_truncated"] = len(log_signals) >= 20
+        report["log_signals_may_be_truncated"] = len(log_signals) >= 20
         report["anr_marker"] = any(item["category"] == "anr" for item in log_signals)
         report["oom_marker"] = any(item["category"] == "oom" for item in log_signals)
         report["network_failure_marker"] = any(item["category"] == "network" for item in log_signals)
