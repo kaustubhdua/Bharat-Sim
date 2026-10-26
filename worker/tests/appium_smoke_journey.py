@@ -50,13 +50,12 @@ def adb(*args: str, timeout: int = 20) -> str:
 
 def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
     """Configure emulator latency and throughput, then require exact console readback."""
-    # The fixture downloads a controlled-size payload from a CI-only API endpoint
-    # reached through the runner host-interface IP. Keep the active transport and
-    # measured effect separate from emulator console profile readback.
-    adb("emu", "gsm", "voice", "home")
-    adb("emu", "gsm", "data", "home")
+    # Use the emulator Ethernet path: the console shaping controls apply to Ethernet
+    # and cellular, but cellular DNS was intermittent in hosted CI. Disable Wi-Fi and
+    # cellular data so the external HTTPS request uses Ethernet, then verify transport.
     adb("shell", "svc", "wifi", "disable")
-    adb("shell", "svc", "data", "enable")
+    adb("emu", "gsm", "data", "off")
+    adb("shell", "svc", "data", "disable")
     latency = "none" if latency_ms is None else str(latency_ms)
     adb("emu", "network", "delay", latency)
     adb("emu", "network", "speed", speed)
@@ -169,7 +168,7 @@ def find_element(session: str, using: str, value: str, timeout: int = 25) -> str
     raise RuntimeError(f"Could not find element ({using}={value}) within {timeout}s: {last_error}")
 
 
-def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 25) -> dict:
+def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 100) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
@@ -291,13 +290,13 @@ def main() -> int:
         report = {
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
-            "probe_endpoint": "CI-only API payload endpoint via host network-interface IP",
+            "probe_endpoint": "https://speed.cloudflare.com/__down?bytes=2000000",
             "probe_payload_bytes": 2000000,
             "assertions": [
                 "fixture title is visible",
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe downloaded exactly 2,000,000 bytes from the real HTTP response served by the CI-only API endpoint",
+                "each probe downloaded exactly 2,000,000 bytes from the real public HTTPS response",
                 "baseline, latency-only, and bandwidth-only probes used cellular/Ethernet transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
                 "bandwidth-only median duration exceeded baseline by at least 500 ms",
