@@ -95,10 +95,16 @@ public final class MainActivity extends Activity {
                 if (statusCode != 200) {
                     throw new java.io.IOException("Unexpected HTTP status " + statusCode);
                 }
+                // Read exactly the requested bounded payload. Do not wait for
+                // server EOF after the byte count is satisfied: some CDN/proxy
+                // responses can keep a connection alive after delivering the
+                // requested range, especially while bandwidth is constrained.
                 try (java.io.InputStream input = connection.getInputStream()) {
                     byte[] buffer = new byte[8192];
-                    int count;
-                    while ((count = input.read(buffer)) != -1) {
+                    while (bytesRead < 2000000) {
+                        int wanted = Math.min(buffer.length, 2000000 - bytesRead);
+                        int count = input.read(buffer, 0, wanted);
+                        if (count == -1) break;
                         bytesRead += count;
                     }
                 }
