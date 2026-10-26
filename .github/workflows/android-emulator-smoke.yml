@@ -136,8 +136,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          # Android Emulator troubleshooting documents these Google IPv6/IPv4 resolvers for DNS failures.
-          # If hosted-runner egress blocks them, the real traffic test must fail rather than claim success.
+          # Use the verified non-loopback upstream resolver from the hosted runner for emulator DNS.
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -dns-server ${{ steps.runner-dns.outputs.server }}
           script: bash scripts/ci/android-emulator-e2e.sh
       - name: Preserve emulator smoke evidence
