@@ -127,7 +127,10 @@ def annotate_execution_scope(report: dict[str, Any], job: dict[str, Any]) -> Non
         )
     else:
         report["network_constraints_applied"] = False
-        report["constraint_verification"] = "network_control_unverified_or_unsupported"
+        report["constraint_verification"] = (
+            "network_control_unverified_or_unsupported" if isinstance(network_profile, dict)
+            else "unsupported_not_applied"
+        )
 
 
 def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duration: int) -> None:
