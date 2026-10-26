@@ -32,6 +32,32 @@ jobs:
       - run: npm run build
         working-directory: frontend
 
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+        working-directory: backend
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: frontend
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Test dashboard against real API
+        run: npm run test:e2e
+        working-directory: frontend
+        env:
+          CI: "true"
+
   worker-guards:
     runs-on: ubuntu-latest
     steps:
