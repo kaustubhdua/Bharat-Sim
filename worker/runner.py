@@ -38,10 +38,10 @@ def valid_package_name(value: str) -> bool:
 def parse_emulator_network_status(output: str) -> dict[str, int] | None:
     """Parse the Android Emulator console's network status response."""
     patterns = {
-        "download_bps": r"download speed:\\s*(\\d+)\\s+bits/s",
-        "upload_bps": r"upload speed:\\s*(\\d+)\\s+bits/s",
-        "minimum_latency_ms": r"minimum latency:\\s*(\\d+)\\s+ms",
-        "maximum_latency_ms": r"maximum latency:\\s*(\\d+)\\s+ms",
+        "download_bps": r"download speed:\s*(\d+)\s+bits/s",
+        "upload_bps": r"upload speed:\s*(\d+)\s+bits/s",
+        "minimum_latency_ms": r"minimum latency:\s*(\d+)\s+ms",
+        "maximum_latency_ms": r"maximum latency:\s*(\d+)\s+ms",
     }
     values: dict[str, int] = {}
     for key, pattern in patterns.items():
@@ -69,7 +69,7 @@ def apply_emulator_network_profile(
             "the app's active network interface traversed these controls."
         ),
     }
-    if not re.fullmatch(r"emulator-\\d+", serial):
+    if not re.fullmatch(r"emulator-\d+", serial):
         evidence.update({"control_plane": {"status": "unsupported", "reason": "Target is not an Android Emulator serial"}})
         return evidence
 
@@ -87,7 +87,7 @@ def apply_emulator_network_profile(
         }
 
     status_result = run_cmd(["adb", "-s", serial, "emu", "network", "status"], timeout=15)
-    status = parse_emulator_network_status(status_result.stdout + "\\n" + status_result.stderr)
+    status = parse_emulator_network_status(status_result.stdout + "\n" + status_result.stderr)
     expected = {
         "download_bps": down_kbps * 1000,
         "upload_bps": up_kbps * 1000,
@@ -107,7 +107,7 @@ def apply_emulator_network_profile(
         "readback": status,
         "expected_readback": expected,
         "status_command_return_code": status_result.returncode,
-        "status_command_output": (status_result.stdout + "\\n" + status_result.stderr)[-2000:],
+        "status_command_output": (status_result.stdout + "\n" + status_result.stderr)[-2000:],
     }
     evidence["network_constraints_applied"] = verified
     return evidence
@@ -115,12 +115,12 @@ def apply_emulator_network_profile(
 
 def reset_emulator_network_profile(serial: str) -> dict[str, object]:
     """Restore the disposable emulator's default network settings after a run."""
-    if not re.fullmatch(r"emulator-\\d+", serial):
+    if not re.fullmatch(r"emulator-\d+", serial):
         return {"status": "not_applicable", "reason": "Target is not an Android Emulator serial"}
     delay = run_cmd(["adb", "-s", serial, "emu", "network", "delay", "none"], timeout=15)
     speed = run_cmd(["adb", "-s", serial, "emu", "network", "speed", "full"], timeout=15)
     status_result = run_cmd(["adb", "-s", serial, "emu", "network", "status"], timeout=15)
-    status = parse_emulator_network_status(status_result.stdout + "\\n" + status_result.stderr)
+    status = parse_emulator_network_status(status_result.stdout + "\n" + status_result.stderr)
     restored = (
         delay.returncode == 0 and speed.returncode == 0 and status_result.returncode == 0
         and bool(status)
