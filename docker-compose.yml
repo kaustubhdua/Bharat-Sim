@@ -12,6 +12,15 @@ services:
       BHARATSIM_CORS_ORIGINS: ${BHARATSIM_CORS_ORIGINS:-http://localhost:8080}
     volumes:
       - bharatsim-data:/app/backend/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 768m
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3).read()"]
