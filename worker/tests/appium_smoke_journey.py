@@ -204,7 +204,7 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
     }
 
 
-def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 160) -> dict:
+def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 60) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
