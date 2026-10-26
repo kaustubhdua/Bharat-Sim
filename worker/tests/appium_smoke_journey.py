@@ -110,7 +110,7 @@ def main() -> int:
             raise RuntimeError(f"Primary action state assertion failed: {status_text!r}")
         probe_id = find_element(session_id, "accessibility id", "network-probe-status")
         probe_text = wait_for_text(session_id, probe_id, "HTTP 200")
-        probe_match = re.fullmatch(r"HTTP 200 · (\\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER)", probe_text)
+        probe_match = re.fullmatch(r"HTTP 200 · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER)", probe_text)
         if not probe_match:
             raise RuntimeError(f"Fixture network probe response was not parseable: {probe_text!r}")
         probe_duration_ms = int(probe_match.group(1))
