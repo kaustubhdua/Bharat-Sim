@@ -32,7 +32,6 @@ public final class MainActivity extends Activity {
         TextView title = new TextView(this);
         title.setText("BharatSim Android smoke test");
         title.setContentDescription("fixture-title");
-        title.setContentDescription("fixture-title");
         title.setTextSize(24);
         title.setTextColor(Color.rgb(30, 70, 45));
         title.setGravity(Gravity.CENTER);
@@ -85,8 +84,8 @@ public final class MainActivity extends Activity {
             HttpURLConnection connection = null;
             try {
                 connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(30000);
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(12000);
                 connection.setRequestMethod("GET");
                 connection.setRequestProperty("Connection", "close");
                 connection.setRequestProperty("Accept-Encoding", "identity");
