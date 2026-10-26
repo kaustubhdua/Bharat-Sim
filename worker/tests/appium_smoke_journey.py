@@ -59,6 +59,7 @@ def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
     latency = "none" if latency_ms is None else str(latency_ms)
     adb("emu", "network", "delay", latency)
     adb("emu", "network", "speed", speed)
+    time.sleep(2)  # Let Android route selection and emulator profile changes settle.
     if speed == "full":
         upload_bps = download_bps = 0
     else:
