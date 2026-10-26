@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure a real fixture HTTP request before/after Android Emulator network shaping."""
+"""Measure real fixture HTTP transfers before/after Android Emulator network shaping."""
 from __future__ import annotations
 
 import argparse
@@ -339,8 +339,8 @@ def main() -> int:
         report = {
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
-            "probe_endpoint": "https://ipv4.lg.plutex.de/25MB.bin",
-            "probe_endpoint_scope": "public IPv4-only PLUTEX Looking Glass HTTPS test file; the fixture requests bytes 0-249,999 and measures real external traffic through the Android Emulator network stack, not arbitrary uploaded-app traffic",
+            "probe_endpoint": "http://10.0.2.2:8001/payload?bytes=250000",
+            "probe_endpoint_scope": "CI-hosted controlled HTTP payload reached through Android Emulator host alias 10.0.2.2; measures actual bytes transferred through the emulator network stack, not public-Internet performance or arbitrary uploaded-app traffic",
             "probe_payload_bytes": 250_000,
             "assertions": [
                 "primary action is located by stable accessibility identifier",
