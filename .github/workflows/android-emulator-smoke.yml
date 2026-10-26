@@ -110,7 +110,7 @@ jobs:
           dns_server=""
           for resolver_file in /run/systemd/resolve/resolv.conf /etc/resolv.conf; do
             if [ -r "$resolver_file" ]; then
-              dns_server="$(awk '$1 == "nameserver" && $2 !~ /^127\\./ && $2 != "::1" { print $2; exit }' "$resolver_file")"
+              dns_server="$(awk '$1 == "nameserver" && $2 !~ /^127\./ && $2 != "::1" { print $2; exit }' "$resolver_file")"
               if [ -n "$dns_server" ]; then
                 break
               fi
