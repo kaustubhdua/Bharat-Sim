@@ -84,8 +84,8 @@ public final class MainActivity extends Activity {
             HttpURLConnection connection = null;
             try {
                 connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(30000);
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(12000);
                 connection.setRequestMethod("GET");
                 connection.setRequestProperty("Connection", "close");
                 connection.setRequestProperty("Accept-Encoding", "identity");
