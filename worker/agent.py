@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -102,6 +103,40 @@ def download_apk(base_url: str, token: str, job: dict[str, Any], target: Path) -
     if len(expected) != 64 or digest.hexdigest() != expected:
         target.unlink(missing_ok=True)
         raise WorkerError("Downloaded APK SHA-256 does not match the queued run")
+
+
+_SENSITIVE_TEXT_PATTERNS = (
+    # Authorization headers and bearer tokens.
+    (re.compile(r"(?i)(authorization\\s*:\\s*bearer\\s+)[A-Za-z0-9._~+/=-]+"), r"\\1[REDACTED]"),
+    (re.compile(r"(?i)(\\bbearer\\s+)[A-Za-z0-9._~+/=-]+"), r"\\1[REDACTED]"),
+    # Common key/value formats, including JSON-ish log fragments.
+    (
+        re.compile(
+            r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|client[_-]?secret)["']?\\s*[:=]\\s*["']?)([^"'\\s,;&}]+)(["']?)"""
+        ),
+        r"\\1[REDACTED]\\3",
+    ),
+    (re.compile(r"(?i)([?&](?:token|key|secret|password|api_key|access_token)=)[^&\\s]+"), r"\\1[REDACTED]"),
+    (re.compile(r"\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b"), "[REDACTED_JWT]"),
+)
+
+
+def redact_sensitive_text(value: str) -> str:
+    """Redact common credentials before worker logs become persisted run evidence."""
+    for pattern, replacement in _SENSITIVE_TEXT_PATTERNS:
+        value = pattern.sub(replacement, value)
+    return value
+
+
+def redact_report_text(value: Any) -> Any:
+    """Redact string fields recursively without altering numeric or boolean evidence."""
+    if isinstance(value, str):
+        return redact_sensitive_text(value)
+    if isinstance(value, list):
+        return [redact_report_text(item) for item in value]
+    if isinstance(value, dict):
+        return {key: redact_report_text(item) for key, item in value.items()}
+    return value
 
 
 def annotate_execution_scope(report: dict[str, Any], job: dict[str, Any]) -> None:
@@ -208,6 +243,9 @@ def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duratio
             report["runner_return_code"] = completed.returncode
             if completed.stderr:
                 report["runner_stderr_tail"] = completed.stderr[-4_000:]
+            # Logcat and subprocess output can contain bearer tokens or app secrets.
+            # Redact report text before serializing it into the API's persisted result.
+            report = redact_report_text(report)
             final_status = "completed" if report.get("status") == "completed" else "failed"
             error = None if final_status == "completed" else str(report.get("error") or "Android smoke runner failed")[:2000]
             request_json(base_url, token, str(job["result_url"]), {
