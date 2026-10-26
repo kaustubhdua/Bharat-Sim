@@ -18,7 +18,7 @@ import java.net.URL;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
-    private static final String PROBE_URL = "http://10.0.2.2:8000/health/ready";
+    private static final String PROBE_URL = "https://speed.cloudflare.com/__down?bytes=2000000";
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -79,27 +79,44 @@ public final class MainActivity extends Activity {
         long started = SystemClock.elapsedRealtime();
         String transport = activeTransport();
         int statusCode = -1;
+        int bytesRead = 0;
+        HttpURLConnection connection = null;
         try {
-            HttpURLConnection connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
+            connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(10000);
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Connection", "close");
+            connection.setRequestProperty("Accept-Encoding", "identity");
+            connection.setRequestProperty("Cache-Control", "no-cache");
+            connection.setUseCaches(false);
             statusCode = connection.getResponseCode();
             if (statusCode == 200) {
-                connection.getInputStream().close();
+                try (java.io.InputStream input = connection.getInputStream()) {
+                    byte[] buffer = new byte[8192];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        bytesRead += count;
+                    }
+                }
+                if (bytesRead != 2000000) {
+                    throw new IllegalStateException("Expected 2000000 probe bytes, received " + bytesRead);
+                }
             }
-            connection.disconnect();
         } catch (Exception exception) {
             Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport + " probe=" + sequence, exception);
             final String message = "Network probe failed: " + exception.getClass().getSimpleName();
             runOnUiThread(() -> target.setText(message));
             return;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
         }
         long duration = SystemClock.elapsedRealtime() - started;
         if (statusCode == 200) {
-            Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_200 duration_ms=" + duration + " transport=" + transport + " probe=" + sequence);
-            final String message = "HTTP 200 · " + duration + " ms · " + transport + " · probe " + sequence;
+            Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_200 duration_ms=" + duration + " transport=" + transport + " probe=" + sequence + " bytes_read=" + bytesRead);
+            final String message = "HTTP 200 · " + duration + " ms · " + transport + " · probe " + sequence + " · bytes " + bytesRead;
             runOnUiThread(() -> target.setText(message));
         } else {
             Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + statusCode + " duration_ms=" + duration + " transport=" + transport + " probe=" + sequence);
