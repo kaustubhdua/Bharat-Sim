@@ -193,8 +193,11 @@ def main() -> int:
     args = parser.parse_args()
     args.artifacts.mkdir(parents=True, exist_ok=True)
     session_id = None
+    phase = "configure_baseline_profile"
+    evidence: dict[str, object] = {}
     try:
         baseline_profile = set_network_profile(None, "full")
+        evidence["baseline_profile"] = baseline_profile
         wait_for_server()
         created = request("POST", "/session", {
             "capabilities": {
@@ -224,7 +227,8 @@ def main() -> int:
             raise RuntimeError(f"Fixture did not start in the expected Ready state: {status_text!r}")
 
         def take_samples(label: str, previous_sequence: int) -> tuple[list[dict], int]:
-            samples = []
+            samples: list[dict] = []
+            evidence["samples_" + label] = samples
             last_sequence = previous_sequence
             for _ in range(3):
                 request("POST", base + f"/element/{action_id}/click", {})
@@ -245,15 +249,25 @@ def main() -> int:
             raise RuntimeError(f"Warm-up request used unsupported transport: {warmup_probe}")
         last_sequence = warmup_probe["sequence"]
 
+        phase = "baseline_samples"
         baseline_probes, last_sequence = take_samples("baseline", last_sequence)
+        evidence["baseline_probes"] = baseline_probes
 
         # Isolate latency from throughput: full bandwidth, fixed 150 ms delay.
+        phase = "configure_latency_profile"
         latency_profile = set_network_profile(150, "full")
+        evidence["latency_profile"] = latency_profile
+        phase = "latency_samples"
         latency_probes, last_sequence = take_samples("latency-only", last_sequence)
+        evidence["latency_probes"] = latency_probes
 
         # Isolate bandwidth from latency: no delay, 3 Mbps upload/download.
+        phase = "configure_bandwidth_profile"
         bandwidth_profile = set_network_profile(None, "3000:3000")
+        evidence["bandwidth_profile"] = bandwidth_profile
+        phase = "bandwidth_samples"
         bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
+        evidence["bandwidth_probes"] = bandwidth_probes
 
         baseline_median_ms = statistics.median(p["duration_ms"] for p in baseline_probes)
         latency_median_ms = statistics.median(p["duration_ms"] for p in latency_probes)
@@ -278,7 +292,9 @@ def main() -> int:
                 f"delta_ms={bandwidth_delta_ms}, minimum_required_delta_ms={minimum_bandwidth_delta_ms}"
             )
 
+        phase = "verify_network_reset"
         reset_evidence = reset_network()
+        evidence["reset_profile"] = reset_evidence
         if reset_evidence.get("status") != "verified":
             raise RuntimeError(f"Could not verify network profile reset: {reset_evidence}")
 
@@ -326,7 +342,8 @@ def main() -> int:
         (args.artifacts / "appium-journey.report.json").write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))
         return 0
-    except Exception:
+    except Exception as exc:
+        phase_error = str(exc)
         if session_id:
             try:
                 page_source = str(request("GET", f"/session/{session_id}/source").get("value", ""))
@@ -339,6 +356,18 @@ def main() -> int:
                     (args.artifacts / "appium-failure.png").write_bytes(base64.b64decode(image_data, validate=True))
             except Exception as screenshot_error:
                 (args.artifacts / "appium-screenshot-error.txt").write_text(str(screenshot_error))
+        logcat_path = args.artifacts / "appium-failure-logcat.txt"
+        try:
+            logs = subprocess.run(["adb", "-s", ADB_SERIAL, "logcat", "-d", "-t", "2000", "-v", "threadtime"], capture_output=True, text=True, timeout=20, check=False)
+            logcat_path.write_text((logs.stdout + "\n" + logs.stderr)[-300000:], encoding="utf-8", errors="replace")
+            evidence["failure_logcat_return_code"] = logs.returncode
+        except Exception as log_error:
+            evidence["failure_logcat_error"] = str(log_error)
+        (args.artifacts / "appium-journey.failure.json").write_text(json.dumps({
+            "status": "failed", "phase": phase, "error": phase_error,
+            "evidence_collected_before_failure": evidence,
+            "failure_logcat": str(logcat_path),
+        }, indent=2))
         raise
     finally:
         if session_id:
@@ -346,7 +375,18 @@ def main() -> int:
                 request("DELETE", f"/session/{session_id}", timeout=15)
             except Exception as exc:
                 print(f"warning: could not close Appium session cleanly: {exc}")
-        reset_network()
+        try:
+            reset_after_run = reset_network()
+        except Exception as reset_error:
+            reset_after_run = {"status": "unverified", "error": str(reset_error)}
+        failure_report = args.artifacts / "appium-journey.failure.json"
+        if failure_report.exists():
+            try:
+                saved = json.loads(failure_report.read_text(encoding="utf-8"))
+                saved["reset_after_failure"] = reset_after_run
+                failure_report.write_text(json.dumps(saved, indent=2), encoding="utf-8")
+            except Exception as report_error:
+                (args.artifacts / "failure-report-update-error.txt").write_text(str(report_error))
 
 
 if __name__ == "__main__":
