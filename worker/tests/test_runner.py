@@ -2,6 +2,7 @@ import unittest
 from subprocess import CompletedProcess
 from unittest.mock import patch
 
+from worker.tests.appium_smoke_journey import parse_probe_text
 from worker.runner import (
     apply_emulator_network_profile,
     extract_logcat_signals,
@@ -11,6 +12,29 @@ from worker.runner import (
     run_adb_with_retry,
     valid_package_name,
 )
+
+
+
+
+class AppiumProbeStatusParserTests(unittest.TestCase):
+    def test_parses_full_and_partial_content_probe_status(self):
+        for status in (200, 206):
+            with self.subTest(status=status):
+                parsed = parse_probe_text(
+                    f"HTTP {status} · 123 ms · CELLULAR · probe 8 · bytes 2000000 · attempts 2"
+                )
+                self.assertEqual(parsed, {
+                    "http_status": status,
+                    "duration_ms": 123,
+                    "transport": "CELLULAR",
+                    "sequence": 8,
+                    "bytes_read": 2000000,
+                    "attempts": 2,
+                })
+
+    def test_rejects_running_or_malformed_probe_status(self):
+        self.assertIsNone(parse_probe_text("Network probe running"))
+        self.assertIsNone(parse_probe_text("HTTP 500 · 100 ms · CELLULAR · probe 1 · bytes 0 · attempts 1"))
 
 
 class PackageNameValidationTests(unittest.TestCase):
