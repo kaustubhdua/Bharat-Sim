@@ -183,8 +183,14 @@ def main() -> int:
         if status_text != "Ready":
             raise RuntimeError(f"Fixture did not start in the expected Ready state: {status_text!r}")
 
+        # Warm up DNS/TLS once; exclude this cold-start request from timing.
+        request("POST", base + f"/element/{action_id}/click", {})
+        warmup_probe = wait_for_probe(session_id, probe_id, after_sequence=0)
+        if warmup_probe["transport"] not in ("CELLULAR", "ETHERNET"):
+            raise RuntimeError(f"Warm-up request used unsupported transport: {warmup_probe}")
+
         baseline_probes = []
-        last_sequence = 0
+        last_sequence = warmup_probe["sequence"]
         for _ in range(3):
             request("POST", base + f"/element/{action_id}/click", {})
             status_text = request("GET", base + f"/element/{status_id}/text").get("value")
@@ -235,11 +241,12 @@ def main() -> int:
                 "baseline and shaped requests return real HTTP 200 responses from https://example.com/",
                 "both requests use cellular/Ethernet transport",
                 "emulator network console readback matches the configured profile",
-                "three baseline and three shaped requests were measured on the same cellular/Ethernet transport",
+                "one cold-start warm-up was excluded, then three baseline and three shaped requests were measured on the same cellular/Ethernet transport",
                 "median shaped request is at least 100ms slower than median baseline",
             ],
             "baseline_profile": baseline_profile,
             "shaped_profile": shaped_profile,
+            "warmup_probe": warmup_probe,
             "baseline_probes": baseline_probes,
             "shaped_probes": shaped_probes,
             "baseline_median_ms": baseline_median_ms,
