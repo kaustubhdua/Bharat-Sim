@@ -13,7 +13,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - Uploaded APKs are deleted after terminal worker results when filesystem cleanup succeeds; abandoned uploads expire after 24 hours during startup, run creation, or worker claim requests.
 - The runner has an explicit opt-in environment guard, explicit Android serial, bounded duration, APK size limit, bounded archive metadata checks, and command timeouts.
 - APK-derived Android package names are strictly validated before being passed to an ADB shell command, and the worker agent refuses HTTP redirects and rejects absolute, external, or non-worker route URLs in server-provided job fields before attaching worker credentials.
-- Worker result callbacks validate report status and, when supplied, require the reported APK SHA-256 to match the leased artifact.
+- Completed worker callbacks require a valid 64-character APK SHA-256 matching the leased artifact; failure callbacks may omit the hash when failure happens before download or runner execution.
 - The smoke runner attempts to uninstall the test package after execution and fails the run if cleanup fails, warning that a disposable VM reset is still the stronger isolation boundary.
 - The network shaper is guarded and only accepts dedicated test interface names. Its apply action parses reported qdisc delay/jitter/loss/rate and compares them with requested values; this is configuration evidence, not proof of end-to-end emulator traffic conditions.
 
