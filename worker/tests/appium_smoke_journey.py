@@ -48,19 +48,22 @@ def adb(*args: str, timeout: int = 20) -> str:
     return output
 
 
-def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
-    """Configure emulator latency and throughput, then require exact console readback."""
-    # Use cellular with a public Cloudflare HTTPS endpoint. The workflow selects
-    # a verified upstream DNS resolver; external DNS/Internet availability is an
-    # explicit test precondition, not synthetic or locally fabricated evidence.
+def prepare_cellular_transport() -> None:
+    """Select cellular once before sampling; don't flap connectivity between profiles."""
     adb("shell", "svc", "wifi", "disable")
     adb("emu", "gsm", "voice", "home")
     adb("emu", "gsm", "data", "home")
     adb("shell", "svc", "data", "enable")
+    # Allow the active route and DNS state to settle before the first measurement.
+    time.sleep(5)
+
+
+def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
+    """Change only emulator latency/throughput, then require exact console readback."""
     latency = "none" if latency_ms is None else str(latency_ms)
     adb("emu", "network", "delay", latency)
     adb("emu", "network", "speed", speed)
-    time.sleep(2)  # Let Android route selection and emulator profile changes settle.
+    time.sleep(2)  # Let emulator profile changes settle without resetting transport.
     if speed == "full":
         upload_bps = download_bps = 0
     else:
@@ -75,16 +78,18 @@ def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
         "upload_bps": upload_bps,
     }
     output = adb("emu", "network", "status")
+
     def read(pattern: str) -> int:
         match = re.search(pattern, output, re.I)
         if not match:
             raise RuntimeError(f"Could not parse emulator network status: {output}")
         return int(match.group(1))
+
     observed = {
-        "minimum_latency_ms": read(r"minimum latency:\s*(\d+)\s+ms"),
-        "maximum_latency_ms": read(r"maximum latency:\s*(\d+)\s+ms"),
-        "download_bps": read(r"download speed:\s*(\d+)\s+bits/s"),
-        "upload_bps": read(r"upload speed:\s*(\d+)\s+bits/s"),
+        "minimum_latency_ms": read(r"minimum latency:\\s*(\\d+)\\s+ms"),
+        "maximum_latency_ms": read(r"maximum latency:\\s*(\\d+)\\s+ms"),
+        "download_bps": read(r"download speed:\\s*(\\d+)\\s+bits/s"),
+        "upload_bps": read(r"upload speed:\\s*(\\d+)\\s+bits/s"),
     }
     expected_latency = 0 if latency_ms is None else latency_ms
     matched = (
@@ -196,6 +201,9 @@ def main() -> int:
     phase = "configure_baseline_profile"
     evidence: dict[str, object] = {}
     try:
+        phase = "prepare_cellular_transport"
+        prepare_cellular_transport()
+        phase = "configure_baseline_profile"
         baseline_profile = set_network_profile(None, "full")
         evidence["baseline_profile"] = baseline_profile
         wait_for_server()
