@@ -119,10 +119,10 @@ def reset_network() -> dict:
             match = re.search(pattern, output, re.I)
             return int(match.group(1)) if match else None
         observed = {
-            "minimum_latency_ms": read(r"minimum latency:\\s*(\\d+)\\s+ms"),
-            "maximum_latency_ms": read(r"maximum latency:\\s*(\\d+)\\s+ms"),
-            "download_bps": read(r"download speed:\\s*(\\d+)\\s+bits/s"),
-            "upload_bps": read(r"upload speed:\\s*(\\d+)\\s+bits/s"),
+            "minimum_latency_ms": read(r"minimum latency:\s*(\d+)\s+ms"),
+            "maximum_latency_ms": read(r"maximum latency:\s*(\d+)\s+ms"),
+            "download_bps": read(r"download speed:\s*(\d+)\s+bits/s"),
+            "upload_bps": read(r"upload speed:\s*(\d+)\s+bits/s"),
         }
     except Exception as exc:
         return {"status": "unverified", "command_results": command_results, "error": str(exc)}
