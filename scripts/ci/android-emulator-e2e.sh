@@ -21,7 +21,7 @@ export BHARATSIM_API_URL=http://127.0.0.1:8000
 export BHARATSIM_ALLOW_INSECURE_HTTP=true
 export BHARATSIM_WORKER_ID=ci-emulator-worker
 export BHARATSIM_POLL_SECONDS=1
-export BHARATSIM_SMOKE_DURATION_SECONDS=5
+export BHARATSIM_SMOKE_DURATION_SECONDS=20
 export BHARATSIM_WORKER_TOKEN="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 export BHARATSIM_DATA_DIR="$RUNNER_TEMP/bharatsim-api-data"
 
