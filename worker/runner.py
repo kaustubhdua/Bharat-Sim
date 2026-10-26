@@ -28,6 +28,29 @@ def run_cmd(args: list[str], timeout: int = 20) -> subprocess.CompletedProcess[s
     return subprocess.run(args, capture_output=True, text=True, timeout=timeout, check=False)
 
 
+def run_adb_with_retry(
+    serial: str, args: list[str], timeout: int = 30, attempts: int = 3
+) -> subprocess.CompletedProcess[str]:
+    """Retry bounded ADB operations after transient emulator transport disconnects.
+
+    A failed command remains a failure unless a subsequent complete command
+    succeeds. Waiting for the device is bounded so an offline emulator cannot
+    hang the worker indefinitely.
+    """
+    last = subprocess.CompletedProcess(args=["adb", "-s", serial, *args], returncode=1, stdout="", stderr="not attempted")
+    for attempt in range(attempts):
+        last = run_cmd(["adb", "-s", serial, *args], timeout=timeout)
+        if last.returncode == 0:
+            return last
+        if attempt + 1 >= attempts:
+            break
+        run_cmd(["adb", "-s", serial, "wait-for-device"], timeout=10)
+        state = run_cmd(["adb", "-s", serial, "get-state"], timeout=8)
+        if state.returncode != 0 or state.stdout.strip() != "device":
+            time.sleep(1)
+    return last
+
+
 def valid_package_name(value: str) -> bool:
     """Allow ordinary Java-style package identifiers only; reject shell syntax."""
     return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+", value))
@@ -225,7 +248,8 @@ def main() -> int:
         "steps": [],
         "limitations": [
             "Smoke test only; no app-specific interaction flow is automated.",
-            "Network shaping, memory pressure and storage pressure are not applied by this script.",
+            "Latency and bandwidth controls are applied only to Android Emulator targets and only control-plane readback is verified here; packet loss and CPU/RAM/storage pressure are unsupported.",
+            "A single smoke run does not prove app traffic traversed the configured network profile; use the repeated baseline-versus-shaped fixture experiment for that separate claim.",
             "A missing crash marker does not prove the app is healthy.",
         ],
     }
@@ -288,7 +312,7 @@ def main() -> int:
 
         time.sleep(args.duration)
         t = time.monotonic()
-        logs = run_cmd(["adb", "-s", serial, "logcat", "-d", "-t", "5000", "-v", "threadtime"], timeout=30)
+        logs = run_adb_with_retry(serial, ["logcat", "-d", "-t", "5000", "-v", "threadtime"], timeout=30)
         record("collect_logcat", logs, time.monotonic() - t)
         if logs.returncode != 0:
             raise RuntimeError("logcat collection failed")
@@ -327,7 +351,7 @@ def main() -> int:
     # emulator. This is cleanup, not a substitute for reverting a VM snapshot.
     if report.get("package_name"):
         t = time.monotonic()
-        uninstall = run_cmd(["adb", "-s", serial, "uninstall", str(report["package_name"])], timeout=30)
+        uninstall = run_adb_with_retry(serial, ["uninstall", str(report["package_name"])], timeout=30)
         record("cleanup_uninstall", uninstall, time.monotonic() - t)
         if uninstall.returncode != 0 and "Unknown package" not in (uninstall.stdout + uninstall.stderr):
             report["cleanup_warning"] = "Could not uninstall the test package; reset or discard this emulator before another job."
