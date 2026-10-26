@@ -91,7 +91,11 @@ assert str(result.get("constraint_verification", "")).startswith("partial_networ
 network_profile = result.get("network_profile") or {}
 assert network_profile.get("control_plane", {}).get("status") == "verified", network_profile
 assert network_profile.get("network_constraints_applied") is True, network_profile
-assert network_profile.get("traffic_path_verified") is False, network_profile
+assert network_profile.get("traffic_path_verified") is True, network_profile
+probe = network_profile.get("traffic_probe") or {}
+assert probe.get("http_status") == 200, network_profile
+assert probe.get("transport") in ("CELLULAR", "ETHERNET"), network_profile
+assert probe.get("duration_ms", 0) >= network_profile["requested"]["latency_ms"], network_profile
 assert network_profile.get("reset", {}).get("status") == "verified", network_profile
 for step_name in ("install_apk", "launch_app", "collect_logcat"):
     step = next((s for s in result.get("steps", []) if s.get("name") == step_name), None)
