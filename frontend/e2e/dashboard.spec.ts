@@ -35,7 +35,7 @@ test("run registration without a worker never claims an APK was executed", async
   await expect(page.getByText(/No worker heartbeat detected/)).toBeVisible();
   await page.getByRole("button", { name: /Register test run/ }).click();
 
-  await page.getByRole("button", { name: "Test runs" }).click();
+  await page.getByRole("button", { name: /^Test runs/ }).click();
   await expect(page.getByRole("heading", { name: "Test sessions" })).toBeVisible();
   await expect(page.getByText(/awaiting worker|queued for worker/).first()).toBeVisible();
 });
