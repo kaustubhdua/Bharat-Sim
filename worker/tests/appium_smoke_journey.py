@@ -50,6 +50,11 @@ def adb(*args: str, timeout: int = 20) -> str:
 
 def set_network_profile(latency_ms: int | None) -> dict:
     """Configure the emulator and require exact console readback."""
+    # Explicitly register the emulator's simulated cellular service before
+    # disabling Wi-Fi; some CI emulator images otherwise report CELLULAR as
+    # the active transport but cannot resolve external hosts.
+    adb("emu", "gsm", "voice", "home")
+    adb("emu", "gsm", "data", "home")
     adb("shell", "svc", "wifi", "disable")
     adb("shell", "svc", "data", "enable")
     if latency_ms is None:
