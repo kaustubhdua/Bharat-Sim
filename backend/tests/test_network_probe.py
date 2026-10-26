@@ -7,6 +7,7 @@ client = TestClient(app)
 
 def test_ci_network_payload_is_disabled_by_default(monkeypatch):
     monkeypatch.delenv("BHARATSIM_ENABLE_TEST_NETWORK_PROBE", raising=False)
+    monkeypatch.delenv("BHARATSIM_ENV", raising=False)
     response = client.get("/__ci/network-payload")
     assert response.status_code == 404
     assert response.json()["detail"] == "Not found"
