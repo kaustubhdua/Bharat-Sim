@@ -2,7 +2,7 @@
 
 **The Cheap Phone Test** — test Android apps under constrained device and unreliable-network conditions, then explain failures with traceable evidence.
 
-> **Status: MVP with an authenticated worker-dispatch prototype.** The API, responsive dashboard, log analysis, risk planner, APK upload validation, lease-based job protocol, and local ADB smoke worker are implemented. The GitHub Actions Android emulator workflow now exercises the real local API → queue → worker → ADB → callback → saved-report path using a source-built fixture APK. The source-built fixture's Appium/UiAutomator2 primary-action journey now passes in a disposable GitHub Actions emulator; public deployment, production sandbox review, verified network impairment, and physical-device validation remain unverified.
+> **Status: MVP with an authenticated worker-dispatch prototype.** The API, responsive dashboard, log analysis, risk planner, APK upload validation, lease-based job protocol, and local ADB smoke worker are implemented. The GitHub Actions Android emulator workflow exercises the real local API → queue → worker → ADB → callback → saved-report path using a source-built fixture APK. The fixture's Appium/UiAutomator2 primary-action journey passes in a disposable GitHub Actions emulator. Emulator console delay/bandwidth settings are applied and read back; actual app traffic-path use, packet loss, resource pressure, public deployment, production sandboxing, and physical-device fidelity remain unverified.
 
 ## What works in this repository
 
@@ -15,14 +15,14 @@
 - React/Vite dashboard with run history, worker heartbeat status, log analysis, and report inspection.
 - Docker Compose setup for local API/dashboard deployment, with a loopback-only web binding by default.
 - CI for backend tests, frontend production build, worker safety guards, and container builds.
-- Dedicated Android emulator workflow that builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, and uploads short-lived evidence. It also runs an isolated Linux network-namespace test that measures real ping traffic through a shaped veth and checks cleanup. This validates the shaper in isolation, not Android-emulator traffic integration. Do not interpret a smoke-completed status as proof of arbitrary-app health or persona constraint enforcement.
+- Dedicated Android emulator workflow that builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, verifies emulator console latency/bandwidth readback and confirms default network settings are restored. It also runs an isolated Linux network-namespace test that measures real ping traffic through a shaped veth. Emulator console readback is control-plane evidence only; active app traffic routing is not verified.
 
 ## What is not complete
 
 - No public production URL or deployed commit has been verified.
 - A real disposable Android emulator workflow has passed for the source-built BharatSim fixture: upload → queue/lease → ADB install/launch/logcat → authenticated callback → persisted report, followed by an Appium UI action assertion and screenshot. This validates the fixture pipeline only; it does not validate arbitrary third-party APKs or production isolation.
 - Appium/UiAutomator2 is integrated for a fixture-app primary-action journey. Product-specific test-flow authoring, broader assertion coverage, and arbitrary-app compatibility remain incomplete.
-- Network shaping and RAM/storage pressure are not wired to the worker or verified against emulator traffic.
+- Emulator console latency and upload/download bandwidth controls are wired to the worker and read back from the emulator. The current workflow does not prove app traffic used the affected interface; packet loss, CPU/RAM/storage pressure, and battery-saver behavior remain unsupported.
 - Multi-user identity, per-user run ownership, durable object storage, and production-grade sandbox isolation are not implemented.
 - Sarvam translation is not wired into the product.
 
@@ -32,7 +32,7 @@
 - frontend/: Vite + React dashboard.
 - backend/tests/: backend, upload-security, and worker-protocol tests.
 - worker/agent.py: authenticated polling worker using Python's standard library.
-- worker/runner.py: bounded ADB install/launch/logcat smoke runner.
+- worker/runner.py: bounded ADB install/launch/logcat smoke runner with guarded Android Emulator console latency/bandwidth controls, exact control-plane readback, and reset verification.
 - worker/network_shaper.py: guarded Linux tc/netem prototype; not integrated into Android job execution. `scripts/ci/network-shaper-e2e.sh` measures traffic across an isolated shaped veth in CI.
 - docs/: architecture, API, security, open-source references, and roadmap.
 
@@ -87,7 +87,8 @@ See worker/README.md. Configure BHARATSIM_WORKER_TOKEN on the API and worker, pr
 - /api/v1/workers reports worker heartbeats seen in the last 90 seconds.
 - Runs remain queued/awaiting a worker until the worker claims them. A run becomes completed or failed only after an authenticated worker result is accepted.
 - A completed smoke run means the runner finished install/launch/observation/log collection; it is not proof of broad app correctness.
-- Network and device constraints must be reported as verified, unverified, or unsupported. The current worker does not apply them.
+- Emulator console network latency and bandwidth are reported verified only when control-plane readback matches the request; this does not prove app traffic used the controlled interface.
+- Packet loss, resource pressure, and overall persona enforcement remain unsupported/unverified and must not be described as applied.
 
 ## Security
 
