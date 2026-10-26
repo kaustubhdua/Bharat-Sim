@@ -280,7 +280,7 @@ def main() -> int:
                 "fixture title is visible",
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "baseline and shaped requests return real HTTP 200 responses from https://example.com/",
+                "baseline and shaped requests return real HTTP 200 responses from the Cloudflare DNS-over-HTTPS endpoint with TLS hostname verification",
                 "all baseline and shaped requests use the controlled cellular transport",
                 "emulator network console readback matches the configured profile",
                 "one cold-start warm-up was excluded, then three baseline and three shaped requests were measured on the same cellular/Ethernet transport",
