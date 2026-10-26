@@ -269,9 +269,9 @@ def main() -> int:
         latency_probes, last_sequence = take_samples("latency-only", last_sequence)
         evidence["latency_probes"] = latency_probes
 
-        # Isolate bandwidth from latency: no delay, 3 Mbps upload/download.
+        # Isolate bandwidth from latency: no delay, 10 Mbps upload/download.
         phase = "configure_bandwidth_profile"
-        bandwidth_profile = set_network_profile(None, "3000:3000")
+        bandwidth_profile = set_network_profile(None, "10000:10000")
         evidence["bandwidth_profile"] = bandwidth_profile
         phase = "bandwidth_samples"
         bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
