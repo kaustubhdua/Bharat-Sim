@@ -18,7 +18,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       env: {
-        BHARATSIM_DATA_DIR: "/tmp/bharatsim-playwright-e2e",
+        BHARATSIM_DATA_DIR: `/tmp/bharatsim-playwright-e2e-${process.env.GITHUB_RUN_ID || process.pid}`,
         BHARATSIM_WORKER_TOKEN: "ci-test-token-not-for-production-0123456789",
       },
     },
