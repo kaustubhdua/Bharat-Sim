@@ -47,3 +47,19 @@ test("Configure a test navigates to the real APK registration form", async ({ pa
   await expect(page.getByRole("button", { name: /Register test run/ })).toBeDisabled();
   await expect(page.getByText("Choose an APK to enable run registration")).toBeVisible();
 });
+test("dashboard remains usable at narrow mobile widths without horizontal overflow", async ({ page }) => {
+  for (const width of [375, 320]) {
+    await page.setViewportSize({ width, height: 812 });
+    await page.goto("/");
+    await expect(page.getByText("API connected")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
+    const dimensions = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      document: document.documentElement.scrollWidth,
+    }));
+    expect(
+      dimensions.document,
+      `unexpected horizontal overflow at ${width}px: ${JSON.stringify(dimensions)}`,
+    ).toBeLessThanOrEqual(dimensions.viewport);
+  }
+});
