@@ -147,7 +147,8 @@ def test_run_metadata_survives_api_process_restart(tmp_path: Path) -> None:
             detail = get_json(base_url + "/api/v1/runs/" + run_id)
             assert detail["id"] == run_id
             assert detail["status"] == "awaiting_worker"
-            assert detail["apk_sha256"] == created["apk"]["sha256"]\n            assert detail.get("result") is None
+            assert detail["apk_sha256"] == created["apk"]["sha256"]
+            assert detail.get("result") is None
         finally:
             stop_api(second)
     finally:
