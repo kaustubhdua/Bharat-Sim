@@ -94,15 +94,47 @@ def set_network_profile(latency_ms: int | None) -> dict:
     return {"requested": expected, "observed": observed, "status": "verified"}
 
 
-def reset_network() -> None:
-    """Best-effort cleanup even after failed assertions."""
-    for args in (
+def reset_network() -> dict:
+    """Restore defaults and verify the emulator network control plane."""
+    commands = (
         ("emu", "network", "delay", "none"),
         ("emu", "network", "speed", "full"),
         ("shell", "svc", "wifi", "enable"),
         ("shell", "svc", "data", "enable"),
-    ):
-        subprocess.run(["adb", "-s", ADB_SERIAL, *args], capture_output=True, text=True, timeout=20, check=False)
+    )
+    command_results = []
+    for args in commands:
+        completed = subprocess.run(
+            ["adb", "-s", ADB_SERIAL, *args],
+            capture_output=True, text=True, timeout=20, check=False,
+        )
+        command_results.append({
+            "command": " ".join(args),
+            "return_code": completed.returncode,
+            "output_tail": (completed.stdout + completed.stderr)[-500:],
+        })
+    try:
+        output = adb("emu", "network", "status")
+        def read(pattern: str) -> int | None:
+            match = re.search(pattern, output, re.I)
+            return int(match.group(1)) if match else None
+        observed = {
+            "minimum_latency_ms": read(r"minimum latency:\\s*(\\d+)\\s+ms"),
+            "maximum_latency_ms": read(r"maximum latency:\\s*(\\d+)\\s+ms"),
+            "download_bps": read(r"download speed:\\s*(\\d+)\\s+bits/s"),
+            "upload_bps": read(r"upload speed:\\s*(\\d+)\\s+bits/s"),
+        }
+    except Exception as exc:
+        return {"status": "unverified", "command_results": command_results, "error": str(exc)}
+    verified = (
+        all(item["return_code"] == 0 and "KO:" not in item["output_tail"] for item in command_results)
+        and all(value == 0 for value in observed.values())
+    )
+    return {
+        "status": "verified" if verified else "unverified",
+        "observed": observed,
+        "command_results": command_results,
+    }
 
 
 def wait_for_server() -> None:
@@ -230,6 +262,10 @@ def main() -> int:
                 f"delta_ms={delta_ms}"
             )
 
+        reset_evidence = reset_network()
+        if reset_evidence.get("status") != "verified":
+            raise RuntimeError(f"Could not verify network profile reset: {reset_evidence}")
+
         screenshot = request("GET", base + "/screenshot")
         image_data = screenshot.get("value")
         if not isinstance(image_data, str) or not image_data:
@@ -258,6 +294,7 @@ def main() -> int:
             "shaped_median_ms": shaped_median_ms,
             "observed_delta_ms": delta_ms,
             "traffic_path_verified": True,
+            "reset_profile": reset_evidence,
             "screenshot": str(screenshot_path),
         }
         (args.artifacts / "appium-journey.report.json").write_text(json.dumps(report, indent=2))
