@@ -5,6 +5,7 @@ from unittest.mock import patch
 from worker.runner import (
     apply_emulator_network_profile,
     parse_emulator_network_status,
+    parse_fixture_network_probe,
     reset_emulator_network_profile,
     valid_package_name,
 )
