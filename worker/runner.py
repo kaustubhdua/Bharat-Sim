@@ -148,6 +148,44 @@ def parse_fixture_network_probe(log_text: str) -> dict[str, object] | None:
     return {"http_status": 200, "duration_ms": int(match.group(1)), "transport": match.group(2)}
 
 
+
+def extract_logcat_signals(log_text: str, max_signals: int = 20) -> list[dict[str, object]]:
+    """Extract bounded, line-addressable crash/ANR/resource/network/storage markers.
+
+    These are diagnostic signals, not verified root causes. Context is clipped and
+    bounded so the report can safely fit the worker's inline evidence limit.
+    """
+    rules = (
+        ("crash", re.compile(r"FATAL EXCEPTION|Fatal signal|SIGSEGV|Process: .+ has died", re.I)),
+        ("anr", re.compile(r"\bANR in\b|Application Not Responding|Input dispatching timed out", re.I)),
+        ("oom", re.compile(r"OutOfMemoryError|lowmemorykiller|lmkd:.*kill|Killing .+ because .+low memory", re.I)),
+        ("network", re.compile(r"SocketTimeoutException|UnknownHostException|ConnectException|Network is unreachable|ECONNRESET|SSLHandshakeException", re.I)),
+        ("storage", re.compile(r"ENOSPC|No space left on device|SQLiteFullException|Disk quota exceeded", re.I)),
+    )
+    lines = log_text.splitlines()
+    signals: list[dict[str, object]] = []
+    for index, line in enumerate(lines):
+        for category, pattern in rules:
+            match = pattern.search(line)
+            if not match:
+                continue
+            context_start = max(0, index - 1)
+            context_end = min(len(lines), index + 3)
+            signals.append({
+                "category": category,
+                "line_number": index + 1,
+                "marker": match.group(0)[:100],
+                "evidence": [
+                    {"line_number": pos + 1, "text": lines[pos][:400]}
+                    for pos in range(context_start, context_end)
+                ],
+            })
+            break
+        if len(signals) >= max(1, min(max_signals, 20)):
+            break
+    return signals
+
+
 def reset_emulator_network_profile(serial: str) -> dict[str, object]:
     """Restore the disposable emulator's default network settings after a run."""
     if not re.fullmatch(r"emulator-\d+", serial):
@@ -323,6 +361,13 @@ def main() -> int:
         report["logcat_artifact"] = str(log_path)
         report["logcat_bytes"] = len(logs.stdout.encode("utf-8", errors="replace"))
         report["fatal_exception_marker"] = bool(re.search(r"FATAL EXCEPTION|Fatal signal|SIGSEGV", logs.stdout, re.I))
+        log_signals = extract_logcat_signals(logs.stdout)
+        report["log_signals"] = log_signals
+        report["log_signals_truncated"] = len(log_signals) >= 20
+        report["anr_marker"] = any(item["category"] == "anr" for item in log_signals)
+        report["oom_marker"] = any(item["category"] == "oom" for item in log_signals)
+        report["network_failure_marker"] = any(item["category"] == "network" for item in log_signals)
+        report["storage_failure_marker"] = any(item["category"] == "storage" for item in log_signals)
         network_probe_logs = run_cmd(
             ["adb", "-s", serial, "logcat", "-d", "-s", "BharatSimNetworkProbe:I", "*:S"],
             timeout=15,
