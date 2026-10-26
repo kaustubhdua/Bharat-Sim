@@ -77,11 +77,8 @@ def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
     latency = "none" if latency_ms is None else str(latency_ms)
     adb("emu", "network", "delay", latency)
     adb("emu", "network", "speed", speed)
-    # Changing emulator bandwidth can interrupt the emulated cellular route.
-    # Re-establish data before measuring rather than misclassifying a route transition.
-    adb("shell", "svc", "data", "disable")
-    adb("emu", "gsm", "data", "home")
-    adb("shell", "svc", "data", "enable")
+    # Let the emulator network simulator settle after applying a runtime profile.
+    # Do not toggle mobile data here: keep the same active transport across samples.
     time.sleep(5)
     upload_bps, download_bps = speed_limits_bps(speed)
     expected = {
