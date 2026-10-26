@@ -129,6 +129,16 @@ PY
 # and three bandwidth-only real HTTPS downloads through the emulator network
 # stack, then verifies the emulator controls are reset to defaults.
 adb install smoke-android/app/build/outputs/apk/debug/app-debug.apk
+
+# A hosted Pixel emulator can occasionally leave a system "launcher isn't
+# responding" dialog in front of the app after cold boot. The launcher is not
+# the target under test, so dismiss that stale host-UI state and verify that
+# the fixture activity itself can be foregrounded before Appium attaches.
+adb -s emulator-5554 shell am force-stop com.google.android.apps.nexuslauncher >/dev/null 2>&1 || true
+adb -s emulator-5554 shell input keyevent 4 >/dev/null 2>&1 || true
+adb -s emulator-5554 shell am start -W -n org.bharatsim.smokeapp/.MainActivity > artifacts/fixture-activity-preflight.log
+grep -q "Status: ok" artifacts/fixture-activity-preflight.log
+
 appium --address 127.0.0.1 --port 4723 > artifacts/appium-server.log 2>&1 &
 APPIUM_PID=$!
 python worker/tests/appium_smoke_journey.py --artifacts artifacts
