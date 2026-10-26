@@ -1,7 +1,24 @@
 import unittest
 import urllib.request
 
-from worker.agent import NoRedirectHandler, WorkerError, resolve_api_url
+from worker.agent import NoRedirectHandler, WorkerError, annotate_execution_scope, resolve_api_url
+
+
+class ExecutionScopeTruthfulnessTests(unittest.TestCase):
+    def test_smoke_completion_is_not_an_app_health_pass(self):
+        report = {"status": "completed"}
+        annotate_execution_scope(report, {"persona_id": "edge-village"})
+        self.assertEqual(report["execution_scope"], "install_launch_logcat_smoke")
+        self.assertEqual(report["requested_persona_id"], "edge-village")
+        self.assertFalse(report["constraints_applied"])
+        self.assertEqual(report["constraint_verification"], "unsupported_not_applied")
+        self.assertIn("does not prove the app is healthy", report["result_interpretation"])
+
+    def test_missing_persona_is_not_invented(self):
+        report = {}
+        annotate_execution_scope(report, {})
+        self.assertEqual(report["requested_persona_id"], "unknown")
+        self.assertFalse(report["constraints_applied"])
 
 
 class WorkerRedirectSecurityTests(unittest.TestCase):
