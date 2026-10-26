@@ -14,6 +14,7 @@ def test_ci_network_payload_is_disabled_by_default(monkeypatch):
 
 def test_ci_network_payload_returns_exact_uncached_bytes_when_opted_in(monkeypatch):
     monkeypatch.setenv("BHARATSIM_ENABLE_TEST_NETWORK_PROBE", "true")
+    monkeypatch.setenv("BHARATSIM_ENV", "ci")
     response = client.get("/__ci/network-payload")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/octet-stream"
