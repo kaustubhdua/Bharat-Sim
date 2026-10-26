@@ -37,7 +37,7 @@
 
 - [x] Implement and pass the Appium/UiAutomator2 fixture journey with explicit steps, assertions, screenshots, and repeatable checkpoints.
 - [ ] Add app-specific journey authoring, broader assertions, and error-state coverage for arbitrary uploaded applications.
-- [ ] Verify actual latency and bandwidth effects with the revised controlled-size payload experiment. Earlier small external requests produced inconsistent deltas, and a local API host-alias request did not show a shaping effect; do not reuse those results as proof of active traffic shaping.
+- [ ] Verify actual latency and bandwidth effects with the revised controlled-size payload experiment. Earlier small external requests produced inconsistent deltas, and a request to the emulator's special host alias did not show a shaping effect. The revised test uses a 2,000,000-byte payload from a CI-only API endpoint reached via the host network-interface IP; the endpoint is disabled by default. Do not mark active traffic shaping complete until this exact workflow passes.
 - [ ] Extend traffic-path verification to arbitrary app-specific requests and repeated baseline/latency/bandwidth/recovery experiments.
 - [ ] Run real app-request baseline, latency, bandwidth, packet-loss, outage, and recovery experiments; record requested vs verified conditions. Delay/bandwidth control readback exists, but packet loss and outage are not implemented, and `constraints_applied=false` remains until the full persona is enforced.
 - [ ] Add supported RAM/storage/CPU pressure controls or report those constraints as unsupported.
