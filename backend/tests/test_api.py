@@ -10,7 +10,15 @@ def test_health_and_capabilities_are_honest():
     assert ready["execution_capability"] == "external-worker-required"
     caps = client.get("/api/v1/capabilities").json()
     assert caps["log_analysis"] is True
+    # Partial Android Emulator controls are real, but full persona shaping is not.
     assert caps["network_shaping"] is False
+    network = caps["emulator_network_controls"]
+    assert network["latency"] is True
+    assert network["bandwidth"] is True
+    assert network["configuration_readback"] is True
+    assert network["packet_loss"] is False
+    assert network["outage_and_recovery"] is False
+    assert network["arbitrary_app_traffic_verified"] is False
 
 
 def test_personas_and_plan():
