@@ -90,7 +90,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          # Explicit DNS keeps external HTTPS probes resolvable when the fixture switches to simulated cellular data.
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -dns-server 8.8.8.8,8.8.4.4
           script: bash scripts/ci/android-emulator-e2e.sh
       - name: Preserve emulator smoke evidence
         if: always()
