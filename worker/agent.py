@@ -178,6 +178,39 @@ def annotate_execution_scope(report: dict[str, Any], job: dict[str, Any]) -> Non
         )
 
 
+def persona_network_cli_args(job: dict[str, Any]) -> list[str]:
+    """Translate authored persona targets into validated runner arguments.
+
+    This forwards requested values only. The runner verifies emulator control-plane
+    readback and reports unsupported packet-loss/resource controls; it never treats
+    a requested profile as proof that arbitrary app traffic was shaped.
+    """
+    profile = job.get("persona_profile")
+    if profile is None or profile == {}:
+        return []
+    if not isinstance(profile, dict):
+        raise WorkerError("persona_profile must be an object")
+    try:
+        latency = int(profile["latency_ms"])
+        down = int(profile["down_kbps"])
+        up = int(profile["up_kbps"])
+        loss = float(profile.get("packet_loss_pct", 0))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise WorkerError("persona profile is missing valid network target values") from exc
+    if not 0 <= latency <= 2000:
+        raise WorkerError("persona latency target is outside the supported 0–2000 ms range")
+    if not 1 <= down <= 1_000_000 or not 1 <= up <= 1_000_000:
+        raise WorkerError("persona throughput target is outside the supported 1–1000000 kbps range")
+    if not 0 <= loss <= 100:
+        raise WorkerError("persona packet-loss target must be between 0 and 100 percent")
+    return [
+        "--network-latency-ms", str(latency),
+        "--network-down-kbps", str(down),
+        "--network-up-kbps", str(up),
+        "--network-loss-pct", str(loss),
+    ]
+
+
 def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duration: int) -> None:
     run_id = str(job["id"])
     lease_token = str(job["lease_token"])
