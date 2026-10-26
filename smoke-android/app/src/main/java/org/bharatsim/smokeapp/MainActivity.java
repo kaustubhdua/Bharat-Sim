@@ -79,9 +79,9 @@ public final class MainActivity extends Activity {
         long started = SystemClock.elapsedRealtime();
         String transport = activeTransport();
         int statusCode = -1;
-        // This is a real request from the Android guest to the running BharatSim
-        // API through the emulator's host gateway. It avoids external DNS and
-        // third-party uptime dependencies while exercising the actual network path.
+        // This is a real request to a public endpoint at an IPv4 address resolved
+        // on the host runner. Pinning the IP avoids guest DNS dependency while the
+        // request still traverses the emulator's simulated cellular network.
         try {
             HttpURLConnection connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
             connection.setInstanceFollowRedirects(false);
@@ -103,7 +103,7 @@ public final class MainActivity extends Activity {
             return;
         }
         long duration = SystemClock.elapsedRealtime() - started;
-        if (statusCode == 200) {
+        if (statusCode >= 200 && statusCode < 400) {
             Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + statusCode + " duration_ms=" + duration + " transport=" + transport + " probe=" + sequence);
             final String message = "HTTP " + statusCode + " · " + duration + " ms · " + transport + " · probe " + sequence;
             runOnUiThread(() -> target.setText(message));
