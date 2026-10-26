@@ -303,7 +303,7 @@ def main() -> int:
             ["adb", "-s", serial, "logcat", "-d", "-s", "BharatSimNetworkProbe:I", "*:S"],
             timeout=15,
         )
-        network_probe = parse_fixture_network_probe(network_probe_logs.stdout + "\\n" + network_probe_logs.stderr)
+        network_probe = parse_fixture_network_probe(network_probe_logs.stdout + "\n" + network_probe_logs.stderr)
         if isinstance(report.get("network_profile"), dict):
             report["network_profile"]["traffic_probe_log_return_code"] = network_probe_logs.returncode
             report["network_profile"]["traffic_probe"] = network_probe
