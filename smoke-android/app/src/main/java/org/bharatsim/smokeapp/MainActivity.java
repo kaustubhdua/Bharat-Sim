@@ -18,7 +18,7 @@ import java.net.URL;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
-    private static final String PROBE_URL = "https://speed.cloudflare.com/__down?bytes=2000000";
+    private static final String PROBE_URL = BuildConfig.PROBE_URL;
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
