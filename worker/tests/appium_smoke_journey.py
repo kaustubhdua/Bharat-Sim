@@ -50,9 +50,9 @@ def adb(*args: str, timeout: int = 20) -> str:
 
 def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
     """Configure emulator latency and throughput, then require exact console readback."""
-    # The fixture downloads a controlled-size payload from a real public endpoint.
-    # Explicit cellular service and disabled Wi-Fi ensure the request uses the
-    # emulator network path; profile readback is recorded separately from measured effect.
+    # The fixture downloads a controlled-size payload from a CI-only API endpoint
+    # reached through the runner host-interface IP. Keep the active transport and
+    # measured effect separate from emulator console profile readback.
     adb("emu", "gsm", "voice", "home")
     adb("emu", "gsm", "data", "home")
     adb("shell", "svc", "wifi", "disable")
