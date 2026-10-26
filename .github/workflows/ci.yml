@@ -50,7 +50,7 @@ jobs:
         run: npm install
         working-directory: frontend
       - name: Install Chromium for Playwright
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
         working-directory: frontend
       - name: Test dashboard against real API
         run: npm run test:e2e
