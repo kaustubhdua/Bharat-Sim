@@ -30,6 +30,11 @@ API_PID=$!
 WORKER_PID=
 APPIUM_PID=
 cleanup() {
+  # Always restore network controls, even when Appium assertions fail.
+  adb -s emulator-5554 emu network delay none >/dev/null 2>&1 || true
+  adb -s emulator-5554 emu network speed full >/dev/null 2>&1 || true
+  adb -s emulator-5554 shell svc wifi enable >/dev/null 2>&1 || true
+  adb -s emulator-5554 shell svc data enable >/dev/null 2>&1 || true
   [ -z "$APPIUM_PID" ] || kill "$APPIUM_PID" 2>/dev/null || true
   [ -z "$WORKER_PID" ] || kill "$WORKER_PID" 2>/dev/null || true
   [ -z "$API_PID" ] || kill "$API_PID" 2>/dev/null || true
@@ -89,15 +94,11 @@ assert result.get("constraints_applied") is False, result
 network_profile = result.get("network_profile") or {}
 assert network_profile.get("control_plane", {}).get("status") == "verified", network_profile
 assert network_profile.get("network_constraints_applied") is True, network_profile
-probe = network_profile.get("traffic_probe") or {}
-assert probe.get("http_status") == 200, network_profile
-assert probe.get("transport") in ("CELLULAR", "ETHERNET", "WIFI"), network_profile
-if probe.get("transport") in ("CELLULAR", "ETHERNET") and probe.get("duration_ms", 0) >= network_profile["requested"]["latency_ms"]:
-    assert network_profile.get("traffic_path_verified") is True, network_profile
-    assert str(result.get("constraint_verification", "")).startswith("fixture_network_path_verified"), result
-else:
-    assert network_profile.get("traffic_path_verified") is False, network_profile
-    assert str(result.get("constraint_verification", "")).startswith("partial_network_control_verified"), result
+# The worker smoke report verifies emulator control-plane settings and reset.
+# App traffic-path verification is performed separately below, while the
+# profile is active and the fixture makes a real HTTP request.
+assert network_profile.get("traffic_path_verified") is False, network_profile
+assert str(result.get("constraint_verification", "")).startswith("partial_network_control_verified"), result
 assert network_profile.get("reset", {}).get("status") == "verified", network_profile
 for step_name in ("install_apk", "launch_app", "collect_logcat"):
     step = next((s for s in result.get("steps", []) if s.get("name") == step_name), None)
@@ -119,6 +120,18 @@ report = {
 Path("artifacts/api-run.report.json").write_text(json.dumps(report, indent=2))
 print(json.dumps(report, indent=2))
 PY
+
+# Apply a fresh profile around the UI-driven real request, not just the worker
+# setup phase. Disable Wi-Fi so the probe must use the emulator's cellular
+# network (or fail rather than pretending the traffic path was shaped).
+adb -s emulator-5554 shell svc wifi disable
+adb -s emulator-5554 shell svc data enable
+adb -s emulator-5554 emu network delay 35
+adb -s emulator-5554 emu network speed 3000:12000
+adb -s emulator-5554 emu network status > artifacts/emulator-network-status.txt
+grep -Eq 'minimum latency:[[:space:]]+35 ms' artifacts/emulator-network-status.txt
+grep -Eq 'download speed:[[:space:]]+12000000 bits/s' artifacts/emulator-network-status.txt
+grep -Eq 'upload speed:[[:space:]]+3000000 bits/s' artifacts/emulator-network-status.txt
 
 adb install smoke-android/app/build/outputs/apk/debug/app-debug.apk
 appium --address 127.0.0.1 --port 4723 > artifacts/appium-server.log 2>&1 &
