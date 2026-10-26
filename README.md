@@ -92,6 +92,10 @@ See worker/README.md. Configure BHARATSIM_WORKER_TOKEN on the API and worker, pr
 - Emulator console network latency and bandwidth are reported verified only when control-plane readback matches the request; this does not prove app traffic used the controlled interface.
 - Packet loss, resource pressure, and overall persona enforcement remain unsupported/unverified and must not be described as applied.
 
+## Production release gates
+
+See [`docs/PRODUCTION_RELEASE_GATES.md`](docs/PRODUCTION_RELEASE_GATES.md) for the evidence-based release checklist covering tenant isolation, real emulator evidence, constraint verification, and production deployment. Public APK execution remains blocked until the P0 safety gates are satisfied.
+
 ## Security
 
 Treat every uploaded APK as untrusted code. APK archive checks are not malware scanning or sandboxing. Keep execution on an isolated disposable worker with restricted egress, no production secrets, resource/time limits, and cleanup. The shared API/worker tokens are machine-to-machine credentials, not multi-user authentication. Do not expose public APK execution until identity/ownership, quotas, storage retention, and host isolation have been reviewed. See [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [worker/README.md](worker/README.md).
