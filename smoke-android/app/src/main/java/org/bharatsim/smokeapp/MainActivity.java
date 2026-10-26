@@ -17,6 +17,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import javax.net.ssl.SNIHostName;
@@ -89,29 +90,34 @@ public final class MainActivity extends Activity {
         // Use a fixed Cloudflare anycast IP to avoid making DNS resolution a
         // hidden dependency of the network-shaping experiment. TLS still uses
         // SNI and hostname verification for cloudflare-dns.com.
-        try (SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket()) {
-            socket.connect(new InetSocketAddress("1.1.1.1", 443), 10000);
-            socket.setSoTimeout(10000);
-            SSLParameters parameters = socket.getSSLParameters();
-            parameters.setEndpointIdentificationAlgorithm("HTTPS");
-            parameters.setServerNames(Collections.singletonList(new SNIHostName("cloudflare-dns.com")));
-            socket.setSSLParameters(parameters);
-            socket.startHandshake();
+        try (Socket rawSocket = new Socket()) {
+            rawSocket.connect(new InetSocketAddress("1.1.1.1", 443), 10000);
+            // Wrap the connected socket with the DNS hostname so TLS endpoint
+            // verification validates cloudflare-dns.com, not the pinned IP.
+            try (SSLSocket socket = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
+                    .createSocket(rawSocket, "cloudflare-dns.com", 443, true)) {
+                socket.setSoTimeout(10000);
+                SSLParameters parameters = socket.getSSLParameters();
+                parameters.setEndpointIdentificationAlgorithm("HTTPS");
+                parameters.setServerNames(Collections.singletonList(new SNIHostName("cloudflare-dns.com")));
+                socket.setSSLParameters(parameters);
+                socket.startHandshake();
 
-            OutputStream output = socket.getOutputStream();
-            output.write(("GET /dns-query?name=example.com&type=A HTTP/1.1\r\n"
-                    + "Host: cloudflare-dns.com\r\n"
-                    + "Accept: application/dns-json\r\n"
-                    + "Connection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
-            output.flush();
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
-            String statusLine = reader.readLine();
-            if (statusLine != null) {
-                java.util.regex.Matcher matcher = java.util.regex.Pattern
-                        .compile("^HTTP/1\\.[01] (\\d{3})(?:\\s.*)?$")
-                        .matcher(statusLine);
-                if (matcher.matches()) statusCode = Integer.parseInt(matcher.group(1));
+                OutputStream output = socket.getOutputStream();
+                output.write(("GET /dns-query?name=example.com&type=A HTTP/1.1\r\n"
+                        + "Host: cloudflare-dns.com\r\n"
+                        + "Accept: application/dns-json\r\n"
+                        + "Connection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                output.flush();
+                BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+                String statusLine = reader.readLine();
+                if (statusLine != null) {
+                    java.util.regex.Matcher matcher = java.util.regex.Pattern
+                            .compile("^HTTP/1\\.[01] (\\d{3})(?:\\s.*)?$")
+                            .matcher(statusLine);
+                    if (matcher.matches()) statusCode = Integer.parseInt(matcher.group(1));
+                }
             }
         } catch (Exception exception) {
             Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport + " probe=" + sequence, exception);
