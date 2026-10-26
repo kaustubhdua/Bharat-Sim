@@ -41,6 +41,11 @@ jobs:
           python-version: "3.12"
       - name: Install API dependencies
         run: python -m pip install -r backend/requirements.txt
+      - name: Verify real traffic through isolated Linux netem interface
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iproute2 iputils-ping
+          sudo bash scripts/ci/network-shaper-e2e.sh
       - name: Install Appium and Android UIAutomator2 driver
         run: |
           npm install --global appium@3
