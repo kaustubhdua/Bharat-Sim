@@ -291,13 +291,13 @@ def main() -> int:
         report = {
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
-            "probe_endpoint": "https://speed.cloudflare.com/__down?bytes=2000000",
+            "probe_endpoint": "CI-only API payload endpoint via host network-interface IP",
             "probe_payload_bytes": 2000000,
             "assertions": [
                 "fixture title is visible",
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe downloaded exactly 2,000,000 bytes from the real public endpoint",
+                "each probe downloaded exactly 2,000,000 bytes from the real HTTP response served by the CI-only API endpoint",
                 "baseline, latency-only, and bandwidth-only probes used cellular/Ethernet transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
                 "bandwidth-only median duration exceeded baseline by at least 500 ms",
