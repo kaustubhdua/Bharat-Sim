@@ -17,7 +17,7 @@
 - [x] Network shaper apply parses and compares `tc`-reported delay, jitter, loss and rate settings.
 - [x] CI creates a disposable Linux network namespace and veth pair, measures actual ping RTT before and after shaping, requires the configured delay to be observable, and verifies qdisc cleanup. This proves the Linux prototype on that veth only.
 - [x] Pass server-authored persona network targets to the worker; apply Android Emulator console latency and upload/download speed controls, read back the configured values, and verify restoration to defaults after each run.
-- [x] In a disposable emulator, disable Wi-Fi, use the cellular transport, apply a 35 ms delay / 12 Mbps down / 3 Mbps up profile, and have the source-built fixture make a real HTTP 200 request to the local API. CI observed 220 ms request duration over CELLULAR and asserts transport plus minimum duration. This verifies the fixture request path only.
+- [ ] Complete a differential traffic-path experiment in a disposable emulator: record a baseline request to a real external HTTPS endpoint, apply/read back a latency profile, repeat the request over the same cellular/Ethernet transport, require a meaningful measured increase, then restore and verify defaults. A single absolute duration was noisy and is not sufficient causal evidence.
 - [x] Add a separate CI workflow that boots an Android emulator, starts a local API and authenticated worker, verifies upload → queue → ADB execution → result callback → persisted report, then checks an Appium primary-action journey with a screenshot artifact.
 
 ## Remaining before calling execution fully functional
@@ -35,7 +35,7 @@
 
 - [x] Implement and pass the Appium/UiAutomator2 fixture journey with explicit steps, assertions, screenshots, and repeatable checkpoints.
 - [ ] Add app-specific journey authoring, broader assertions, and error-state coverage for arbitrary uploaded applications.
-- [x] Verify a real request from the source-built fixture uses the Android emulator's cellular/Ethernet transport and meets the configured latency threshold while controls are active. CI evidence: HTTP 200, CELLULAR, 220 ms measured duration under a 35 ms setting. This does not prove arbitrary uploaded apps use the same path.
+- [ ] Verify a real request from the source-built fixture is measurably slower under the active emulator profile than its baseline on the same cellular/Ethernet transport. Earlier absolute-duration evidence varied (220 ms in one run, 13 ms in another) and does not establish causality.
 - [ ] Extend traffic-path verification to arbitrary app-specific requests and repeated baseline/latency/bandwidth/recovery experiments.
 - [ ] Run real app-request baseline, latency, bandwidth, packet-loss, outage, and recovery experiments; record requested vs verified conditions. Delay/bandwidth control readback exists, but packet loss and outage are not implemented, and `constraints_applied=false` remains until the full persona is enforced.
 - [ ] Add supported RAM/storage/CPU pressure controls or report those constraints as unsupported.
