@@ -20,6 +20,7 @@ cleanup() {
     BHARATSIM_ENABLE_NETEM=true "${SHAPER[@]}" clear --interface "$IFACE" >/dev/null 2>&1
   fi
   ip netns del "$NS" >/dev/null 2>&1
+  ip link del "$IFACE" >/dev/null 2>&1
 }
 trap cleanup EXIT
 
