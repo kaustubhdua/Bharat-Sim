@@ -27,3 +27,74 @@ class PackageNameValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+from unittest.mock import patch
+from subprocess import CompletedProcess
+
+from worker.runner import (
+    apply_emulator_network_profile,
+    parse_emulator_network_status,
+    reset_emulator_network_profile,
+)
+
+
+class EmulatorNetworkProfileTests(unittest.TestCase):
+    STATUS = """Current network status:
+ download speed: 1200000 bits/s (146.5 KB/s)
+ upload speed: 350000 bits/s (42.7 KB/s)
+ minimum latency: 180 ms
+ maximum latency: 180 ms
+ OK
+"""
+
+    def test_parse_status_readback(self):
+        self.assertEqual(
+            parse_emulator_network_status(self.STATUS),
+            {
+                "download_bps": 1200000,
+                "upload_bps": 350000,
+                "minimum_latency_ms": 180,
+                "maximum_latency_ms": 180,
+            },
+        )
+        self.assertIsNone(parse_emulator_network_status("OK\\nKO: invalid command"))
+
+    def test_applies_and_verifies_emulator_control_plane_without_overclaiming_traffic_path(self):
+        ok = CompletedProcess(args=[], returncode=0, stdout="OK\\n", stderr="")
+        status = CompletedProcess(args=[], returncode=0, stdout=self.STATUS, stderr="")
+        with patch("worker.runner.run_cmd", side_effect=[ok, ok, status]) as run:
+            evidence = apply_emulator_network_profile("emulator-5554", 180, 1200, 350, 2.0)
+        self.assertEqual(evidence["control_plane"]["status"], "verified")
+        self.assertTrue(evidence["network_constraints_applied"])
+        self.assertFalse(evidence["traffic_path_verified"])
+        self.assertIn("packet_loss", evidence["unsupported_controls"])
+        self.assertIn("ram_pressure", evidence["unsupported_controls"])
+        self.assertEqual(run.call_count, 3)
+        self.assertEqual(run.call_args_list[0].args[0][-2:], ["180", "180"])
+        self.assertEqual(run.call_args_list[1].args[0][-2:], ["350", "1200"])
+
+    def test_refuses_to_claim_emulator_controls_for_physical_device(self):
+        with patch("worker.runner.run_cmd") as run:
+            evidence = apply_emulator_network_profile("R58M123ABC", 180, 1200, 350, 0)
+        self.assertEqual(evidence["control_plane"]["status"], "unsupported")
+        self.assertFalse(evidence.get("network_constraints_applied", False))
+        run.assert_not_called()
+
+    def test_reset_requires_verified_default_readback(self):
+        ok = CompletedProcess(args=[], returncode=0, stdout="OK\\n", stderr="")
+        status = CompletedProcess(
+            args=[], returncode=0,
+            stdout="""Current network status:
+ download speed: 0 bits/s (0.0 KB/s)
+ upload speed: 0 bits/s (0.0 KB/s)
+ minimum latency: 0 ms
+ maximum latency: 0 ms
+ OK
+""", stderr=""
+        )
+        with patch("worker.runner.run_cmd", side_effect=[ok, ok, status]):
+            evidence = reset_emulator_network_profile("emulator-5554")
+        self.assertEqual(evidence["status"], "verified")
+
+
