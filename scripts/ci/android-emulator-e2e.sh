@@ -81,6 +81,9 @@ result = final.get("result") or {}
 assert result.get("apk_sha256") == uploaded["apk"]["sha256"], "APK evidence hash mismatch"
 assert result.get("runner_return_code") == 0, result
 assert result.get("package_name") == "org.bharatsim.smokeapp", result.get("package_name")
+assert result.get("execution_scope") == "install_launch_logcat_smoke", result
+assert result.get("constraints_applied") is False, result
+assert result.get("constraint_verification") == "unsupported_not_applied", result
 for step_name in ("install_apk", "launch_app", "collect_logcat"):
     step = next((s for s in result.get("steps", []) if s.get("name") == step_name), None)
     assert step and step.get("return_code") == 0, f"{step_name} failed: {step}"
@@ -90,6 +93,10 @@ report = {
     "run_id": run_id,
     "apk_sha256": uploaded["apk"]["sha256"],
     "result_status": result.get("status"),
+    "execution_scope": result.get("execution_scope"),
+    "requested_persona_id": result.get("requested_persona_id"),
+    "constraints_applied": result.get("constraints_applied"),
+    "result_interpretation": result.get("result_interpretation"),
     "steps": [s.get("name") for s in result.get("steps", [])],
     "fatal_exception_marker": result.get("fatal_exception_marker"),
     "api_saved_report": True,
