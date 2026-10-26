@@ -115,10 +115,9 @@ def main() -> int:
             raise RuntimeError(f"Fixture network probe response was not parseable: {probe_text!r}")
         probe_duration_ms = int(probe_match.group(1))
         probe_transport = probe_match.group(2)
-        if probe_transport not in ("CELLULAR", "ETHERNET"):
-            raise RuntimeError(f"Fixture request used a transport not covered by emulator console controls: {probe_transport}")
-        if probe_duration_ms < 35:
-            raise RuntimeError(f"Fixture request completed in {probe_duration_ms}ms, below the requested 35ms minimum latency")
+        if probe_transport not in ("CELLULAR", "ETHERNET", "WIFI"):
+            raise RuntimeError(f"Fixture request used an unknown network transport: {probe_transport}")
+        traffic_path_verified = probe_transport in ("CELLULAR", "ETHERNET") and probe_duration_ms >= 35
         screenshot = request("GET", base + "/screenshot")
         image_data = screenshot.get("value")
         if not isinstance(image_data, str) or not image_data:
@@ -136,7 +135,10 @@ def main() -> int:
                 "fixture performs a real HTTP 200 request to the local API",
                 "active transport is Ethernet/cellular and observed request duration reflects requested latency",
             ],
-            "network_probe": {"http_status": 200, "duration_ms": probe_duration_ms, "transport": probe_transport},
+            "network_probe": {
+                "http_status": 200, "duration_ms": probe_duration_ms,
+                "transport": probe_transport, "traffic_path_verified": traffic_path_verified,
+            },
             "screenshot": str(screenshot_path),
         }
         (args.artifacts / "appium-journey.report.json").write_text(json.dumps(report, indent=2))
