@@ -3,7 +3,8 @@ from subprocess import CompletedProcess
 from unittest.mock import patch
 
 from worker.tests.appium_smoke_journey import parse_probe_text
-from worker.tests.appium_smoke_journey import speed_limits_bps\nfrom worker.runner import (
+from worker.tests.appium_smoke_journey import speed_limits_bps
+from worker.runner import (
     apply_emulator_network_profile,
     extract_logcat_signals,
     parse_emulator_network_status,
@@ -21,14 +22,14 @@ class AppiumProbeStatusParserTests(unittest.TestCase):
         for status in (200, 206):
             with self.subTest(status=status):
                 parsed = parse_probe_text(
-                    f"HTTP {status} · 123 ms · CELLULAR · probe 8 · bytes 2000000 · attempts 2"
+                    f"HTTP {status} · 123 ms · CELLULAR · probe 8 · bytes 1000000 · attempts 2"
                 )
                 self.assertEqual(parsed, {
                     "http_status": status,
                     "duration_ms": 123,
                     "transport": "CELLULAR",
                     "sequence": 8,
-                    "bytes_read": 2000000,
+                    "bytes_read": 1000000,
                     "attempts": 2,
                 })
 
