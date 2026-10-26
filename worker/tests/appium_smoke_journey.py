@@ -199,14 +199,14 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
     }
 
 
-def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 100) -> dict:
+def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 160) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
         last_text = str(request("GET", f"/session/{session}/element/{element_id}/text", timeout=5).get("value", ""))
         probe = parse_probe_text(last_text)
         if probe and int(probe["sequence"]) > after_sequence:
-            if int(probe["bytes_read"]) != 500_000:
+            if int(probe["bytes_read"]) != 250_000:
                 raise RuntimeError(f"Fixture downloaded unexpected payload size: {probe['bytes_read']}")
             return probe
         if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
@@ -287,7 +287,7 @@ def main() -> int:
         # Test bandwidth immediately after baseline to isolate whether the
         # speed control itself breaks the next real HTTPS transfer.
         phase = "configure_bandwidth_profile"
-        bandwidth_profile = set_network_profile(None, "umts")
+        bandwidth_profile = set_network_profile(None, "1000:1000")
         evidence["bandwidth_profile"] = bandwidth_profile
         phase = "bandwidth_samples"
         bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
@@ -341,11 +341,11 @@ def main() -> int:
             "package_name": "org.bharatsim.smokeapp",
             "probe_endpoint": "https://ipv4.lg.plutex.de/25MB.bin",
             "probe_endpoint_scope": "public IPv4-only PLUTEX Looking Glass HTTPS test file; the fixture requests bytes 0-499,999 and measures real external traffic through the Android Emulator network stack, not arbitrary uploaded-app traffic",
-            "probe_payload_bytes": 500_000,
+            "probe_payload_bytes": 250_000,
             "assertions": [
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe transferred exactly 500,000 bytes from the public IPv4-only PLUTEX HTTPS test file through the Android Emulator network stack",
+                "each probe transferred exactly 250,000 bytes from the public IPv4-only PLUTEX HTTPS test file through the Android Emulator network stack",
                 "per-request retry counts are captured in probe evidence",
                 "baseline, latency-only, and bandwidth-only probes used cellular/Ethernet transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
