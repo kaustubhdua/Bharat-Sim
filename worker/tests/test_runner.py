@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from worker.runner import (
     apply_emulator_network_profile,
+    extract_logcat_signals,
     parse_emulator_network_status,
     parse_fixture_network_probe,
     reset_emulator_network_profile,
@@ -133,6 +134,37 @@ class EmulatorNetworkProfileTests(unittest.TestCase):
         self.assertEqual(evidence["status"], "verified")
 
 
+
+
+
+class StructuredLogcatSignalTests(unittest.TestCase):
+    def test_extracts_real_marker_lines_with_bounded_context(self):
+        logs = """01-01 00:00:00.000 I App: startup
+01-01 00:00:01.000 E AndroidRuntime: FATAL EXCEPTION: main
+01-01 00:00:01.001 E AndroidRuntime: java.lang.OutOfMemoryError: Failed allocation
+01-01 00:00:02.000 E ActivityManager: ANR in com.example.app
+01-01 00:00:03.000 W Network: java.net.SocketTimeoutException: timeout
+01-01 00:00:04.000 E Storage: No space left on device
+"""
+        signals = extract_logcat_signals(logs)
+        categories = [item["category"] for item in signals]
+        self.assertEqual(categories, ["crash", "oom", "anr", "network", "storage"])
+        self.assertEqual(signals[0]["line_number"], 2)
+        self.assertIn("FATAL EXCEPTION", signals[0]["marker"])
+        self.assertTrue(all(item["evidence"] for item in signals))
+        self.assertTrue(all(len(line["text"]) <= 400 for item in signals for line in item["evidence"]))
+
+    def test_caps_signal_count_to_prevent_unbounded_inline_reports(self):
+        logs = "\n".join(
+            f"line {index}: java.net.SocketTimeoutException: timeout"
+            for index in range(40)
+        )
+        signals = extract_logcat_signals(logs, max_signals=500)
+        self.assertEqual(len(signals), 20)
+        self.assertEqual(signals[-1]["line_number"], 20)
+
+    def test_clean_logs_return_no_synthetic_findings(self):
+        self.assertEqual(extract_logcat_signals("Activity started\\nUI rendered\\n"), [])
 
 
 if __name__ == "__main__":
