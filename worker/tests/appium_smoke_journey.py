@@ -7,6 +7,7 @@ import base64
 import json
 import re
 import subprocess
+import statistics
 import time
 import urllib.error
 import urllib.request
@@ -178,26 +179,44 @@ def main() -> int:
         status_id = find_element(session_id, "accessibility id", "journey-status")
         probe_id = find_element(session_id, "accessibility id", "network-probe-status")
 
-        request("POST", base + f"/element/{action_id}/click", {})
         status_text = request("GET", base + f"/element/{status_id}/text").get("value")
-        if status_text != "Primary action completed":
-            raise RuntimeError(f"Primary action state assertion failed: {status_text!r}")
-        baseline_probe = wait_for_probe(session_id, probe_id, after_sequence=0)
-        if baseline_probe["transport"] not in ("CELLULAR", "ETHERNET"):
-            raise RuntimeError(f"Baseline request used unsupported transport: {baseline_probe}")
+        if status_text != "Ready":
+            raise RuntimeError(f"Fixture did not start in the expected Ready state: {status_text!r}")
 
-        # Apply a substantially larger delay than ordinary measurement noise,
-        # verify the console readback, then issue a second real HTTPS request.
+        baseline_probes = []
+        last_sequence = 0
+        for _ in range(3):
+            request("POST", base + f"/element/{action_id}/click", {})
+            status_text = request("GET", base + f"/element/{status_id}/text").get("value")
+            if status_text != "Primary action completed":
+                raise RuntimeError(f"Primary action state assertion failed: {status_text!r}")
+            probe = wait_for_probe(session_id, probe_id, after_sequence=last_sequence)
+            if probe["transport"] not in ("CELLULAR", "ETHERNET"):
+                raise RuntimeError(f"Baseline request used unsupported transport: {probe}")
+            baseline_probes.append(probe)
+            last_sequence = probe["sequence"]
+
+        # Use repeated requests and compare medians so unrelated jitter in one
+        # HTTP request cannot masquerade as a verified network impairment.
         shaped_profile = set_network_profile(150)
-        request("POST", base + f"/element/{action_id}/click", {})
-        shaped_probe = wait_for_probe(session_id, probe_id, after_sequence=baseline_probe["sequence"])
-        delta_ms = shaped_probe["duration_ms"] - baseline_probe["duration_ms"]
-        if shaped_probe["transport"] not in ("CELLULAR", "ETHERNET"):
-            raise RuntimeError(f"Shaped request used unsupported transport: {shaped_probe}")
+        shaped_probes = []
+        for _ in range(3):
+            request("POST", base + f"/element/{action_id}/click", {})
+            probe = wait_for_probe(session_id, probe_id, after_sequence=last_sequence)
+            if probe["transport"] not in ("CELLULAR", "ETHERNET"):
+                raise RuntimeError(f"Shaped request used unsupported transport: {probe}")
+            shaped_probes.append(probe)
+            last_sequence = probe["sequence"]
+
+        baseline_median_ms = statistics.median(p["duration_ms"] for p in baseline_probes)
+        shaped_median_ms = statistics.median(p["duration_ms"] for p in shaped_probes)
+        delta_ms = shaped_median_ms - baseline_median_ms
         if delta_ms < 100:
             raise RuntimeError(
-                "Emulator delay was configured but not causally observed in the fixture request: "
-                f"baseline={baseline_probe}, shaped={shaped_probe}, delta_ms={delta_ms}"
+                "Emulator delay was configured but not causally observed in repeated fixture requests: "
+                f"baseline={baseline_probes}, shaped={shaped_probes}, "
+                f"baseline_median_ms={baseline_median_ms}, shaped_median_ms={shaped_median_ms}, "
+                f"delta_ms={delta_ms}"
             )
 
         screenshot = request("GET", base + "/screenshot")
@@ -216,12 +235,15 @@ def main() -> int:
                 "baseline and shaped requests return real HTTP 200 responses from https://example.com/",
                 "both requests use cellular/Ethernet transport",
                 "emulator network console readback matches the configured profile",
-                "shaped request is at least 100ms slower than baseline",
+                "three baseline and three shaped requests were measured on the same cellular/Ethernet transport",
+                "median shaped request is at least 100ms slower than median baseline",
             ],
             "baseline_profile": baseline_profile,
             "shaped_profile": shaped_profile,
-            "baseline_probe": baseline_probe,
-            "shaped_probe": shaped_probe,
+            "baseline_probes": baseline_probes,
+            "shaped_probes": shaped_probes,
+            "baseline_median_ms": baseline_median_ms,
+            "shaped_median_ms": shaped_median_ms,
             "observed_delta_ms": delta_ms,
             "traffic_path_verified": True,
             "screenshot": str(screenshot_path),
