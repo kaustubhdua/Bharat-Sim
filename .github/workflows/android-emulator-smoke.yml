@@ -92,8 +92,6 @@ jobs:
           gradle-version: "8.7"
       - name: Build known-good test APK
         working-directory: smoke-android
-        env:
-          BHARATSIM_PROBE_URL: http://10.0.2.2:8001/payload?bytes=2000000
         run: gradle --no-daemon assembleDebug
       - name: Add Android build-tools to PATH
         shell: bash
@@ -103,6 +101,28 @@ jobs:
           export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/35.0.0:$PATH"
           command -v adb
           test -x "$ANDROID_HOME/build-tools/35.0.0/aapt"
+      - name: Discover and verify hosted runner DNS
+        id: runner-dns
+        shell: bash
+        run: |
+          echo "Hosted runner resolver configuration:"
+          cat /etc/resolv.conf
+          dns_server=""
+          for resolver_file in /run/systemd/resolve/resolv.conf /etc/resolv.conf; do
+            if [ -r "$resolver_file" ]; then
+              dns_server="$(awk '$1 == "nameserver" && $2 !~ /^127\./ && $2 != "::1" { print $2; exit }' "$resolver_file")"
+              if [ -n "$dns_server" ]; then
+                break
+              fi
+            fi
+          done
+          if [ -z "$dns_server" ]; then
+            echo "Could not find a non-loopback upstream DNS resolver" >&2
+            exit 1
+          fi
+          echo "Selected upstream resolver: $dns_server"
+          getent ahostsv4 speed.cloudflare.com
+          echo "server=$dns_server" >> "$GITHUB_OUTPUT"
       - name: Enable KVM access
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -116,8 +136,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          # Explicit DNS keeps external HTTPS probes resolvable when the fixture switches to simulated cellular data.
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -dns-server 8.8.8.8,8.8.4.4
+          # Use the verified non-loopback upstream resolver from the hosted runner.
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -dns-server ${{ steps.runner-dns.outputs.server }}
           script: bash scripts/ci/android-emulator-e2e.sh
       - name: Preserve emulator smoke evidence
         if: always()
