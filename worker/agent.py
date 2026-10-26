@@ -104,6 +104,18 @@ def download_apk(base_url: str, token: str, job: dict[str, Any], target: Path) -
         raise WorkerError("Downloaded APK SHA-256 does not match the queued run")
 
 
+def annotate_execution_scope(report: dict[str, Any], job: dict[str, Any]) -> None:
+    """Make the distinction between smoke execution and constraint validation explicit."""
+    report["execution_scope"] = "install_launch_logcat_smoke"
+    report["result_interpretation"] = (
+        "Smoke procedure completed; this does not prove the app is healthy "
+        "or that the selected persona constraints were applied."
+    )
+    report["requested_persona_id"] = str(job.get("persona_id") or "unknown")
+    report["constraints_applied"] = False
+    report["constraint_verification"] = "unsupported_not_applied"
+
+
 def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duration: int) -> None:
     run_id = str(job["id"])
     lease_token = str(job["lease_token"])
@@ -140,17 +152,8 @@ def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duratio
                 report = {"status": "failed", "error": "Runner did not produce a report", "runner_return_code": completed.returncode}
             report.pop("device_serial", None)
             report.pop("logcat_artifact", None)
-            # A completed install/launch/logcat procedure is not an app-health pass.
-            # The selected persona is metadata only until resource/network constraints
-            # are actually applied and independently measured by a supported worker.
-            report["execution_scope"] = "install_launch_logcat_smoke"
-            report["result_interpretation"] = (
-                "Smoke procedure completed; this does not prove the app is healthy "
-                "or that the selected persona constraints were applied."
-            )
-            report["requested_persona_id"] = str(job.get("persona_id") or "unknown")
-            report["constraints_applied"] = False
-            report["constraint_verification"] = "unsupported_not_applied"
+            # This metadata deliberately prevents a smoke result from being read as a health pass.
+            annotate_execution_scope(report, job)
             # Keep the report well below the API's 250 KB JSON limit even with non-ASCII log text.
             for step in report.get("steps", []):
                 if isinstance(step, dict):
