@@ -307,15 +307,14 @@ def main() -> int:
         if isinstance(report.get("network_profile"), dict):
             report["network_profile"]["traffic_probe_log_return_code"] = network_probe_logs.returncode
             report["network_profile"]["traffic_probe"] = network_probe
-            requested = report["network_profile"].get("requested", {})
-            control = report["network_profile"].get("control_plane", {})
-            report["network_profile"]["traffic_path_verified"] = bool(
-                network_probe
-                and isinstance(requested, dict)
-                and isinstance(control, dict)
-                and control.get("status") == "verified"
-                and network_probe.get("transport") in ("CELLULAR", "ETHERNET")
-                and network_probe.get("duration_ms", 0) >= int(requested.get("latency_ms", 0))
+            # A single absolute duration cannot establish causality: an unshaped
+            # request can be slow for unrelated reasons. Only the dedicated
+            # baseline-versus-shaped Appium experiment may mark the fixture path
+            # verified after comparing repeated real requests under controlled
+            # profiles. Keep this worker report explicitly partial.
+            report["network_profile"]["traffic_path_verified"] = False
+            report["network_profile"]["traffic_path_verification"] = (
+                "unverified_single_sample_requires_baseline_comparison"
             )
         if report["fatal_exception_marker"]:
             report["status"] = "failed"
