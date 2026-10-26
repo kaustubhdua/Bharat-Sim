@@ -138,7 +138,7 @@ jobs:
           disable-animations: true
           # Android Emulator troubleshooting documents these Google IPv6/IPv4 resolvers for DNS failures.
           # If hosted-runner egress blocks them, the real traffic test must fail rather than claim success.
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -dns-server 2001:4860:4860::8844,2001:4860:4860::8888,8.8.8.8,8.8.4.4
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -dns-server ${{ steps.runner-dns.outputs.server }}
           script: bash scripts/ci/android-emulator-e2e.sh
       - name: Preserve emulator smoke evidence
         if: always()
