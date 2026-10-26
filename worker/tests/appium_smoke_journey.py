@@ -77,15 +77,13 @@ def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
     latency = "none" if latency_ms is None else str(latency_ms)
     adb("emu", "network", "delay", latency)
     adb("emu", "network", "speed", speed)
-    time.sleep(2)  # Let emulator profile changes settle without resetting transport.
-    if speed == "full":
-        upload_bps = download_bps = 0
-    else:
-        parts = speed.split(":")
-        if len(parts) != 2 or not all(part.isdigit() for part in parts):
-            raise ValueError(f"Invalid emulator speed profile: {speed}")
-        upload_bps = int(parts[0]) * 1000
-        download_bps = int(parts[1]) * 1000
+    # Changing emulator bandwidth can interrupt the emulated cellular route.
+    # Re-establish data before measuring rather than misclassifying a route transition.
+    adb("shell", "svc", "data", "disable")
+    adb("emu", "gsm", "data", "home")
+    adb("shell", "svc", "data", "enable")
+    time.sleep(5)
+    upload_bps, download_bps = speed_limits_bps(speed)
     expected = {
         "latency_ms": 0 if latency_ms is None else latency_ms,
         "download_bps": download_bps,
