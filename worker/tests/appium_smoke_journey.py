@@ -50,12 +50,12 @@ def adb(*args: str, timeout: int = 20) -> str:
 
 def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
     """Configure emulator latency and throughput, then require exact console readback."""
-    # Use the emulator Ethernet path: the console shaping controls apply to Ethernet
-    # and cellular, but cellular DNS was intermittent in hosted CI. Disable Wi-Fi and
-    # cellular data so the external HTTPS request uses Ethernet, then verify transport.
+    # Force the emulator cellular path while keeping Wi-Fi off. Do not hard-code
+    # public DNS servers in the emulator boot options; use the host-derived resolver.
+    adb("emu", "gsm", "voice", "home")
+    adb("emu", "gsm", "data", "home")
     adb("shell", "svc", "wifi", "disable")
-    adb("emu", "gsm", "data", "off")
-    adb("shell", "svc", "data", "disable")
+    adb("shell", "svc", "data", "enable")
     latency = "none" if latency_ms is None else str(latency_ms)
     adb("emu", "network", "delay", latency)
     adb("emu", "network", "speed", speed)
@@ -326,6 +326,16 @@ def main() -> int:
         print(json.dumps(report, indent=2))
         return 0
     except Exception:
+        try:
+            logcat = subprocess.run(
+                ["adb", "-s", ADB_SERIAL, "logcat", "-d", "-t", "5000", "-v", "threadtime"],
+                capture_output=True, text=True, timeout=20, check=False,
+            )
+            (args.artifacts / "appium-failure-logcat.txt").write_text(
+                logcat.stdout[-200_000:] + logcat.stderr[-10_000:]
+            )
+        except Exception as logcat_error:
+            (args.artifacts / "appium-failure-logcat-error.txt").write_text(str(logcat_error))
         if session_id:
             try:
                 page_source = str(request("GET", f"/session/{session_id}/source").get("value", ""))
