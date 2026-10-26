@@ -131,6 +131,81 @@ Path("artifacts/api-run.report.json").write_text(json.dumps(report, indent=2))
 print(json.dumps(report, indent=2))
 PY
 
+# Exercise a real Android install failure through the worker/API path.
+# The APK is structurally valid and has the same package name as the already
+# installed fixture, but is re-signed with a different key. Android must reject
+# the update because the signatures do not match; the worker must report failure
+# and attempt package cleanup instead of turning the procedure into a success.
+command -v keytool
+command -v apksigner
+adb install smoke-android/app/build/outputs/apk/debug/app-debug.apk
+keytool -genkeypair -noprompt \
+  -keystore artifacts/alternate-signing.jks \
+  -storepass bharatsim-ci-only -keypass bharatsim-ci-only \
+  -alias bharatsim-negative -keyalg RSA -keysize 2048 -validity 2 \
+  -dname "CN=BharatSim CI Install Failure Fixture"
+apksigner sign \
+  --ks artifacts/alternate-signing.jks \
+  --ks-key-alias bharatsim-negative \
+  --ks-pass pass:bharatsim-ci-only \
+  --key-pass pass:bharatsim-ci-only \
+  --out artifacts/alternate-signed.apk \
+  smoke-android/app/build/outputs/apk/debug/app-debug.apk
+curl --fail --silent --show-error \
+  -F persona_id=baseline \
+  -F "apk=@artifacts/alternate-signed.apk;type=application/vnd.android.package-archive" \
+  http://127.0.0.1:8000/api/v1/runs > artifacts/install-failure-upload-response.json
+
+python - <<'PYINSTALLFAIL'
+import json
+import time
+import urllib.request
+from pathlib import Path
+
+uploaded = json.loads(Path("artifacts/install-failure-upload-response.json").read_text())
+run_id = uploaded["id"]
+deadline = time.monotonic() + 120
+final = None
+while time.monotonic() < deadline:
+    with urllib.request.urlopen(f"http://127.0.0.1:8000/api/v1/runs/{run_id}", timeout=5) as response:
+        final = json.load(response)
+    if final["status"] in ("completed", "failed"):
+        break
+    time.sleep(1)
+if not final or final["status"] != "failed":
+    raise SystemExit(f"Signature-conflict APK did not fail closed: {final}")
+result = final.get("result") or {}
+if result.get("status") != "failed" or result.get("runner_return_code") == 0:
+    raise SystemExit(f"Install failure was not preserved by worker callback: {result}")
+if result.get("apk_sha256") != uploaded["apk"]["sha256"]:
+    raise SystemExit("Failed run lost or mismatched the uploaded APK SHA-256")
+steps = {step.get("name"): step for step in result.get("steps", [])}
+install = steps.get("install_apk")
+cleanup = steps.get("cleanup_uninstall")
+if not install or install.get("return_code") == 0:
+    raise SystemExit(f"Expected real Android install failure evidence: {install}")
+if not cleanup or cleanup.get("return_code") != 0:
+    raise SystemExit(f"Expected successful package cleanup after failed install: {cleanup}")
+Path("artifacts/install-failure.report.json").write_text(json.dumps({
+    "status": final["status"],
+    "run_id": run_id,
+    "apk_sha256": result["apk_sha256"],
+    "execution_scope": result.get("execution_scope"),
+    "failure_kind": "android_install_signature_conflict",
+    "install_return_code": install["return_code"],
+    "install_stderr_tail": install.get("stderr_tail", ""),
+    "cleanup_return_code": cleanup["return_code"],
+    "runner_return_code": result["runner_return_code"],
+    "result_interpretation": result.get("result_interpretation"),
+}, indent=2))
+print(json.dumps({
+    "status": final["status"],
+    "failure_kind": "android_install_signature_conflict",
+    "install_return_code": install["return_code"],
+    "cleanup_return_code": cleanup["return_code"],
+}, indent=2))
+PYINSTALLFAIL
+
 # Exercise the real worker failure callback with an APK-shaped archive whose
 # manifest is deliberately invalid. It must end in a failed report and must
 # never be represented as a successful execution.
