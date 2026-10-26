@@ -62,7 +62,7 @@ def speed_limits_bps(speed: str) -> tuple[int, int]:
     """Return expected (upload, download) bits/s for supported emulator speed profiles."""
     presets = {
         "full": (0, 0),
-        "umts": (128_000, 1_920_000),
+        "umts": (384_000, 384_000),
     }
     if speed in presets:
         return presets[speed]
