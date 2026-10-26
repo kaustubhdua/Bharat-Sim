@@ -18,7 +18,8 @@ import java.net.URL;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
-    // CI injects a controlled payload endpoint through BuildConfig; this fixture does not represent arbitrary APK traffic.\n    private static final String PROBE_URL = BuildConfig.PROBE_URL;
+    // CI injects a controlled payload endpoint through BuildConfig; this fixture does not represent arbitrary APK traffic.
+    private static final String PROBE_URL = BuildConfig.PROBE_URL;
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
