@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -310,6 +310,19 @@ def health_ready():
         "timestamp": utcnow(),
     }
     return JSONResponse(status_code=200 if database_ok else 503, content=payload)
+
+@app.get("/__ci/network-payload", include_in_schema=False)
+def ci_network_payload():
+    """Controlled payload for CI-only emulator traffic measurements; disabled by default."""
+    if os.getenv("BHARATSIM_ENABLE_TEST_NETWORK_PROBE") != "true":
+        raise HTTPException(status_code=404, detail="Not found")
+    payload = b"B" * 2_000_000
+    return Response(
+        content=payload,
+        media_type="application/octet-stream",
+        headers={"Cache-Control": "no-store", "X-BharatSim-Test-Payload-Bytes": str(len(payload))},
+    )
+
 
 @app.get("/api/v1/personas")
 def list_personas():
