@@ -84,6 +84,7 @@ public final class MainActivity extends Activity {
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(10000);
             connection.setRequestMethod("GET");
+            connection.setRequestProperty("Connection", "close");
             statusCode = connection.getResponseCode();
             if (statusCode == 200) {
                 connection.getInputStream().close();
