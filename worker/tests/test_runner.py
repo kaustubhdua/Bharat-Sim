@@ -101,14 +101,16 @@ class EmulatorNetworkProfileTests(unittest.TestCase):
         self.assertEqual(run.call_args_list[1].args[0][-1], "350:1200")
 
     def test_parse_fixture_probe_from_filtered_logcat(self):
-        evidence = parse_fixture_network_probe(
-            "06-01 10:00:00.000 I BharatSimNetworkProbe: "
-            "BHARATSIM_NETWORK_PROBE status=HTTP_206 duration_ms=91 transport=CELLULAR"
-        )
-        self.assertEqual(
-            evidence,
-            {"http_status": 206, "duration_ms": 91, "transport": "CELLULAR"},
-        )
+        for status in (200, 206):
+            with self.subTest(status=status):
+                evidence = parse_fixture_network_probe(
+                    "06-01 10:00:00.000 I BharatSimNetworkProbe: "
+                    f"BHARATSIM_NETWORK_PROBE status=HTTP_{status} duration_ms=91 transport=CELLULAR"
+                )
+                self.assertEqual(
+                    evidence,
+                    {"http_status": status, "duration_ms": 91, "transport": "CELLULAR"},
+                )
 
     def test_refuses_to_claim_emulator_controls_for_physical_device(self):
         with patch("worker.runner.run_cmd") as run:
