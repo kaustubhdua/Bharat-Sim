@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import re
 import time
 import urllib.error
 import urllib.request
@@ -61,6 +62,19 @@ def find_element(session: str, using: str, value: str, timeout: int = 25) -> str
     raise RuntimeError(f"Could not find element ({using}={value}) within {timeout}s: {last_error}")
 
 
+def wait_for_text(session: str, element_id: str, prefix: str, timeout: int = 60) -> str:
+    deadline = time.monotonic() + timeout
+    last_text = ""
+    while time.monotonic() < deadline:
+        last_text = str(request("GET", f"/session/{session}/element/{element_id}/text").get("value", ""))
+        if last_text.startswith(prefix):
+            return last_text
+        if "probe failed" in last_text.lower() or "returned HTTP" in last_text:
+            raise RuntimeError(f"Fixture network probe failed: {last_text}")
+        time.sleep(1)
+    raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts"))
@@ -94,6 +108,17 @@ def main() -> int:
         status_text = request("GET", base + f"/element/{status_id}/text").get("value")
         if status_text != "Primary action completed":
             raise RuntimeError(f"Primary action state assertion failed: {status_text!r}")
+        probe_id = find_element(session_id, "accessibility id", "network-probe-status")
+        probe_text = wait_for_text(session_id, probe_id, "HTTP 200")
+        probe_match = re.fullmatch(r"HTTP 200 · (\\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER)", probe_text)
+        if not probe_match:
+            raise RuntimeError(f"Fixture network probe response was not parseable: {probe_text!r}")
+        probe_duration_ms = int(probe_match.group(1))
+        probe_transport = probe_match.group(2)
+        if probe_transport not in ("CELLULAR", "ETHERNET"):
+            raise RuntimeError(f"Fixture request used a transport not covered by emulator console controls: {probe_transport}")
+        if probe_duration_ms < 35:
+            raise RuntimeError(f"Fixture request completed in {probe_duration_ms}ms, below the requested 35ms minimum latency")
         screenshot = request("GET", base + "/screenshot")
         image_data = screenshot.get("value")
         if not isinstance(image_data, str) or not image_data:
@@ -108,7 +133,10 @@ def main() -> int:
                 "fixture title is visible",
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
+                "fixture performs a real HTTP 200 request to the local API",
+                "active transport is Ethernet/cellular and observed request duration reflects requested latency",
             ],
+            "network_probe": {"http_status": 200, "duration_ms": probe_duration_ms, "transport": probe_transport},
             "screenshot": str(screenshot_path),
         }
         (args.artifacts / "appium-journey.report.json").write_text(json.dumps(report, indent=2))
