@@ -21,17 +21,18 @@
 
 ### P0 — Prove real Android execution
 
-- [ ] Provision a disposable emulator worker with Android SDK platform-tools and build-tools.
-- [ ] Run a real, authorized APK end to end through the dashboard/API → queue → worker → ADB → callback → saved report.
+- [x] Provision a disposable Android emulator in GitHub Actions with Android SDK platform-tools and build-tools.
+- [x] Execute a source-built, authorized fixture APK through local FastAPI upload → queue/lease → worker → ADB install/launch/logcat → result callback → persisted run report. The first run proved this path; the combined workflow remains red until the Appium journey also passes.
+- [ ] Pass the Appium/UiAutomator2 primary-action UI assertion in the emulator workflow; a previous run reached the UI step but failed to locate the action element.
 - [ ] Exercise install failure, launch failure, worker crash, timeout, stale lease, duplicate callback, and retry recovery on a real worker.
 - [ ] Verify worker heartbeats and run evidence survive API restarts.
 - [ ] Capture screenshots and structured crash/ANR/exit evidence; distinguish a completed smoke procedure from a passing app journey.
 
 ### P0 — Make constraints truthful
 
-- [ ] Implement Appium/UiAutomator2 journeys with explicit steps, assertions, screenshots, and repeatable checkpoints.
+- [ ] Stabilize and pass the Appium/UiAutomator2 fixture journey with explicit steps, assertions, screenshots, and repeatable checkpoints. The workflow is implemented but not yet green.
 - [ ] Wire network profiles to an isolated emulator traffic path and verify actual traffic traverses the shaper.
-- [ ] Run baseline, latency, bandwidth, packet-loss, outage, and recovery experiments; record requested vs verified conditions.
+- [ ] Run baseline, latency, bandwidth, packet-loss, outage, and recovery experiments; record requested vs verified conditions. The current runner now explicitly reports `constraints_applied=false` rather than implying persona constraints were enforced.
 - [ ] Add supported RAM/storage/CPU pressure controls or report those constraints as unsupported.
 - [ ] Validate at least one low-cost physical Android device before making real-device fidelity claims.
 
