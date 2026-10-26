@@ -90,9 +90,10 @@ public final class MainActivity extends Activity {
                 connection.setRequestProperty("Connection", "close");
                 connection.setRequestProperty("Accept-Encoding", "identity");
                 connection.setRequestProperty("Cache-Control", "no-cache");
+                connection.setRequestProperty("Range", "bytes=0-1999999");
                 connection.setUseCaches(false);
                 statusCode = connection.getResponseCode();
-                if (statusCode != 200) {
+                if (statusCode != 200 && statusCode != 206) {
                     throw new java.io.IOException("Unexpected HTTP status " + statusCode);
                 }
                 // Read exactly the requested bounded payload. Do not wait for
@@ -111,10 +112,10 @@ public final class MainActivity extends Activity {
                     throw new IllegalStateException("Expected 2000000 probe bytes, received " + bytesRead);
                 }
                 long duration = SystemClock.elapsedRealtime() - started;
-                Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_200 duration_ms=" + duration
+                Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + statusCode + " duration_ms=" + duration
                         + " transport=" + transport + " probe=" + sequence
                         + " bytes_read=" + bytesRead + " attempts=" + attempt);
-                final String message = "HTTP 200 · " + duration + " ms · " + transport
+                final String message = "HTTP " + statusCode + " · " + duration + " ms · " + transport
                         + " · probe " + sequence + " · bytes " + bytesRead + " · attempts " + attempt;
                 runOnUiThread(() -> target.setText(message));
                 return;
