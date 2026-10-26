@@ -117,6 +117,45 @@ jobs:
           # Explicit DNS is required because the fixture measures a real public HTTPS download.
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -dns-server 8.8.8.8,8.8.4.4
           script: bash scripts/ci/android-emulator-e2e.sh
+      - name: Generate evidence artifact manifest
+        if: always()
+        env:
+          EVIDENCE_COMMIT: ${{ github.sha }}
+          EVIDENCE_RUN_ID: ${{ github.run_id }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path("artifacts")
+          root.mkdir(parents=True, exist_ok=True)
+          records = []
+          for path in sorted(root.rglob("*")):
+              if not path.is_file() or path.name == "evidence-manifest.json":
+                  continue
+              digest = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              records.append({
+                  "path": str(path.relative_to(root)),
+                  "size_bytes": path.stat().st_size,
+                  "sha256": digest.hexdigest(),
+              })
+          manifest = {
+              "schema_version": "1.0",
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "github_run_id": os.environ["EVIDENCE_RUN_ID"],
+              "commit_sha": os.environ["EVIDENCE_COMMIT"],
+              "artifact_count": len(records),
+              "artifacts": records,
+          }
+          (root / "evidence-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n")
+          print(json.dumps({"artifact_count": len(records), "manifest": str(root / "evidence-manifest.json")}, indent=2))
+          PY
       - name: Preserve emulator smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
