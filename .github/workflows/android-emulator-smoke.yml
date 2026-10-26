@@ -63,6 +63,30 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null
           set -o pipefail
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Preinstall emulator image with transient-download retries
+        shell: bash
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
+          fi
+          test -x "$SDKMANAGER"
+          installed=false
+          for attempt in 1 2 3 4 5; do
+            echo "Installing emulator and API 35 Google APIs image (attempt $attempt/5)"
+            if "$SDKMANAGER" --install "emulator" "system-images;android-35;google_apis;x86_64"; then
+              installed=true
+              break
+            fi
+            if [ "$attempt" -lt 5 ]; then
+              sleep "$((attempt * 10))"
+            fi
+          done
+          if [ "$installed" != true ]; then
+            echo "Android emulator image installation failed after five attempts" >&2
+            exit 1
+          fi
+          "$SDKMANAGER" --list_installed | grep -F "system-images;android-35;google_apis;x86_64"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
