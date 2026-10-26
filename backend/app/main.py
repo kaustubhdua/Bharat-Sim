@@ -457,6 +457,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
         return {"job": {
             "id": row["id"], "apk_name": row["apk_name"], "apk_sha256": row["apk_sha256"],
             "persona_id": row["persona_id"], "attempt": row["attempts"] + 1,
+            "persona_profile": PERSONAS.get(row["persona_id"], {}),
             "lease_token": lease_token, "lease_until": lease_until,
             "apk_url": f"/internal/worker/runs/{row['id']}/apk",
             "heartbeat_url": f"/internal/worker/runs/{row['id']}/heartbeat",
