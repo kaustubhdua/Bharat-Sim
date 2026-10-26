@@ -19,6 +19,7 @@ import java.net.URL;
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
+    private static final int PROBE_BYTES = 1_000_000;
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -90,7 +91,7 @@ public final class MainActivity extends Activity {
                 connection.setRequestProperty("Connection", "close");
                 connection.setRequestProperty("Accept-Encoding", "identity");
                 connection.setRequestProperty("Cache-Control", "no-cache");
-                connection.setRequestProperty("Range", "bytes=0-1999999");
+                connection.setRequestProperty("Range", "bytes=0-" + (PROBE_BYTES - 1));
                 connection.setUseCaches(false);
                 statusCode = connection.getResponseCode();
                 if (statusCode != 200 && statusCode != 206) {
@@ -101,15 +102,15 @@ public final class MainActivity extends Activity {
                 // may keep the connection alive after delivering the requested bytes.
                 try (java.io.InputStream input = connection.getInputStream()) {
                     byte[] buffer = new byte[8192];
-                    while (bytesRead < 2000000) {
-                        int wanted = Math.min(buffer.length, 2000000 - bytesRead);
+                    while (bytesRead < PROBE_BYTES) {
+                        int wanted = Math.min(buffer.length, PROBE_BYTES - bytesRead);
                         int count = input.read(buffer, 0, wanted);
                         if (count == -1) break;
                         bytesRead += count;
                     }
                 }
-                if (bytesRead != 2000000) {
-                    throw new IllegalStateException("Expected 2000000 probe bytes, received " + bytesRead);
+                if (bytesRead != PROBE_BYTES) {
+                    throw new IllegalStateException("Expected " + PROBE_BYTES + " probe bytes, received " + bytesRead);
                 }
                 long duration = SystemClock.elapsedRealtime() - started;
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + statusCode + " duration_ms=" + duration
