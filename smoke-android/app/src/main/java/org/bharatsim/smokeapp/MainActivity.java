@@ -17,7 +17,6 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import javax.net.ssl.SNIHostName;
@@ -27,7 +26,6 @@ import javax.net.ssl.SSLSocketFactory;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
-    private static final String PROBE_URL = "https://example.com/";
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -101,10 +99,10 @@ public final class MainActivity extends Activity {
             socket.startHandshake();
 
             OutputStream output = socket.getOutputStream();
-            output.write(("GET /cdn-cgi/trace HTTP/1.1\\r\\n"
-                    + "Host: cloudflare-dns.com\\r\\n"
-                    + "Accept: text/plain\\r\\n"
-                    + "Connection: close\\r\\n\\r\\n").getBytes(StandardCharsets.US_ASCII));
+            output.write(("GET /cdn-cgi/trace HTTP/1.1\r\n"
+                    + "Host: cloudflare-dns.com\r\n"
+                    + "Accept: text/plain\r\n"
+                    + "Connection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
             output.flush();
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
