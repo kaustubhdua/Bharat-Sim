@@ -13,8 +13,15 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Button;
 
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
@@ -79,23 +86,31 @@ public final class MainActivity extends Activity {
         long started = SystemClock.elapsedRealtime();
         String transport = activeTransport();
         int statusCode = -1;
-        // This is a real request to a public endpoint at an IPv4 address resolved
-        // on the host runner. Pinning the IP avoids guest DNS dependency while the
-        // request still traverses the emulator's simulated cellular network.
-        try {
-            HttpURLConnection connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
-            connection.setInstanceFollowRedirects(false);
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Connection", "close");
-            statusCode = connection.getResponseCode();
-            if (statusCode >= 200 && statusCode < 400) {
-                connection.getInputStream().close();
-            } else if (connection.getErrorStream() != null) {
-                connection.getErrorStream().close();
+        // Resolve the public endpoint on the host runner and pin its IPv4 here,
+        // so guest DNS is not needed. The explicit Host header preserves the
+        // intended virtual host while traffic traverses the emulator's cellular path.
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(InetAddress.getByName(BuildConfig.PROBE_IP), 80), 10000);
+            socket.setSoTimeout(10000);
+            OutputStream output = socket.getOutputStream();
+            String request = "GET / HTTP/1.1\r\n"
+                    + "Host: example.com\r\n"
+                    + "User-Agent: BharatSimNetworkProbe/1.0\r\n"
+                    + "Connection: close\r\n\r\n";
+            output.write(request.getBytes(StandardCharsets.US_ASCII));
+            output.flush();
+
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(socket.getInputStream(), StandardCharsets.ISO_8859_1));
+            String statusLine = reader.readLine();
+            Matcher matcher = statusLine == null ? null
+                    : Pattern.compile("^HTTP/1\\.[01] (\\d{3})(?: .*)?$").matcher(statusLine);
+            if (matcher == null || !matcher.matches()) {
+                throw new IllegalStateException("Invalid HTTP status line from pinned public endpoint");
             }
-            connection.disconnect();
+            statusCode = Integer.parseInt(matcher.group(1));
+            // Read the response through EOF so duration includes the actual round trip.
+            while (reader.readLine() != null) { }
         } catch (Exception exception) {
             Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport + " probe=" + sequence, exception);
             final String message = "Network probe failed: " + exception.getClass().getSimpleName();
