@@ -92,8 +92,6 @@ jobs:
           gradle-version: "8.7"
       - name: Build known-good test APK
         working-directory: smoke-android
-        env:
-          BHARATSIM_PROBE_URL: http://10.0.2.2:8001/payload?bytes=250000
         run: gradle --no-daemon assembleDebug
       - name: Add Android build-tools to PATH
         shell: bash
@@ -116,8 +114,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          # The probe endpoint is served locally by the CI host through emulator alias 10.0.2.2.
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          # Explicit DNS is required because the fixture measures a real public HTTPS download.
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -dns-server 8.8.8.8,8.8.4.4
           script: bash scripts/ci/android-emulator-e2e.sh
       - name: Preserve emulator smoke evidence
         if: always()
