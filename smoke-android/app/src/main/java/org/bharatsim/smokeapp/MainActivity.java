@@ -35,6 +35,7 @@ public final class MainActivity extends Activity {
 
         Button action = new Button(this);
         action.setText("Run primary action");
+        action.setContentDescription("primary-action");
         action.setOnClickListener(view -> status.setText("Primary action completed"));
 
         layout.addView(title);
