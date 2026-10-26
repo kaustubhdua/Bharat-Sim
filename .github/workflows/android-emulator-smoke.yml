@@ -66,6 +66,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
+      - name: Set controlled network probe endpoint
+        shell: bash
+        run: |
+          HOST_IP="$(ip -4 route get 1.1.1.1 | awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}')"
+          test -n "$HOST_IP"
+          echo "BHARATSIM_PROBE_URL=http://${HOST_IP}:8000/__ci/network-payload" >> "$GITHUB_ENV"
       - name: Build known-good test APK
         working-directory: smoke-android
         run: gradle --no-daemon assembleDebug
