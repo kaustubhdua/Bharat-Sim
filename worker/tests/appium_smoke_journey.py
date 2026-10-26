@@ -285,7 +285,7 @@ def main() -> int:
         evidence["baseline_probes"] = baseline_probes
 
         # Test bandwidth immediately after baseline to isolate whether the
-        # speed control itself breaks the next real HTTPS transfer.
+        # speed control itself affects the next real HTTP transfer.
         phase = "configure_bandwidth_profile"
         bandwidth_profile = set_network_profile(None, "1000:1000")
         evidence["bandwidth_profile"] = bandwidth_profile
