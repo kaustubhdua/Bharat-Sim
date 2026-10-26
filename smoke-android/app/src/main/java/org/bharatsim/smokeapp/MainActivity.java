@@ -13,20 +13,12 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Button;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import javax.net.ssl.SNIHostName;
-import javax.net.ssl.SSLParameters;
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
+    private static final String PROBE_URL = "http://10.0.2.2:8000/health/live";
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -87,38 +79,22 @@ public final class MainActivity extends Activity {
         long started = SystemClock.elapsedRealtime();
         String transport = activeTransport();
         int statusCode = -1;
-        // Use a fixed Cloudflare anycast IP to avoid making DNS resolution a
-        // hidden dependency of the network-shaping experiment. TLS still uses
-        // SNI and hostname verification for cloudflare-dns.com.
-        try (Socket rawSocket = new Socket()) {
-            rawSocket.connect(new InetSocketAddress("1.1.1.1", 443), 10000);
-            // Wrap the connected socket with the DNS hostname so TLS endpoint
-            // verification validates cloudflare-dns.com, not the pinned IP.
-            try (SSLSocket socket = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
-                    .createSocket(rawSocket, "cloudflare-dns.com", 443, true)) {
-                socket.setSoTimeout(10000);
-                SSLParameters parameters = socket.getSSLParameters();
-                parameters.setEndpointIdentificationAlgorithm("HTTPS");
-                parameters.setServerNames(Collections.singletonList(new SNIHostName("cloudflare-dns.com")));
-                socket.setSSLParameters(parameters);
-                socket.startHandshake();
-
-                OutputStream output = socket.getOutputStream();
-                output.write(("GET /dns-query?name=example.com&type=A HTTP/1.1\r\n"
-                        + "Host: cloudflare-dns.com\r\n"
-                        + "Accept: application/dns-json\r\n"
-                        + "Connection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
-                output.flush();
-                BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
-                String statusLine = reader.readLine();
-                if (statusLine != null) {
-                    java.util.regex.Matcher matcher = java.util.regex.Pattern
-                            .compile("^HTTP/1\\.[01] (\\d{3})(?:\\s.*)?$")
-                            .matcher(statusLine);
-                    if (matcher.matches()) statusCode = Integer.parseInt(matcher.group(1));
-                }
+        // This is a real request from the Android guest to the running BharatSim
+        // API through the emulator's host gateway. It avoids external DNS and
+        // third-party uptime dependencies while exercising the actual network path.
+        try {
+            HttpURLConnection connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(10000);
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Connection", "close");
+            statusCode = connection.getResponseCode();
+            if (statusCode == 200) {
+                connection.getInputStream().close();
+            } else if (connection.getErrorStream() != null) {
+                connection.getErrorStream().close();
             }
+            connection.disconnect();
         } catch (Exception exception) {
             Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport + " probe=" + sequence, exception);
             final String message = "Network probe failed: " + exception.getClass().getSimpleName();
