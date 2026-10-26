@@ -17,6 +17,7 @@ public final class MainActivity extends Activity {
         layout.setBackgroundColor(Color.rgb(245, 248, 242));
         TextView title = new TextView(this);
         title.setText("BharatSim Android smoke test");
+        title.setContentDescription("fixture-title");
         title.setTextSize(24);
         title.setTextColor(Color.rgb(30, 70, 45));
         title.setGravity(Gravity.CENTER);
