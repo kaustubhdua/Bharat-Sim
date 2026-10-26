@@ -10,7 +10,7 @@ android {
         targetSdk 28
         versionCode 1
         versionName "1.0"
-        buildConfigField "String", "PROBE_URL", "\\"${probeUrl}\\""
+        buildConfigField "String", "PROBE_URL", "\"${probeUrl}\""
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
