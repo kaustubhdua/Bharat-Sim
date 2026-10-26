@@ -21,7 +21,7 @@ public final class MainActivity extends Activity {
         title.setTextColor(Color.rgb(30, 70, 45));
         title.setGravity(Gravity.CENTER);
         TextView detail = new TextView(this);
-        detail.setText("REAL EMULATOR FIXTURE\\nInstall • Launch • Observe • Collect logs");
+        detail.setText("REAL EMULATOR FIXTURE\nInstall • Launch • Observe • Collect logs");
         detail.setTextSize(16);
         detail.setTextColor(Color.DKGRAY);
         detail.setGravity(Gravity.CENTER);
