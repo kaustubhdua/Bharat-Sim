@@ -118,6 +118,11 @@ def main() -> int:
         if probe_transport not in ("CELLULAR", "ETHERNET", "WIFI"):
             raise RuntimeError(f"Fixture request used an unknown network transport: {probe_transport}")
         traffic_path_verified = probe_transport in ("CELLULAR", "ETHERNET") and probe_duration_ms >= 35
+        if not traffic_path_verified:
+            raise RuntimeError(
+                "Network traffic path was not verified under the active emulator profile: "
+                f"transport={probe_transport}, duration_ms={probe_duration_ms}, required_latency_ms=35"
+            )
         screenshot = request("GET", base + "/screenshot")
         image_data = screenshot.get("value")
         if not isinstance(image_data, str) or not image_data:
@@ -133,7 +138,8 @@ def main() -> int:
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
                 "fixture performs a real HTTP 200 request to the local API",
-                "active transport is Ethernet/cellular and observed request duration reflects requested latency",
+                "real HTTP request ran on cellular/Ethernet while emulator latency profile was active",
+                "measured request duration met the 35ms minimum-latency check",
             ],
             "network_probe": {
                 "http_status": 200, "duration_ms": probe_duration_ms,
