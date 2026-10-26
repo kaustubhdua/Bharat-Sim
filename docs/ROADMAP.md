@@ -17,7 +17,7 @@
 - [x] Network shaper apply parses and compares `tc`-reported delay, jitter, loss and rate settings.
 - [x] CI creates a disposable Linux network namespace and veth pair, measures actual ping RTT before and after shaping, requires the configured delay to be observable, and verifies qdisc cleanup. This proves the Linux prototype on that veth only.
 - [x] Pass server-authored persona network targets to the worker; apply Android Emulator console latency and upload/download speed controls, read back the configured values, and verify restoration to defaults after each run.
-- [ ] Revalidate the differential traffic-path experiment using real requests from the Android guest to the running BharatSim API health endpoint through the emulator host gateway on the controlled cellular path. A previous external-HTTPS probe measured baseline median 88 ms vs shaped median 233 ms (+145 ms) under a 150 ms delay and verified reset, but subsequent runs exposed DNS and transport-path reliability problems. Do not count the earlier result as proof for the current probe revision until the new CI run passes. This gate covers the source-built fixture only.
+- [ ] Revalidate differential traffic-path experiment using real HTTP requests from the Android guest to a host-resolved, pinned public IPv4 endpoint with `Host: example.com`, over the controlled cellular path. Do not use the emulator host gateway for this test because it bypassed the intended network shaping in observed runs. Earlier external-HTTPS measurement (88 ms baseline vs 233 ms shaped) is historical and not proof for the current probe revision. Require a fresh passing CI run and verified reset. This gate covers the source-built fixture only.
 - [x] Add a separate CI workflow that boots an Android emulator, starts a local API and authenticated worker, verifies upload → queue → ADB execution → result callback → persisted report, then checks an Appium primary-action journey with a screenshot artifact.
 
 ## Remaining before calling execution fully functional
@@ -35,7 +35,7 @@
 
 - [x] Implement and pass the Appium/UiAutomator2 fixture journey with explicit steps, assertions, screenshots, and repeatable checkpoints.
 - [ ] Add app-specific journey authoring, broader assertions, and error-state coverage for arbitrary uploaded applications.
-- [x] Verify a real request from the source-built fixture is measurably slower under the active emulator profile than its baseline on the same cellular/Ethernet transport. Latest CI: median 88 ms baseline vs 233 ms shaped, +145 ms; network profile reset verified.
+- [ ] Verify pinned public-endpoint requests from the source-built fixture are measurably slower under the active emulator profile than baseline on the same controlled cellular transport. Earlier 88 ms vs 233 ms measurement is historical; the current DNS-independent test must pass before this is marked complete.
 - [ ] Extend traffic-path verification to arbitrary app-specific requests and repeated baseline/latency/bandwidth/recovery experiments.
 - [ ] Run real app-request baseline, latency, bandwidth, packet-loss, outage, and recovery experiments; record requested vs verified conditions. Delay/bandwidth control readback exists, but packet loss and outage are not implemented, and `constraints_applied=false` remains until the full persona is enforced.
 - [ ] Add supported RAM/storage/CPU pressure controls or report those constraints as unsupported.
