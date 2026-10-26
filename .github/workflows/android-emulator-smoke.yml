@@ -92,8 +92,6 @@ jobs:
           gradle-version: "8.7"
       - name: Build known-good test APK
         working-directory: smoke-android
-        env:
-          BHARATSIM_PROBE_URL: http://10.0.2.2:8001/payload?bytes=2000000
         run: gradle --no-daemon assembleDebug
       - name: Add Android build-tools to PATH
         shell: bash
