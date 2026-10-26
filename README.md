@@ -2,7 +2,7 @@
 
 **The Cheap Phone Test** — test Android apps under constrained device and unreliable-network conditions, then explain failures with traceable evidence.
 
-> **Status: MVP with an authenticated worker-dispatch prototype.** The API, responsive dashboard, log analysis, risk planner, APK upload validation, lease-based job protocol, and local ADB smoke worker are implemented. A real public deployment, production sandbox review, verified network impairment, and physical-device validation are not yet verified.
+> **Status: MVP with an authenticated worker-dispatch prototype.** The API, responsive dashboard, log analysis, risk planner, APK upload validation, lease-based job protocol, and local ADB smoke worker are implemented. The GitHub Actions Android emulator workflow now exercises the real local API → queue → worker → ADB → callback → saved-report path using a source-built fixture APK. The Appium UI assertion is being stabilized; public deployment, production sandbox review, verified network impairment, and physical-device validation remain unverified.
 
 ## What works in this repository
 
@@ -14,7 +14,8 @@
 - Deterministic logcat signal analysis, failure fingerprints, evidence-linked findings, and a transparent heuristic BharatScore.
 - React/Vite dashboard with run history, worker heartbeat status, log analysis, and report inspection.
 - Docker Compose setup for local API/dashboard deployment, with a loopback-only web binding by default.
-- CI for backend tests, frontend production build, worker safety guards, and container builds. A separate Android emulator workflow builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, and uploads short-lived evidence.
+- CI for backend tests, frontend production build, worker safety guards, and container builds.
+- Dedicated Android emulator workflow that builds a known-good fixture APK, tests API-backed worker execution, and runs an Appium UI assertion with evidence artifacts. Do not interpret a smoke-completed status as proof of app health or persona constraint enforcement. A separate Android emulator workflow builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, and uploads short-lived evidence.
 
 ## What is not complete
 
