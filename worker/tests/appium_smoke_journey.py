@@ -53,7 +53,7 @@ def set_network_profile(latency_ms: int | None) -> dict:
     # Network delay/speed controls affect the emulator's simulated mobile
     # network. Register cellular service and disable Wi-Fi so measurements
     # cannot silently bypass the profile on the Wi-Fi path. The fixture probe
-    # uses a pinned IP with validated TLS SNI, avoiding cellular DNS dependency.
+    # uses a pinned public IPv4 HTTP endpoint, avoiding guest-side DNS dependency.
     adb("emu", "gsm", "voice", "home")
     adb("emu", "gsm", "data", "home")
     adb("shell", "svc", "wifi", "disable")
@@ -173,8 +173,11 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
     while time.monotonic() < deadline:
         last_text = str(request("GET", f"/session/{session}/element/{element_id}/text").get("value", ""))
         match = PROBE_RE.fullmatch(last_text)
-        if match and int(match.group(3)) > after_sequence:
-            return {"duration_ms": int(match.group(1)), "transport": match.group(2), "sequence": int(match.group(3))}
+        if match and int(match.group(4)) > after_sequence:
+            status_code = int(match.group(1))
+            if not 200 <= status_code < 400:
+                raise RuntimeError(f"Fixture public endpoint returned HTTP {status_code}: {last_text}")
+            return {"http_status": status_code, "duration_ms": int(match.group(2)), "transport": match.group(3), "sequence": int(match.group(4))}
         if "probe failed" in last_text.lower() or "returned HTTP" in last_text.lower():
             raise RuntimeError(f"Fixture network probe failed: {last_text}")
         time.sleep(0.5)
@@ -221,7 +224,7 @@ def main() -> int:
         if status_text != "Ready":
             raise RuntimeError(f"Fixture did not start in the expected Ready state: {status_text!r}")
 
-        # Warm up DNS/TLS once; exclude this cold-start request from timing.
+        # Warm up the pinned public HTTP path once; exclude connection setup from timing.
         request("POST", base + f"/element/{action_id}/click", {})
         warmup_probe = wait_for_probe(session_id, probe_id, after_sequence=0)
         if warmup_probe["transport"] != "CELLULAR":
@@ -280,7 +283,7 @@ def main() -> int:
                 "fixture title is visible",
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "baseline and shaped requests return real HTTP 200 responses from the running BharatSim API health endpoint through the Android emulator host gateway",
+                "baseline and shaped requests receive real HTTP 2xx/3xx responses from a public endpoint at a host-resolved, pinned IPv4 address (no guest DNS dependency)",
                 "all baseline and shaped requests use the controlled cellular transport",
                 "emulator network console readback matches the configured profile",
                 "one cold-start warm-up was excluded, then three baseline and three shaped requests were measured on the controlled cellular transport",
