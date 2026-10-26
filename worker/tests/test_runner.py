@@ -67,8 +67,8 @@ class EmulatorNetworkProfileTests(unittest.TestCase):
         self.assertIn("packet_loss", evidence["unsupported_controls"])
         self.assertIn("ram_pressure", evidence["unsupported_controls"])
         self.assertEqual(run.call_count, 3)
-        self.assertEqual(run.call_args_list[0].args[0][-2:], ["180", "180"])
-        self.assertEqual(run.call_args_list[1].args[0][-2:], ["350", "1200"])
+        self.assertEqual(run.call_args_list[0].args[0][-1], "180")
+        self.assertEqual(run.call_args_list[1].args[0][-1], "350:1200")
 
     def test_refuses_to_claim_emulator_controls_for_physical_device(self):
         with patch("worker.runner.run_cmd") as run:
