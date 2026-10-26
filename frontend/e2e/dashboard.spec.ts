@@ -27,15 +27,12 @@ test("log analysis reports findings from submitted evidence and preserves source
   await expect(page.getByText(/Findings are heuristic signals, not confirmed root causes/)).toBeVisible();
 });
 
-test("run registration without a worker never claims an APK was executed", async ({ page }) => {
+test("run registration is disabled until a real APK is selected", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
-  await page.getByRole("button", { name: /Configure a test/ }).click();
-  await expect(page.getByText(/No worker heartbeat detected/)).toBeVisible();
-  await page.getByRole("button", { name: /Register test run/ }).click();
-
-  await page.getByRole("button", { name: /^Test runs/ }).click();
-  await expect(page.getByRole("heading", { name: "Test sessions" })).toBeVisible();
-  await expect(page.getByText(/awaiting worker|queued for worker/).first()).toBeVisible();
+  const register = page.getByRole("button", { name: /Register test run/ });
+  await expect(register).toBeDisabled();
+  await expect(page.getByText("Choose an APK to enable run registration")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Test runs/ })).toContainText("0");
 });
