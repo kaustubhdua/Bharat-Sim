@@ -238,3 +238,43 @@ def test_run_fails_closed_after_three_expired_worker_leases(monkeypatch, tmp_pat
     final = client.get(f"/api/v1/runs/{run_id}").json()
     assert final["status"] == "failed"
     assert final["error"] == "Worker lease expired after maximum attempts"
+
+
+
+def test_worker_heartbeat_renews_live_lease_and_updates_worker_status(monkeypatch, tmp_path):
+    client = prepare_isolated_db(monkeypatch, tmp_path)
+    headers = {"X-BharatSim-Worker-Token": os.environ["BHARATSIM_WORKER_TOKEN"]}
+    created = client.post(
+        "/api/v1/runs",
+        data={"persona_id": "baseline"},
+        files={"apk": ("heartbeat.apk", apk_bytes(), "application/vnd.android.package-archive")},
+    )
+    run_id = created.json()["id"]
+    job = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "heartbeat-worker"}
+    ).json()["job"]
+
+    before = job["lease_until"]
+    response = client.post(
+        f"/internal/worker/runs/{run_id}/heartbeat",
+        headers=headers,
+        json={"lease_token": job["lease_token"]},
+    )
+    assert response.status_code == 200
+    renewed = response.json()["lease_until"]
+    assert renewed > before
+
+    with main.db() as conn:
+        run = conn.execute(
+            "SELECT status, lease_until, worker_id FROM runs WHERE id=?", (run_id,)
+        ).fetchone()
+        worker = conn.execute(
+            "SELECT status, current_run_id, last_seen FROM workers WHERE id=?",
+            ("heartbeat-worker",),
+        ).fetchone()
+    assert run["status"] == "leased"
+    assert run["lease_until"] == renewed
+    assert run["worker_id"] == "heartbeat-worker"
+    assert worker["status"] == "running"
+    assert worker["current_run_id"] == run_id
+    assert worker["last_seen"]
