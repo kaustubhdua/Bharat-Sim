@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-"""W3C WebDriver journey against the known-good BharatSim fixture app."""
+"""Measure a real fixture HTTP request before/after Android Emulator network shaping."""
 from __future__ import annotations
 
 import argparse
 import base64
 import json
 import re
+import subprocess
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 BASE = "http://127.0.0.1:4723"
+ADB_SERIAL = "emulator-5554"
 ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
+PROBE_RE = re.compile(r"HTTP 200 · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER) · probe (\d+)")
 
 
 def request(method: str, path: str, payload: dict | None = None, timeout: int = 30) -> dict:
@@ -31,6 +34,69 @@ def request(method: str, path: str, payload: dict | None = None, timeout: int = 
     if isinstance(result, dict) and isinstance(result.get("value"), dict) and result["value"].get("error"):
         raise RuntimeError(f"WebDriver error: {result['value']}")
     return result
+
+
+def adb(*args: str, timeout: int = 20) -> str:
+    completed = subprocess.run(
+        ["adb", "-s", ADB_SERIAL, *args],
+        capture_output=True, text=True, timeout=timeout, check=False,
+    )
+    output = completed.stdout + completed.stderr
+    if completed.returncode != 0 or "KO:" in output:
+        raise RuntimeError(f"ADB command failed ({' '.join(args)}): {output[-1000:]}")
+    return output
+
+
+def set_network_profile(latency_ms: int | None) -> dict:
+    """Configure the emulator and require exact console readback."""
+    adb("shell", "svc", "wifi", "disable")
+    adb("shell", "svc", "data", "enable")
+    if latency_ms is None:
+        adb("emu", "network", "delay", "none")
+        adb("emu", "network", "speed", "full")
+        expected = {"latency_ms": 0, "download_bps": 0, "upload_bps": 0}
+    else:
+        adb("emu", "network", "delay", str(latency_ms))
+        adb("emu", "network", "speed", "3000:12000")
+        expected = {"latency_ms": latency_ms, "download_bps": 12000000, "upload_bps": 3000000}
+    output = adb("emu", "network", "status")
+    def read(pattern: str) -> int:
+        match = re.search(pattern, output, re.I)
+        if not match:
+            raise RuntimeError(f"Could not parse emulator network status: {output}")
+        return int(match.group(1))
+    observed = {
+        "minimum_latency_ms": read(r"minimum latency:\s*(\d+)\s+ms"),
+        "maximum_latency_ms": read(r"maximum latency:\s*(\d+)\s+ms"),
+        "download_bps": read(r"download speed:\s*(\d+)\s+bits/s"),
+        "upload_bps": read(r"upload speed:\s*(\d+)\s+bits/s"),
+    }
+    if latency_ms is None:
+        matched = (
+            observed["minimum_latency_ms"] == 0 and observed["maximum_latency_ms"] == 0
+            and observed["download_bps"] == 0 and observed["upload_bps"] == 0
+        )
+    else:
+        matched = (
+            observed["minimum_latency_ms"] == latency_ms
+            and observed["maximum_latency_ms"] == latency_ms
+            and observed["download_bps"] == expected["download_bps"]
+            and observed["upload_bps"] == expected["upload_bps"]
+        )
+    if not matched:
+        raise RuntimeError(f"Network profile readback mismatch: expected={expected}, observed={observed}")
+    return {"requested": expected, "observed": observed, "status": "verified"}
+
+
+def reset_network() -> None:
+    """Best-effort cleanup even after failed assertions."""
+    for args in (
+        ("emu", "network", "delay", "none"),
+        ("emu", "network", "speed", "full"),
+        ("shell", "svc", "wifi", "enable"),
+        ("shell", "svc", "data", "enable"),
+    ):
+        subprocess.run(["adb", "-s", ADB_SERIAL, *args], capture_output=True, text=True, timeout=20, check=False)
 
 
 def wait_for_server() -> None:
@@ -62,16 +128,17 @@ def find_element(session: str, using: str, value: str, timeout: int = 25) -> str
     raise RuntimeError(f"Could not find element ({using}={value}) within {timeout}s: {last_error}")
 
 
-def wait_for_text(session: str, element_id: str, prefix: str, timeout: int = 60) -> str:
+def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 60) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
         last_text = str(request("GET", f"/session/{session}/element/{element_id}/text").get("value", ""))
-        if last_text.startswith(prefix):
-            return last_text
-        if "probe failed" in last_text.lower() or "returned HTTP" in last_text:
+        match = PROBE_RE.fullmatch(last_text)
+        if match and int(match.group(3)) > after_sequence:
+            return {"duration_ms": int(match.group(1)), "transport": match.group(2), "sequence": int(match.group(3))}
+        if "probe failed" in last_text.lower() or "returned HTTP" in last_text.lower():
             raise RuntimeError(f"Fixture network probe failed: {last_text}")
-        time.sleep(1)
+        time.sleep(0.5)
     raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}")
 
 
@@ -80,49 +147,59 @@ def main() -> int:
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts"))
     args = parser.parse_args()
     args.artifacts.mkdir(parents=True, exist_ok=True)
-    wait_for_server()
-    created = request("POST", "/session", {
-        "capabilities": {
-            "alwaysMatch": {
-                "platformName": "Android",
-                "appium:automationName": "UiAutomator2",
-                "appium:deviceName": "emulator-5554",
-                "appium:appPackage": "org.bharatsim.smokeapp",
-                "appium:appActivity": ".MainActivity",
-                "appium:noReset": True,
-                "appium:newCommandTimeout": 60,
-            },
-            "firstMatch": [{}],
-        }
-    }, timeout=120)
-    value = created.get("value", {})
-    session_id = created.get("sessionId") or value.get("sessionId")
-    if not session_id:
-        raise RuntimeError(f"Appium did not return a session id: {created}")
-    base = f"/session/{session_id}"
+    session_id = None
+    page_source = ""
     try:
-        title_id = find_element(session_id, "accessibility id", "fixture-title")
+        # Establish an unshaped baseline on cellular before the controlled run.
+        baseline_profile = set_network_profile(None)
+        wait_for_server()
+        created = request("POST", "/session", {
+            "capabilities": {
+                "alwaysMatch": {
+                    "platformName": "Android",
+                    "appium:automationName": "UiAutomator2",
+                    "appium:deviceName": ADB_SERIAL,
+                    "appium:appPackage": "org.bharatsim.smokeapp",
+                    "appium:appActivity": ".MainActivity",
+                    "appium:noReset": True,
+                    "appium:newCommandTimeout": 120,
+                },
+                "firstMatch": [{}],
+            }
+        }, timeout=120)
+        value = created.get("value", {})
+        session_id = created.get("sessionId") or value.get("sessionId")
+        if not session_id:
+            raise RuntimeError(f"Appium did not return a session id: {created}")
+        base = f"/session/{session_id}"
+
+        find_element(session_id, "accessibility id", "fixture-title")
         action_id = find_element(session_id, "accessibility id", "primary-action")
-        request("POST", base + f"/element/{action_id}/click", {})
         status_id = find_element(session_id, "accessibility id", "journey-status")
+        probe_id = find_element(session_id, "accessibility id", "network-probe-status")
+
+        request("POST", base + f"/element/{action_id}/click", {})
         status_text = request("GET", base + f"/element/{status_id}/text").get("value")
         if status_text != "Primary action completed":
             raise RuntimeError(f"Primary action state assertion failed: {status_text!r}")
-        probe_id = find_element(session_id, "accessibility id", "network-probe-status")
-        probe_text = wait_for_text(session_id, probe_id, "HTTP 200")
-        probe_match = re.fullmatch(r"HTTP 200 · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER)", probe_text)
-        if not probe_match:
-            raise RuntimeError(f"Fixture network probe response was not parseable: {probe_text!r}")
-        probe_duration_ms = int(probe_match.group(1))
-        probe_transport = probe_match.group(2)
-        if probe_transport not in ("CELLULAR", "ETHERNET", "WIFI"):
-            raise RuntimeError(f"Fixture request used an unknown network transport: {probe_transport}")
-        traffic_path_verified = probe_transport in ("CELLULAR", "ETHERNET") and probe_duration_ms >= 35
-        if not traffic_path_verified:
+        baseline_probe = wait_for_probe(session_id, probe_id, after_sequence=0)
+        if baseline_probe["transport"] not in ("CELLULAR", "ETHERNET"):
+            raise RuntimeError(f"Baseline request used unsupported transport: {baseline_probe}")
+
+        # Apply a substantially larger delay than ordinary measurement noise,
+        # verify the console readback, then issue a second real HTTPS request.
+        shaped_profile = set_network_profile(150)
+        request("POST", base + f"/element/{action_id}/click", {})
+        shaped_probe = wait_for_probe(session_id, probe_id, after_sequence=baseline_probe["sequence"])
+        delta_ms = shaped_probe["duration_ms"] - baseline_probe["duration_ms"]
+        if shaped_probe["transport"] not in ("CELLULAR", "ETHERNET"):
+            raise RuntimeError(f"Shaped request used unsupported transport: {shaped_probe}")
+        if delta_ms < 100:
             raise RuntimeError(
-                "Network traffic path was not verified under the active emulator profile: "
-                f"transport={probe_transport}, duration_ms={probe_duration_ms}, required_latency_ms=35"
+                "Emulator delay was configured but not causally observed in the fixture request: "
+                f"baseline={baseline_probe}, shaped={shaped_probe}, delta_ms={delta_ms}"
             )
+
         screenshot = request("GET", base + "/screenshot")
         image_data = screenshot.get("value")
         if not isinstance(image_data, str) or not image_data:
@@ -131,44 +208,48 @@ def main() -> int:
         screenshot_path.write_bytes(base64.b64decode(image_data, validate=True))
         report = {
             "status": "passed",
-            "session_id": session_id,
             "package_name": "org.bharatsim.smokeapp",
             "assertions": [
                 "fixture title is visible",
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "fixture performs a real HTTP 200 request to the local API",
-                "real HTTP request ran on cellular/Ethernet while emulator latency profile was active",
-                "measured request duration met the 35ms minimum-latency check",
+                "baseline and shaped requests return real HTTP 200 responses from https://example.com/",
+                "both requests use cellular/Ethernet transport",
+                "emulator network console readback matches the configured profile",
+                "shaped request is at least 100ms slower than baseline",
             ],
-            "network_probe": {
-                "http_status": 200, "duration_ms": probe_duration_ms,
-                "transport": probe_transport, "traffic_path_verified": traffic_path_verified,
-            },
+            "baseline_profile": baseline_profile,
+            "shaped_profile": shaped_profile,
+            "baseline_probe": baseline_probe,
+            "shaped_probe": shaped_probe,
+            "observed_delta_ms": delta_ms,
+            "traffic_path_verified": True,
             "screenshot": str(screenshot_path),
         }
         (args.artifacts / "appium-journey.report.json").write_text(json.dumps(report, indent=2))
         print(json.dumps(report, indent=2))
+        return 0
     except Exception:
-        try:
-            (args.artifacts / "appium-page-source.xml").write_text(
-                str(request("GET", base + "/source").get("value", ""))
-            )
-        except Exception as source_error:
-            (args.artifacts / "appium-page-source-error.txt").write_text(str(source_error))
-        try:
-            image_data = request("GET", base + "/screenshot").get("value")
-            if image_data:
-                (args.artifacts / "appium-failure.png").write_bytes(base64.b64decode(image_data, validate=True))
-        except Exception as screenshot_error:
-            (args.artifacts / "appium-screenshot-error.txt").write_text(str(screenshot_error))
+        if session_id:
+            try:
+                page_source = str(request("GET", f"/session/{session_id}/source").get("value", ""))
+                (args.artifacts / "appium-page-source.xml").write_text(page_source)
+            except Exception as source_error:
+                (args.artifacts / "appium-page-source-error.txt").write_text(str(source_error))
+            try:
+                image_data = request("GET", f"/session/{session_id}/screenshot").get("value")
+                if image_data:
+                    (args.artifacts / "appium-failure.png").write_bytes(base64.b64decode(image_data, validate=True))
+            except Exception as screenshot_error:
+                (args.artifacts / "appium-screenshot-error.txt").write_text(str(screenshot_error))
         raise
     finally:
-        try:
-            request("DELETE", base, timeout=15)
-        except Exception as exc:
-            print(f"warning: could not close Appium session cleanly: {exc}")
-    return 0
+        if session_id:
+            try:
+                request("DELETE", f"/session/{session_id}", timeout=15)
+            except Exception as exc:
+                print(f"warning: could not close Appium session cleanly: {exc}")
+        reset_network()
 
 
 if __name__ == "__main__":
