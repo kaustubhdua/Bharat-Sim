@@ -50,8 +50,9 @@ def adb(*args: str, timeout: int = 20) -> str:
 
 def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
     """Configure emulator latency and throughput, then require exact console readback."""
-    # Use cellular with a controlled local HTTP endpoint to remove external DNS
-    # as a variable while measuring real TCP payload transfer through Android.
+    # Use cellular with a public Cloudflare HTTPS endpoint. The workflow selects
+    # a verified upstream DNS resolver; external DNS/Internet availability is an
+    # explicit test precondition, not synthetic or locally fabricated evidence.
     adb("shell", "svc", "wifi", "disable")
     adb("emu", "gsm", "voice", "home")
     adb("emu", "gsm", "data", "home")
