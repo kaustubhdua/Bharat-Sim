@@ -107,17 +107,17 @@ def download_apk(base_url: str, token: str, job: dict[str, Any], target: Path) -
 
 _SENSITIVE_TEXT_PATTERNS = (
     # Authorization headers and bearer tokens.
-    (re.compile(r"(?i)(authorization\\s*:\\s*bearer\\s+)[A-Za-z0-9._~+/=-]+"), r"\\1[REDACTED]"),
-    (re.compile(r"(?i)(\\bbearer\\s+)[A-Za-z0-9._~+/=-]+"), r"\\1[REDACTED]"),
+    (re.compile(r"(?i)(authorization\s*:\s*bearer\s+)[A-Za-z0-9._~+/=-]+"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]+"), r"\1[REDACTED]"),
     # Common key/value formats, including JSON-ish log fragments.
     (
         re.compile(
-            r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|client[_-]?secret)["']?\\s*[:=]\\s*["']?)([^"'\\s,;&}]+)(["']?)"""
+            r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|client[_-]?secret)["']?\s*[:=]\s*["']?)([^"'\s,;&}]+)(["']?)"""
         ),
-        r"\\1[REDACTED]\\3",
+        r"\1[REDACTED]\3",
     ),
-    (re.compile(r"(?i)([?&](?:token|key|secret|password|api_key|access_token)=)[^&\\s]+"), r"\\1[REDACTED]"),
-    (re.compile(r"\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b"), "[REDACTED_JWT]"),
+    (re.compile(r"(?i)([?&](?:token|key|secret|password|api_key|access_token)=)[^&\s]+"), r"\1[REDACTED]"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"), "[REDACTED_JWT]"),
 )
 
 
@@ -137,7 +137,6 @@ def redact_report_text(value: Any) -> Any:
     if isinstance(value, dict):
         return {key: redact_report_text(item) for key, item in value.items()}
     return value
-
 
 def annotate_execution_scope(report: dict[str, Any], job: dict[str, Any]) -> None:
     """Make the distinction between smoke execution and constraint validation explicit."""
