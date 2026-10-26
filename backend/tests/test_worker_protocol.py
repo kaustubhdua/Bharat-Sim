@@ -278,3 +278,33 @@ def test_worker_heartbeat_renews_live_lease_and_updates_worker_status(monkeypatc
     assert worker["status"] == "running"
     assert worker["current_run_id"] == run_id
     assert worker["last_seen"]
+
+
+
+def test_completed_worker_result_requires_matching_apk_hash(monkeypatch, tmp_path):
+    client = prepare_isolated_db(monkeypatch, tmp_path)
+    headers = {"X-BharatSim-Worker-Token": os.environ["BHARATSIM_WORKER_TOKEN"]}
+    created = client.post(
+        "/api/v1/runs",
+        data={"persona_id": "baseline"},
+        files={"apk": ("missing-hash.apk", apk_bytes(), "application/vnd.android.package-archive")},
+    )
+    run = created.json()
+    job = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "missing-hash-worker"}
+    ).json()["job"]
+
+    response = client.post(
+        f"/internal/worker/runs/{run['id']}/result",
+        headers=headers,
+        json={
+            "lease_token": job["lease_token"],
+            "status": "completed",
+            "result": {"status": "completed", "steps": [{"name": "install_apk", "return_code": 0}]},
+        },
+    )
+    assert response.status_code == 422
+    assert "APK SHA-256" in response.json()["detail"]
+    current = client.get(f"/api/v1/runs/{run['id']}").json()
+    assert current["status"] == "leased"
+    assert current.get("result") is None
