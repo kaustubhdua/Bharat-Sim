@@ -9,6 +9,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - Jobs are leased to a worker; the lease token is required to download an APK, renew a lease, and submit a result.
 - Expired leases are retried up to three claims. Stale/duplicate results are rejected.
 - Inline worker result JSON is capped at 250 KB.
+- Before submitting worker evidence, common bearer credentials, key/token/password/secret key-value fields, secret query parameters, and JWT-shaped strings are redacted recursively from report text.
 - Uploaded APKs are deleted after terminal worker results when filesystem cleanup succeeds; abandoned uploads expire after 24 hours during startup, run creation, or worker claim requests.
 - The runner has an explicit opt-in environment guard, explicit Android serial, bounded duration, APK size limit, bounded archive metadata checks, and command timeouts.
 - APK-derived Android package names are strictly validated before being passed to an ADB shell command, and the worker agent refuses HTTP redirects and rejects absolute, external, or non-worker route URLs in server-provided job fields before attaching worker credentials.
@@ -23,7 +24,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - APK archive checks are not malware scanning and do not make an APK safe.
 - The worker agent and runner do not create a sandbox by themselves. A compromised APK may act with the privileges of the Android guest and potentially attack reachable infrastructure.
 - There is no per-run disposable VM snapshot/revert, hardened container/VM policy, verified network egress isolation, or complete cancellation of active device operations.
-- Inline logcat evidence is bounded but not stored in dedicated private object storage with lifecycle/retention controls. The 24-hour upload expiry is request/startup-driven, not a background scheduler.
+- Inline logcat evidence is bounded and common credential patterns are redacted, but pattern-based redaction is not exhaustive and logs are not stored in dedicated private object storage with lifecycle/retention controls. The 24-hour upload expiry is request/startup-driven, not a background scheduler.
 - There are no quotas, billing controls, per-user limits, or full audit trail for a multi-user service.
 - A configured worker token means dispatch is configured; it does not prove a live worker or emulator exists.
 
@@ -44,4 +45,5 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - A worker result is accepted only for an active lease token.
 - A completed smoke run means the runner completed its configured install/launch/observation/log-collection workflow; it is not proof that all app journeys passed.
 - Log markers are heuristic evidence, not proof of root cause.
+- Worker report redaction is a best-effort defense-in-depth control, not a guarantee that all application-specific secrets or personal data are removed.
 - Emulator network delay and upload/download bandwidth controls can be applied and read back on a disposable Android Emulator. The fixture CI journey separately measures repeated real HTTPS requests before and after shaping and verifies reset; this is evidence for the source-built fixture and CI emulator only. Packet loss, CPU/RAM/storage pressure, and battery-saver constraints remain unsupported. Control-plane readback alone is not proof of the active traffic path, and neither result establishes arbitrary APK health.
