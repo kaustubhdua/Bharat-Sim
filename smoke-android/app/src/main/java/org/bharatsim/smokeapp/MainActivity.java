@@ -99,9 +99,9 @@ public final class MainActivity extends Activity {
             socket.startHandshake();
 
             OutputStream output = socket.getOutputStream();
-            output.write(("GET /cdn-cgi/trace HTTP/1.1\r\n"
+            output.write(("GET /dns-query?name=example.com&type=A HTTP/1.1\r\n"
                     + "Host: cloudflare-dns.com\r\n"
-                    + "Accept: text/plain\r\n"
+                    + "Accept: application/dns-json\r\n"
                     + "Connection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
             output.flush();
             BufferedReader reader = new BufferedReader(
