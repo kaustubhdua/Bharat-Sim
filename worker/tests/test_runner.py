@@ -1,6 +1,13 @@
 import unittest
+from subprocess import CompletedProcess
+from unittest.mock import patch
 
-from worker.runner import valid_package_name
+from worker.runner import (
+    apply_emulator_network_profile,
+    parse_emulator_network_status,
+    reset_emulator_network_profile,
+    valid_package_name,
+)
 
 
 class PackageNameValidationTests(unittest.TestCase):
@@ -25,18 +32,7 @@ class PackageNameValidationTests(unittest.TestCase):
                 self.assertFalse(valid_package_name(value))
 
 
-if __name__ == "__main__":
-    unittest.main()
 
-
-from unittest.mock import patch
-from subprocess import CompletedProcess
-
-from worker.runner import (
-    apply_emulator_network_profile,
-    parse_emulator_network_status,
-    reset_emulator_network_profile,
-)
 
 
 class EmulatorNetworkProfileTests(unittest.TestCase):
@@ -98,3 +94,7 @@ class EmulatorNetworkProfileTests(unittest.TestCase):
         self.assertEqual(evidence["status"], "verified")
 
 
+
+
+if __name__ == "__main__":
+    unittest.main()
