@@ -44,4 +44,4 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - A worker result is accepted only for an active lease token.
 - A completed smoke run means the runner completed its configured install/launch/observation/log-collection workflow; it is not proof that all app journeys passed.
 - Log markers are heuristic evidence, not proof of root cause.
-- Network and resource constraints must be labeled verified, unverified, or unsupported. The current runner does not apply them.
+- Emulator network delay and upload/download bandwidth controls can be applied and read back on a disposable Android Emulator. The fixture CI journey separately measures repeated real HTTPS requests before and after shaping and verifies reset; this is evidence for the source-built fixture and CI emulator only. Packet loss, CPU/RAM/storage pressure, and battery-saver constraints remain unsupported. Control-plane readback alone is not proof of the active traffic path, and neither result establishes arbitrary APK health.
