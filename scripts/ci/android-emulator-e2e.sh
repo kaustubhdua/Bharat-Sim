@@ -125,9 +125,9 @@ Path("artifacts/api-run.report.json").write_text(json.dumps(report, indent=2))
 print(json.dumps(report, indent=2))
 PY
 
-# The Appium journey itself establishes a cellular baseline, applies a
-# measured latency profile, issues a second real HTTPS request, and resets
-# emulator settings in its finally block.
+# The Appium journey runs a warm-up plus three baseline, three latency-only,
+# and three bandwidth-only real HTTPS downloads through the emulator network
+# stack, then verifies the emulator controls are reset to defaults.
 adb install smoke-android/app/build/outputs/apk/debug/app-debug.apk
 appium --address 127.0.0.1 --port 4723 > artifacts/appium-server.log 2>&1 &
 APPIUM_PID=$!
