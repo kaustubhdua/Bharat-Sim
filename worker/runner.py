@@ -33,7 +33,109 @@ def valid_package_name(value: str) -> bool:
     return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+", value))
 
 
-def main() -> int:
+
+
+def parse_emulator_network_status(output: str) -> dict[str, int] | None:
+    """Parse the Android Emulator console's network status response."""
+    patterns = {
+        "download_bps": r"download speed:\\s*(\\d+)\\s+bits/s",
+        "upload_bps": r"upload speed:\\s*(\\d+)\\s+bits/s",
+        "minimum_latency_ms": r"minimum latency:\\s*(\\d+)\\s+ms",
+        "maximum_latency_ms": r"maximum latency:\\s*(\\d+)\\s+ms",
+    }
+    values: dict[str, int] = {}
+    for key, pattern in patterns.items():
+        match = re.search(pattern, output, re.I)
+        if not match:
+            return None
+        values[key] = int(match.group(1))
+    return values
+
+
+def apply_emulator_network_profile(
+    serial: str, latency_ms: int, down_kbps: int, up_kbps: int, packet_loss_pct: float
+) -> dict[str, object]:
+    """Apply and read back emulator console controls; never claim packet loss or app-path proof."""
+    evidence: dict[str, object] = {
+        "requested": {
+            "latency_ms": latency_ms, "download_kbps": down_kbps,
+            "upload_kbps": up_kbps, "packet_loss_pct": packet_loss_pct,
+        },
+        "supported_controls": ["network_latency", "download_bandwidth", "upload_bandwidth"],
+        "unsupported_controls": (["packet_loss"] if packet_loss_pct > 0 else []),
+        "traffic_path_verified": False,
+        "note": (
+            "Emulator console status verifies the emulator control plane only; it does not prove "
+            "the app's active network interface traversed these controls."
+        ),
+    }
+    if not re.fullmatch(r"emulator-\\d+", serial):
+        evidence.update({"control_plane": {"status": "unsupported", "reason": "Target is not an Android Emulator serial"}})
+        return evidence
+
+    commands = [
+        ("delay", ["adb", "-s", serial, "emu", "network", "delay", str(latency_ms), str(latency_ms if latency_ms else 0)]),
+        ("speed", ["adb", "-s", serial, "emu", "network", "speed", str(up_kbps), str(down_kbps)]),
+    ]
+    command_evidence: dict[str, object] = {}
+    for name, command in commands:
+        result = run_cmd(command, timeout=15)
+        command_evidence[name] = {
+            "return_code": result.returncode,
+            "stdout": result.stdout[-1000:],
+            "stderr": result.stderr[-1000:],
+        }
+
+    status_result = run_cmd(["adb", "-s", serial, "emu", "network", "status"], timeout=15)
+    status = parse_emulator_network_status(status_result.stdout + "\\n" + status_result.stderr)
+    expected = {
+        "download_bps": down_kbps * 1000,
+        "upload_bps": up_kbps * 1000,
+        "minimum_latency_ms": latency_ms,
+        "maximum_latency_ms": latency_ms,
+    }
+    matched = bool(status) and all(status.get(key) == value for key, value in expected.items())
+    commands_ok = all(
+        isinstance(item, dict) and item.get("return_code") == 0
+        and "KO:" not in str(item.get("stdout", "") + item.get("stderr", ""))
+        for item in command_evidence.values()
+    )
+    verified = bool(matched and commands_ok and status_result.returncode == 0)
+    evidence["control_plane"] = {
+        "status": "verified" if verified else "unverified",
+        "commands": command_evidence,
+        "readback": status,
+        "expected_readback": expected,
+        "status_command_return_code": status_result.returncode,
+        "status_command_output": (status_result.stdout + "\\n" + status_result.stderr)[-2000:],
+    }
+    evidence["network_constraints_applied"] = verified
+    return evidence
+
+
+def reset_emulator_network_profile(serial: str) -> dict[str, object]:
+    """Restore the disposable emulator's default network settings after a run."""
+    if not re.fullmatch(r"emulator-\\d+", serial):
+        return {"status": "not_applicable", "reason": "Target is not an Android Emulator serial"}
+    delay = run_cmd(["adb", "-s", serial, "emu", "network", "delay", "none"], timeout=15)
+    speed = run_cmd(["adb", "-s", serial, "emu", "network", "speed", "full"], timeout=15)
+    status_result = run_cmd(["adb", "-s", serial, "emu", "network", "status"], timeout=15)
+    status = parse_emulator_network_status(status_result.stdout + "\\n" + status_result.stderr)
+    restored = (
+        delay.returncode == 0 and speed.returncode == 0 and status_result.returncode == 0
+        and bool(status)
+        and status.get("minimum_latency_ms") == 0
+        and status.get("maximum_latency_ms") == 0
+        and status.get("download_bps") == 0
+        and status.get("upload_bps") == 0
+    )
+    return {
+        "status": "verified" if restored else "unverified",
+        "readback": status,
+        "commands_return_codes": [delay.returncode, speed.returncode, status_result.returncode],
+    }
+
+\ndef main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("apk", type=Path)
     parser.add_argument("--duration", type=int, default=20, help="seconds to observe the launched app (1–120)")
