@@ -1,7 +1,7 @@
 import unittest
 import urllib.request
 
-from worker.agent import NoRedirectHandler, WorkerError, annotate_execution_scope, resolve_api_url
+from worker.agent import NoRedirectHandler, WorkerError, annotate_execution_scope, redact_report_text, redact_sensitive_text, resolve_api_url
 
 
 class ExecutionScopeTruthfulnessTests(unittest.TestCase):
@@ -68,6 +68,34 @@ class WorkerApiUrlSecurityTests(unittest.TestCase):
         for path in ("/api/v1/runs", "/internal/admin/secrets", "/internal/worker/claim#fragment"):
             with self.subTest(path=path), self.assertRaises(WorkerError):
                 resolve_api_url("https://api.example", path)
+
+
+
+class WorkerEvidenceRedactionTests(unittest.TestCase):
+    def test_redacts_bearer_password_query_token_and_jwt_patterns(self):
+        text = (
+            "Authorization: Bearer abc.def.secret "
+            "password=hunter2 "
+            "GET /callback?access_token=topsecret "
+            "jwt=eyJabcdefghijk.abcdefghijk.abcdefghijk"
+        )
+        redacted = redact_sensitive_text(text)
+        for secret in ("abc.def.secret", "hunter2", "topsecret", "eyJabcdefghijk.abcdefghijk.abcdefghijk"):
+            with self.subTest(secret=secret):
+                self.assertNotIn(secret, redacted)
+        self.assertGreaterEqual(redacted.count("[REDACTED"), 4)
+
+    def test_redacts_nested_report_strings_without_mutating_evidence_types(self):
+        report = {
+            "logcat_tail": 'request {"api_key":"key-value-secret"}',
+            "steps": [{"stderr_tail": "refresh_token=refresh-secret", "return_code": 0}],
+            "constraints_applied": False,
+        }
+        cleaned = redact_report_text(report)
+        self.assertNotIn("key-value-secret", str(cleaned))
+        self.assertNotIn("refresh-secret", str(cleaned))
+        self.assertIs(cleaned["constraints_applied"], False)
+        self.assertEqual(cleaned["steps"][0]["return_code"], 0)
 
 
 if __name__ == "__main__":
