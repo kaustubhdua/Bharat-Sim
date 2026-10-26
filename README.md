@@ -96,6 +96,10 @@ See worker/README.md. Configure BHARATSIM_WORKER_TOKEN on the API and worker, pr
 
 See [`docs/PRODUCTION_RELEASE_GATES.md`](docs/PRODUCTION_RELEASE_GATES.md) for the evidence-based release checklist covering tenant isolation, real emulator evidence, constraint verification, and production deployment. Public APK execution remains blocked until the P0 safety gates are satisfied.
 
+### Private single-tenant API gate
+
+The local Compose stack can optionally require `BHARATSIM_REQUIRE_API_KEY=true` and a random `BHARATSIM_API_KEY` of at least 32 characters. Nginx injects this key server-side for same-origin API calls; it is not shipped in the frontend bundle. This protects a private single-operator instance only—it is not multi-user authentication or a substitute for tenant isolation. Setup instructions are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 ## Security
 
 Treat every uploaded APK as untrusted code. APK archive checks are not malware scanning or sandboxing. Keep execution on an isolated disposable worker with restricted egress, no production secrets, resource/time limits, and cleanup. The shared API/worker tokens are machine-to-machine credentials, not multi-user authentication. Do not expose public APK execution until identity/ownership, quotas, storage retention, and host isolation have been reviewed. See [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [worker/README.md](worker/README.md).
