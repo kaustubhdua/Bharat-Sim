@@ -153,7 +153,7 @@ jobs:
               "artifact_count": len(records),
               "artifacts": records,
           }
-          (root / "evidence-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n")
+          (root / "evidence-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
           print(json.dumps({"artifact_count": len(records), "manifest": str(root / "evidence-manifest.json")}, indent=2))
           PY
       - name: Preserve emulator smoke evidence
