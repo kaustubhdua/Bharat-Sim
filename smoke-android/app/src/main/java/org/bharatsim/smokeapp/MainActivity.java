@@ -19,7 +19,7 @@ import java.net.URL;
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
-    private static final int PROBE_BYTES = 250_000;
+    private static final int PROBE_BYTES = 2_000_000;
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
