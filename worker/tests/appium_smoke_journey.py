@@ -283,7 +283,7 @@ def main() -> int:
                 "baseline and shaped requests return real HTTP 200 responses from the running BharatSim API health endpoint through the Android emulator host gateway",
                 "all baseline and shaped requests use the controlled cellular transport",
                 "emulator network console readback matches the configured profile",
-                "one cold-start warm-up was excluded, then three baseline and three shaped requests were measured on the same cellular/Ethernet transport",
+                "one cold-start warm-up was excluded, then three baseline and three shaped requests were measured on the controlled cellular transport",
                 "median shaped request is at least 100ms slower than median baseline",
             ],
             "baseline_profile": baseline_profile,
