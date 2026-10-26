@@ -12,6 +12,10 @@ until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true
 done
 
 export ANDROID_SERIAL=emulator-5554
+# Force the emulator off Wi-Fi so the console's Ethernet/cellular network controls
+# are relevant to the fixture's real HTTP request path.
+adb -s "$ANDROID_SERIAL" shell svc wifi disable
+adb -s "$ANDROID_SERIAL" shell svc data enable
 export BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true
 export BHARATSIM_API_URL=http://127.0.0.1:8000
 export BHARATSIM_ALLOW_INSECURE_HTTP=true
@@ -22,7 +26,7 @@ export BHARATSIM_WORKER_TOKEN="$(python -c 'import secrets; print(secrets.token_
 export BHARATSIM_DATA_DIR="$RUNNER_TEMP/bharatsim-api-data"
 
 mkdir -p artifacts
-(cd backend && exec uvicorn app.main:app --host 127.0.0.1 --port 8000) > artifacts/api.log 2>&1 &
+(cd backend && exec uvicorn app.main:app --host 0.0.0.0 --port 8000) > artifacts/api.log 2>&1 &
 API_PID=$!
 WORKER_PID=
 APPIUM_PID=
