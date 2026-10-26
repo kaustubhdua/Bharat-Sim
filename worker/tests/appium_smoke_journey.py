@@ -206,7 +206,7 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
         last_text = str(request("GET", f"/session/{session}/element/{element_id}/text", timeout=5).get("value", ""))
         probe = parse_probe_text(last_text)
         if probe and int(probe["sequence"]) > after_sequence:
-            if int(probe["bytes_read"]) != 1_000_000:
+            if int(probe["bytes_read"]) != 500_000:
                 raise RuntimeError(f"Fixture downloaded unexpected payload size: {probe['bytes_read']}")
             return probe
         if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
@@ -340,12 +340,12 @@ def main() -> int:
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
             "probe_endpoint": "https://ipv4.lg.plutex.de/25MB.bin",
-            "probe_endpoint_scope": "public IPv4-only PLUTEX Looking Glass HTTPS test file; the fixture requests bytes 0-999,999 and measures real external traffic through the Android Emulator network stack, not arbitrary uploaded-app traffic",
-            "probe_payload_bytes": 1_000_000,
+            "probe_endpoint_scope": "public IPv4-only PLUTEX Looking Glass HTTPS test file; the fixture requests bytes 0-499,999 and measures real external traffic through the Android Emulator network stack, not arbitrary uploaded-app traffic",
+            "probe_payload_bytes": 500_000,
             "assertions": [
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe transferred exactly 1,000,000 bytes from the public IPv4-only PLUTEX HTTPS test file through the Android Emulator network stack",
+                "each probe transferred exactly 500,000 bytes from the public IPv4-only PLUTEX HTTPS test file through the Android Emulator network stack",
                 "per-request retry counts are captured in probe evidence",
                 "baseline, latency-only, and bandwidth-only probes used cellular/Ethernet transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
