@@ -20,6 +20,20 @@ To delete all local persisted data too:
 
     docker compose down -v
 
+## Optional single-tenant API key
+
+For a private single-operator instance, enable the shared API key before starting the stack:
+
+```bash
+export BHARATSIM_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export BHARATSIM_REQUIRE_API_KEY=true
+docker compose up --build -d
+```
+
+The key is passed to the API and the nginx container as a server-side environment variable. Nginx injects it only on proxied `/api/` requests; it is not embedded in the Vite bundle or returned to browser JavaScript. Keep the key private and rotate it by restarting the stack with a new value. This is a **shared single-tenant gate**, not user identity, tenant isolation, or a substitute for a production authentication system. If the key is required but missing or shorter than 32 characters, the API fails closed.
+
+To run the default loopback-only local evaluation without this gate, leave `BHARATSIM_REQUIRE_API_KEY` unset. Do not expose the stack publicly.
+
 ## Optional local worker
 
 The Compose stack does not run an Android emulator. Provision a disposable emulator separately and configure a random BHARATSIM_WORKER_TOKEN in the shell before starting the API. Use the same token on the worker. Start worker/agent.py on a host that can reach the published loopback port, with an explicit ANDROID_SERIAL and BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true. For loopback-only local testing, set BHARATSIM_API_URL=http://127.0.0.1:8080 and BHARATSIM_ALLOW_INSECURE_HTTP=true in the worker environment.
