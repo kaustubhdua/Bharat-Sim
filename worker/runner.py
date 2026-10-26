@@ -299,8 +299,13 @@ def main() -> int:
         report["logcat_artifact"] = str(log_path)
         report["logcat_bytes"] = len(logs.stdout.encode("utf-8", errors="replace"))
         report["fatal_exception_marker"] = bool(re.search(r"FATAL EXCEPTION|Fatal signal|SIGSEGV", logs.stdout, re.I))
-        network_probe = parse_fixture_network_probe(logs.stdout)
+        network_probe_logs = run_cmd(
+            ["adb", "-s", serial, "logcat", "-d", "-s", "BharatSimNetworkProbe:I", "*:S"],
+            timeout=15,
+        )
+        network_probe = parse_fixture_network_probe(network_probe_logs.stdout + "\\n" + network_probe_logs.stderr)
         if isinstance(report.get("network_profile"), dict):
+            report["network_profile"]["traffic_probe_log_return_code"] = network_probe_logs.returncode
             report["network_profile"]["traffic_probe"] = network_probe
             requested = report["network_profile"].get("requested", {})
             control = report["network_profile"].get("control_plane", {})
