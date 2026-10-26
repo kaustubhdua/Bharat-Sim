@@ -25,7 +25,6 @@ import java.util.regex.Pattern;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
-    private static final String PROBE_URL = "http://" + BuildConfig.PROBE_IP + "/";
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
