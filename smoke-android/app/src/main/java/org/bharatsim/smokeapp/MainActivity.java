@@ -76,22 +76,25 @@ public final class MainActivity extends Activity {
     }
 
     private void performNetworkProbe(TextView target, int sequence) {
-        long started = SystemClock.elapsedRealtime();
         String transport = activeTransport();
-        int statusCode = -1;
-        int bytesRead = 0;
-        HttpURLConnection connection = null;
-        try {
-            connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Connection", "close");
-            connection.setRequestProperty("Accept-Encoding", "identity");
-            connection.setRequestProperty("Cache-Control", "no-cache");
-            connection.setUseCaches(false);
-            statusCode = connection.getResponseCode();
-            if (statusCode == 200) {
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            long started = SystemClock.elapsedRealtime();
+            int statusCode = -1;
+            int bytesRead = 0;
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(30000);
+                connection.setRequestMethod("GET");
+                connection.setRequestProperty("Connection", "close");
+                connection.setRequestProperty("Accept-Encoding", "identity");
+                connection.setRequestProperty("Cache-Control", "no-cache");
+                connection.setUseCaches(false);
+                statusCode = connection.getResponseCode();
+                if (statusCode != 200) {
+                    throw new java.io.IOException("Unexpected HTTP status " + statusCode);
+                }
                 try (java.io.InputStream input = connection.getInputStream()) {
                     byte[] buffer = new byte[8192];
                     int count;
@@ -102,26 +105,32 @@ public final class MainActivity extends Activity {
                 if (bytesRead != 2000000) {
                     throw new IllegalStateException("Expected 2000000 probe bytes, received " + bytesRead);
                 }
+                long duration = SystemClock.elapsedRealtime() - started;
+                Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_200 duration_ms=" + duration
+                        + " transport=" + transport + " probe=" + sequence
+                        + " bytes_read=" + bytesRead + " attempts=" + attempt);
+                final String message = "HTTP 200 · " + duration + " ms · " + transport
+                        + " · probe " + sequence + " · bytes " + bytesRead;
+                runOnUiThread(() -> target.setText(message));
+                return;
+            } catch (Exception exception) {
+                // Public endpoints can transiently time out. Retry one I/O failure,
+                // but never hide a malformed payload or report a failed request as success.
+                if (exception instanceof java.io.IOException && attempt < 2) {
+                    Log.w(TAG, "BHARATSIM_NETWORK_PROBE retrying sequence=" + sequence
+                            + " after=" + exception.getClass().getSimpleName(), exception);
+                    continue;
+                }
+                Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport
+                        + " probe=" + sequence + " attempts=" + attempt, exception);
+                final String message = "Network probe failed: " + exception.getClass().getSimpleName();
+                runOnUiThread(() -> target.setText(message));
+                return;
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
             }
-        } catch (Exception exception) {
-            Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport + " probe=" + sequence, exception);
-            final String message = "Network probe failed: " + exception.getClass().getSimpleName();
-            runOnUiThread(() -> target.setText(message));
-            return;
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
-        long duration = SystemClock.elapsedRealtime() - started;
-        if (statusCode == 200) {
-            Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_200 duration_ms=" + duration + " transport=" + transport + " probe=" + sequence + " bytes_read=" + bytesRead);
-            final String message = "HTTP 200 · " + duration + " ms · " + transport + " · probe " + sequence + " · bytes " + bytesRead;
-            runOnUiThread(() -> target.setText(message));
-        } else {
-            Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + statusCode + " duration_ms=" + duration + " transport=" + transport + " probe=" + sequence);
-            final String message = "Network probe returned HTTP " + statusCode;
-            runOnUiThread(() -> target.setText(message));
         }
     }
 
