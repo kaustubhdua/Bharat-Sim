@@ -206,7 +206,7 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
         last_text = str(request("GET", f"/session/{session}/element/{element_id}/text", timeout=5).get("value", ""))
         probe = parse_probe_text(last_text)
         if probe and int(probe["sequence"]) > after_sequence:
-            if int(probe["bytes_read"]) != 250_000:
+            if int(probe["bytes_read"]) != 2_000_000:
                 raise RuntimeError(f"Fixture downloaded unexpected payload size: {probe['bytes_read']}")
             return probe
         if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
