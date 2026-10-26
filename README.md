@@ -2,7 +2,7 @@
 
 **The Cheap Phone Test** — test Android apps under constrained device and unreliable-network conditions, then explain failures with traceable evidence.
 
-> **Status: MVP with an authenticated worker-dispatch prototype.** The API, responsive dashboard, log analysis, risk planner, APK upload validation, lease-based job protocol, and local ADB smoke worker are implemented. The GitHub Actions Android emulator workflow now exercises the real local API → queue → worker → ADB → callback → saved-report path using a source-built fixture APK. The Appium UI assertion is being stabilized; public deployment, production sandbox review, verified network impairment, and physical-device validation remain unverified.
+> **Status: MVP with an authenticated worker-dispatch prototype.** The API, responsive dashboard, log analysis, risk planner, APK upload validation, lease-based job protocol, and local ADB smoke worker are implemented. The GitHub Actions Android emulator workflow now exercises the real local API → queue → worker → ADB → callback → saved-report path using a source-built fixture APK. The source-built fixture's Appium/UiAutomator2 primary-action journey now passes in a disposable GitHub Actions emulator; public deployment, production sandbox review, verified network impairment, and physical-device validation remain unverified.
 
 ## What works in this repository
 
@@ -15,13 +15,13 @@
 - React/Vite dashboard with run history, worker heartbeat status, log analysis, and report inspection.
 - Docker Compose setup for local API/dashboard deployment, with a loopback-only web binding by default.
 - CI for backend tests, frontend production build, worker safety guards, and container builds.
-- Dedicated Android emulator workflow that builds a known-good fixture APK, tests API-backed worker execution, and runs an Appium UI assertion with evidence artifacts. Do not interpret a smoke-completed status as proof of app health or persona constraint enforcement. A separate Android emulator workflow builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, and uploads short-lived evidence.
+- Dedicated Android emulator workflow that builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, and uploads short-lived evidence. The latest recorded run passed. Do not interpret a smoke-completed status as proof of arbitrary-app health or persona constraint enforcement.
 
 ## What is not complete
 
 - No public production URL or deployed commit has been verified.
-- No real emulator run has been performed in this work session. CI protocol fixtures are synthetic test data and are not device execution evidence.
-- App-specific Appium/UiAutomator journeys are not implemented.
+- A real disposable Android emulator workflow has passed for the source-built BharatSim fixture: upload → queue/lease → ADB install/launch/logcat → authenticated callback → persisted report, followed by an Appium UI action assertion and screenshot. This validates the fixture pipeline only; it does not validate arbitrary third-party APKs or production isolation.
+- Appium/UiAutomator2 is integrated for a fixture-app primary-action journey. Product-specific test-flow authoring, broader assertion coverage, and arbitrary-app compatibility remain incomplete.
 - Network shaping and RAM/storage pressure are not wired to the worker or verified against emulator traffic.
 - Multi-user identity, per-user run ownership, durable object storage, and production-grade sandbox isolation are not implemented.
 - Sarvam translation is not wired into the product.
