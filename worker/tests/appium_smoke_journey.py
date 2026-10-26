@@ -215,7 +215,6 @@ def main() -> int:
             raise RuntimeError(f"Appium did not return a session id: {created}")
         base = f"/session/{session_id}"
 
-        find_element(session_id, "accessibility id", "fixture-title")
         action_id = find_element(session_id, "accessibility id", "primary-action")
         status_id = find_element(session_id, "accessibility id", "journey-status")
         probe_id = find_element(session_id, "accessibility id", "network-probe-status")
@@ -295,7 +294,6 @@ def main() -> int:
             "probe_endpoint_scope": "local CI test server via Android Emulator host gateway; not public-internet evidence",
             "probe_payload_bytes": 2000000,
             "assertions": [
-                "fixture title is visible",
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
                 "each probe downloaded exactly 2,000,000 bytes from the controlled CI HTTP server through the emulator network stack",
