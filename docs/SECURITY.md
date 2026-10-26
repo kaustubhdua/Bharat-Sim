@@ -18,6 +18,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 
 ## Not yet implemented / not sufficient for public execution
 
+- The local API container runs as a non-root user with a read-only root filesystem, dropped Linux capabilities, no-new-privileges, and configured PID/memory limits. These reduce container privileges but are not an APK sandbox.
 - The shared API key and worker token are not user authentication, tenant isolation, or per-run user authorization.
 - APK archive checks are not malware scanning and do not make an APK safe.
 - The worker agent and runner do not create a sandbox by themselves. A compromised APK may act with the privileges of the Android guest and potentially attack reachable infrastructure.
