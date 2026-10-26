@@ -185,7 +185,7 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
             bytes_read = int(match.group(4))
             if bytes_read != 2000000:
                 raise RuntimeError(f"Fixture downloaded unexpected payload size: {bytes_read}")
-            return {"duration_ms": int(match.group(1)), "transport": match.group(2), "sequence": int(match.group(3)), "bytes_read": bytes_read, "attempts": int(match.group(5))}
+            return {"http_status": int(match.group(1)), "duration_ms": int(match.group(2)), "transport": match.group(3), "sequence": int(match.group(4)), "bytes_read": bytes_read, "attempts": int(match.group(6))}
         if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
             raise RuntimeError(f"Fixture network probe failed: {last_text}")
         time.sleep(0.5)
@@ -315,8 +315,8 @@ def main() -> int:
         report = {
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
-            "probe_endpoint": "https://speed.cloudflare.com/__down?bytes=2000000",
-            "probe_endpoint_scope": "public Cloudflare HTTPS download endpoint; measures real external traffic through the Android Emulator network stack, not arbitrary uploaded-app traffic",
+            "probe_endpoint": "https://ipv4.lg.plutex.de/25MB.bin",
+            "probe_endpoint_scope": "public IPv4-only PLUTEX Looking Glass HTTPS test file; the fixture requests bytes 0-1,999,999 and measures real external traffic through the Android Emulator network stack, not arbitrary uploaded-app traffic",
             "probe_payload_bytes": 2000000,
             "assertions": [
                 "primary action is located by stable accessibility identifier",
