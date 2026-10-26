@@ -92,6 +92,8 @@ jobs:
           gradle-version: "8.7"
       - name: Build known-good test APK
         working-directory: smoke-android
+        env:
+          BHARATSIM_PROBE_URL: https://ipv4.lg.plutex.de/25MB.bin
         run: gradle --no-daemon assembleDebug
       - name: Add Android build-tools to PATH
         shell: bash
@@ -121,7 +123,7 @@ jobs:
             exit 1
           fi
           echo "Selected upstream resolver: $dns_server"
-          getent ahostsv4 speed.cloudflare.com
+          getent ahostsv4 ipv4.lg.plutex.de
           echo "server=$dns_server" >> "$GITHUB_OUTPUT"
       - name: Enable KVM access
         run: |
