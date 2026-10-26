@@ -18,7 +18,7 @@ import java.net.URL;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
-    private static final String PROBE_URL = "http://10.0.2.2:8000/health/live";
+    private static final String PROBE_URL = "http://" + BuildConfig.PROBE_IP + "/";
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -84,12 +84,13 @@ public final class MainActivity extends Activity {
         // third-party uptime dependencies while exercising the actual network path.
         try {
             HttpURLConnection connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
+            connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(10000);
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Connection", "close");
             statusCode = connection.getResponseCode();
-            if (statusCode == 200) {
+            if (statusCode >= 200 && statusCode < 400) {
                 connection.getInputStream().close();
             } else if (connection.getErrorStream() != null) {
                 connection.getErrorStream().close();
@@ -103,8 +104,8 @@ public final class MainActivity extends Activity {
         }
         long duration = SystemClock.elapsedRealtime() - started;
         if (statusCode == 200) {
-            Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_200 duration_ms=" + duration + " transport=" + transport + " probe=" + sequence);
-            final String message = "HTTP 200 · " + duration + " ms · " + transport + " · probe " + sequence;
+            Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + statusCode + " duration_ms=" + duration + " transport=" + transport + " probe=" + sequence);
+            final String message = "HTTP " + statusCode + " · " + duration + " ms · " + transport + " · probe " + sequence;
             runOnUiThread(() -> target.setText(message));
         } else {
             Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + statusCode + " duration_ms=" + duration + " transport=" + transport + " probe=" + sequence);
