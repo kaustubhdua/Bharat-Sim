@@ -343,6 +343,8 @@ async def create_run(
     persona_id: str = Form("budget-android"),
     apk: UploadFile | None = File(default=None),
 ):
+    if apk is None or not apk.filename:
+        raise HTTPException(status_code=422, detail="An APK file is required to register a test run")
     cleanup_expired_uploads()
     if persona_id not in PERSONAS:
         raise HTTPException(status_code=422, detail="Unknown persona_id")
