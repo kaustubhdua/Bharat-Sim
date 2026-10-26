@@ -24,6 +24,7 @@ export BHARATSIM_SMOKE_DURATION_SECONDS=20
 export BHARATSIM_WORKER_TOKEN="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 export BHARATSIM_DATA_DIR="$RUNNER_TEMP/bharatsim-api-data"
 export BHARATSIM_ENABLE_TEST_NETWORK_PROBE=true
+export BHARATSIM_ENV=ci
 test -n "${BHARATSIM_PROBE_URL:-}"
 echo "CI network probe endpoint: $BHARATSIM_PROBE_URL"
 
