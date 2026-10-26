@@ -10,7 +10,7 @@
 - [x] Worker reports include bounded, line-addressable crash/ANR/OOM/network/storage marker excerpts from collected logcat with nearby context; they are diagnostic markers, not confirmed root causes, and empty logs do not generate findings.
 - [x] Transparent heuristic BharatScore with explicit limitations.
 - [x] Responsive dashboard for persona selection, run registration/history, log analysis, worker heartbeat status, and report inspection.
-- [x] Real Chromium browser E2E against the actual local FastAPI service and SQLite test database: connected API/profile loading, line-addressable log analysis, and honest awaiting-worker run status. These tests use an isolated test database and do not fabricate execution results.
+- [x] Real Chromium browser E2E against the actual local FastAPI service and isolated SQLite test database: connected API/profile loading, line-addressable log analysis, and disabled run registration until an APK is selected. The backend independently rejects run creation without an APK. These tests do not fabricate execution results.
 - [x] Authenticated worker claim protocol, short-lived leases, heartbeat extension, authorized APK download, result callbacks, stale-result rejection, and bounded inline results.
 - [x] Polling worker agent using the Python standard library and a guarded ADB smoke runner.
 - [x] Backend API/security/worker protocol tests, frontend production build CI, worker guard/compile checks, and automated Python/JavaScript dependency vulnerability audits.
