@@ -75,8 +75,8 @@ def apply_emulator_network_profile(
         return evidence
 
     commands = [
-        ("delay", ["adb", "-s", serial, "emu", "network", "delay", str(latency_ms), str(latency_ms if latency_ms else 0)]),
-        ("speed", ["adb", "-s", serial, "emu", "network", "speed", str(up_kbps), str(down_kbps)]),
+        ("delay", ["adb", "-s", serial, "emu", "network", "delay", str(latency_ms) if latency_ms else "none"]),
+        ("speed", ["adb", "-s", serial, "emu", "network", "speed", f"{up_kbps}:{down_kbps}"]),
     ]
     command_evidence: dict[str, object] = {}
     for name, command in commands:
