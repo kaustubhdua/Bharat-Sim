@@ -13,8 +13,17 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Button;
 
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
@@ -79,17 +88,33 @@ public final class MainActivity extends Activity {
         long started = SystemClock.elapsedRealtime();
         String transport = activeTransport();
         int statusCode = -1;
-        try {
-            HttpURLConnection connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Connection", "close");
-            statusCode = connection.getResponseCode();
-            if (statusCode == 200) {
-                connection.getInputStream().close();
+        // Use a fixed Cloudflare anycast IP to avoid making DNS resolution a
+        // hidden dependency of the network-shaping experiment. TLS still uses
+        // SNI and hostname verification for cloudflare-dns.com.
+        try (SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket()) {
+            socket.connect(new InetSocketAddress("1.1.1.1", 443), 10000);
+            socket.setSoTimeout(10000);
+            SSLParameters parameters = socket.getSSLParameters();
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+            parameters.setServerNames(Collections.singletonList(new SNIHostName("cloudflare-dns.com")));
+            socket.setSSLParameters(parameters);
+            socket.startHandshake();
+
+            OutputStream output = socket.getOutputStream();
+            output.write(("GET /cdn-cgi/trace HTTP/1.1\\r\\n"
+                    + "Host: cloudflare-dns.com\\r\\n"
+                    + "Accept: text/plain\\r\\n"
+                    + "Connection: close\\r\\n\\r\\n").getBytes(StandardCharsets.US_ASCII));
+            output.flush();
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+            String statusLine = reader.readLine();
+            if (statusLine != null) {
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                        .compile("^HTTP/1\\\\.[01] (\\\\d{3})(?:\\\\s.*)?$")
+                        .matcher(statusLine);
+                if (matcher.matches()) statusCode = Integer.parseInt(matcher.group(1));
             }
-            connection.disconnect();
         } catch (Exception exception) {
             Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport + " probe=" + sequence, exception);
             final String message = "Network probe failed: " + exception.getClass().getSimpleName();
