@@ -519,7 +519,15 @@ def worker_submit_result(run_id: str, request: Request, payload: WorkerResultReq
             raise HTTPException(status_code=422, detail="Completed result must include report status=completed")
         if payload.status == "failed" and payload.result.get("status") not in (None, "failed"):
             raise HTTPException(status_code=422, detail="Failed result must not contain a completed report")
-        if payload.result.get("apk_sha256") and payload.result["apk_sha256"] != lease["apk_sha256"]:
+        reported_hash = payload.result.get("apk_sha256")
+        if payload.status == "completed" and (
+            not isinstance(reported_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", reported_hash)
+        ):
+            raise HTTPException(status_code=422, detail="Completed result must include a valid APK SHA-256")
+        if reported_hash is not None and (
+            not isinstance(reported_hash, str)
+            or not hmac.compare_digest(reported_hash, str(lease["apk_sha256"] or ""))
+        ):
             raise HTTPException(status_code=422, detail="Worker report APK SHA-256 does not match the queued artifact")
         worker = conn.execute("SELECT worker_id FROM runs WHERE id=?", (run_id,)).fetchone()
         conn.execute(
