@@ -1,6 +1,16 @@
 name: Android emulator smoke evidence
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "worker/runner.py"
+      - "worker/agent.py"
+      - "worker/tests/**"
+      - "backend/**"
+      - "smoke-android/**"
+      - "scripts/ci/**"
+      - ".github/workflows/android-emulator-smoke.yml"
   pull_request:
     paths:
       - "worker/runner.py"
