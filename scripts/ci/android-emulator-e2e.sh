@@ -23,6 +23,9 @@ export BHARATSIM_POLL_SECONDS=1
 export BHARATSIM_SMOKE_DURATION_SECONDS=20
 export BHARATSIM_WORKER_TOKEN="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 export BHARATSIM_DATA_DIR="$RUNNER_TEMP/bharatsim-api-data"
+export BHARATSIM_ENABLE_TEST_NETWORK_PROBE=true
+test -n "${BHARATSIM_PROBE_URL:-}"
+echo "CI network probe endpoint: $BHARATSIM_PROBE_URL"
 
 mkdir -p artifacts
 (cd backend && exec uvicorn app.main:app --host 0.0.0.0 --port 8000) > artifacts/api.log 2>&1 &
@@ -54,6 +57,8 @@ while time.monotonic() < deadline:
 else:
     raise SystemExit("BharatSim API did not become ready")
 PY
+
+curl --fail --silent --show-error "$BHARATSIM_PROBE_URL" -o /dev/null
 
 python worker/agent.py > artifacts/worker.log 2>&1 &
 WORKER_PID=$!
