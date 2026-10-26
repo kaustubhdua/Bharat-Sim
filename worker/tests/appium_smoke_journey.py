@@ -16,7 +16,7 @@ from pathlib import Path
 BASE = "http://127.0.0.1:4723"
 ADB_SERIAL = "emulator-5554"
 ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
-PROBE_RE = re.compile(r"HTTP 200 · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER) · probe (\d+)")
+PROBE_RE = re.compile(r"HTTP 200 · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER) · probe (\d+) · bytes (\d+)")
 
 
 def request(method: str, path: str, payload: dict | None = None, timeout: int = 30) -> dict:
@@ -80,10 +80,10 @@ def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
             raise RuntimeError(f"Could not parse emulator network status: {output}")
         return int(match.group(1))
     observed = {
-        "minimum_latency_ms": read(r"minimum latency:\\s*(\\d+)\\s+ms"),
-        "maximum_latency_ms": read(r"maximum latency:\\s*(\\d+)\\s+ms"),
-        "download_bps": read(r"download speed:\\s*(\\d+)\\s+bits/s"),
-        "upload_bps": read(r"upload speed:\\s*(\\d+)\\s+bits/s"),
+        "minimum_latency_ms": read(r"minimum latency:\s*(\d+)\s+ms"),
+        "maximum_latency_ms": read(r"maximum latency:\s*(\d+)\s+ms"),
+        "download_bps": read(r"download speed:\s*(\d+)\s+bits/s"),
+        "upload_bps": read(r"upload speed:\s*(\d+)\s+bits/s"),
     }
     expected_latency = 0 if latency_ms is None else latency_ms
     matched = (
