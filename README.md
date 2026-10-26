@@ -75,6 +75,8 @@ See worker/README.md. Configure BHARATSIM_WORKER_TOKEN on the API and worker, pr
     cd frontend
     npm install
     npm run build
+    npx playwright install chromium
+    npm run test:e2e
     cd ..
     docker compose config --quiet
     docker build -f backend/Dockerfile -t bharatsim-api:local .
