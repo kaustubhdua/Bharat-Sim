@@ -56,6 +56,10 @@ def test_worker_claim_download_and_result_round_trip(monkeypatch, tmp_path):
     job = claimed.json()["job"]
     assert job["id"] == run_id
     assert job["attempt"] == 1
+    assert job["persona_profile"]["id"] == "baseline"
+    assert job["persona_profile"]["latency_ms"] == main.PERSONAS["baseline"]["latency_ms"]
+    assert job["persona_profile"]["down_kbps"] == main.PERSONAS["baseline"]["down_kbps"]
+    assert job["persona_profile"]["up_kbps"] == main.PERSONAS["baseline"]["up_kbps"]
 
     downloaded = client.get(
         f"/internal/worker/runs/{run_id}/apk",
