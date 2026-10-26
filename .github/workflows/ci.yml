@@ -52,3 +52,21 @@ jobs:
         run: docker build -f frontend/Dockerfile -t bharatsim-web:ci .
       - name: Validate Compose configuration
         run: docker compose config --quiet
+      - name: Smoke-test hardened Compose stack
+        run: |
+          set -euo pipefail
+          trap 'docker compose down -v' EXIT
+          docker compose up --build -d
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/health/ready >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker compose ps
+              docker compose logs --no-color
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:8080/api/v1/capabilities | python -c 'import json,sys; data=json.load(sys.stdin); assert isinstance(data, dict)'
+          docker compose ps
