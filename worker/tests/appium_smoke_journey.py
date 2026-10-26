@@ -286,9 +286,10 @@ def main() -> int:
         evidence["baseline_probes"] = baseline_probes
 
         # Test bandwidth immediately after baseline to isolate whether the
-        # speed control itself affects the next real HTTP transfer.
+        # speed control itself affects the next real HTTP transfer. A 5 Mbps
+        # cap is below the unbounded baseline but keeps the 2 MB transfer bounded.
         phase = "configure_bandwidth_profile"
-        bandwidth_profile = set_network_profile(None, "1000:1000")
+        bandwidth_profile = set_network_profile(None, "5000:5000")
         evidence["bandwidth_profile"] = bandwidth_profile
         phase = "bandwidth_samples"
         bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
