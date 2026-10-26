@@ -71,6 +71,8 @@ public final class MainActivity extends Activity {
         layout.addView(status);
         layout.addView(networkStatus);
         setContentView(layout);
+        networkStatus.setText("Network probe running");
+        new Thread(() -> performNetworkProbe(networkStatus)).start();
     }
 
     private void performNetworkProbe(TextView target) {
