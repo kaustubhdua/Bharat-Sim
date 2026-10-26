@@ -181,11 +181,18 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
     while time.monotonic() < deadline:
         last_text = str(request("GET", f"/session/{session}/element/{element_id}/text", timeout=5).get("value", ""))
         match = PROBE_RE.fullmatch(last_text)
-        if match and int(match.group(3)) > after_sequence:
-            bytes_read = int(match.group(4))
+        if match and int(match.group(4)) > after_sequence:
+            bytes_read = int(match.group(5))
             if bytes_read != 2000000:
                 raise RuntimeError(f"Fixture downloaded unexpected payload size: {bytes_read}")
-            return {"http_status": int(match.group(1)), "duration_ms": int(match.group(2)), "transport": match.group(3), "sequence": int(match.group(4)), "bytes_read": bytes_read, "attempts": int(match.group(6))}
+            return {
+                "http_status": int(match.group(1)),
+                "duration_ms": int(match.group(2)),
+                "transport": match.group(3),
+                "sequence": int(match.group(4)),
+                "bytes_read": bytes_read,
+                "attempts": int(match.group(6)),
+            }
         if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
             raise RuntimeError(f"Fixture network probe failed: {last_text}")
         time.sleep(0.5)
