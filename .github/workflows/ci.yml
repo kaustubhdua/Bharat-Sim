@@ -96,3 +96,28 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:8080/api/v1/capabilities | python -c 'import json,sys; data=json.load(sys.stdin); assert isinstance(data, dict)'
           docker compose ps
+
+          # Verify the optional single-tenant key is injected by nginx server-side,
+          # accepted by the API, and absent from the static frontend bundle.
+          export BHARATSIM_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export BHARATSIM_REQUIRE_API_KEY=true
+          docker compose down -v
+          docker compose up --build -d
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/health/ready >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker compose ps
+              docker compose logs --no-color
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:8080/api/v1/personas | python -c 'import json,sys; assert len(json.load(sys.stdin)["items"]) >= 4'
+          docker compose exec -T api python -c 'import os,urllib.error,urllib.request; base="http://127.0.0.1:8000/api/v1/personas"; req=urllib.request.Request(base); exec("try:\n urllib.request.urlopen(req,timeout=3)\n raise SystemExit(1)\nexcept urllib.error.HTTPError as e:\n assert e.code == 401"); req=urllib.request.Request(base,headers={"X-BharatSim-API-Key":os.environ["BHARATSIM_API_KEY"]}); assert urllib.request.urlopen(req,timeout=3).status == 200'
+          if docker compose exec -T web sh -c "grep -R -F '$BHARATSIM_API_KEY' /usr/share/nginx/html"; then
+            echo "API key leaked into the static frontend bundle" >&2
+            exit 1
+          fi
+          docker compose ps
