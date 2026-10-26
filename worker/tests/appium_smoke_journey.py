@@ -50,9 +50,9 @@ def adb(*args: str, timeout: int = 20) -> str:
 
 def set_network_profile(latency_ms: int | None) -> dict:
     """Configure the emulator and require exact console readback."""
-    # Explicitly register the emulator's simulated cellular service before
-    # disabling Wi-Fi; some CI emulator images otherwise report CELLULAR as
-    # the active transport but cannot resolve external hosts.
+    # Force the fixture onto the emulator network path with a deterministic
+    # host-local API endpoint (10.0.2.2 is the Android Emulator host alias).
+    # This avoids public DNS/CDN availability affecting the latency experiment.
     adb("emu", "gsm", "voice", "home")
     adb("emu", "gsm", "data", "home")
     adb("shell", "svc", "wifi", "disable")
@@ -174,7 +174,7 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
         match = PROBE_RE.fullmatch(last_text)
         if match and int(match.group(3)) > after_sequence:
             return {"duration_ms": int(match.group(1)), "transport": match.group(2), "sequence": int(match.group(3))}
-        if "probe failed" in last_text.lower() or "returned HTTP" in last_text.lower():
+        if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
             raise RuntimeError(f"Fixture network probe failed: {last_text}")
         time.sleep(0.5)
     raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}")
@@ -285,8 +285,8 @@ def main() -> int:
                 "fixture title is visible",
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "baseline and shaped requests return real HTTP 200 responses from https://example.com/",
-                "both requests use cellular/Ethernet transport",
+                "baseline and shaped requests return real HTTP 200 responses from the local API health endpoint via 10.0.2.2:8000",
+                "both requests use cellular/Ethernet transport to reach the controlled local API endpoint",
                 "emulator network console readback matches the configured profile",
                 "one cold-start warm-up was excluded, then three baseline and three shaped requests were measured on the same cellular/Ethernet transport",
                 "median shaped request is at least 50ms slower than median baseline (minimum signal threshold; not an exact-delay claim)",
