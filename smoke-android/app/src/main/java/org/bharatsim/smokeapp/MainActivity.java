@@ -18,7 +18,7 @@ import java.net.URL;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
-    private static final String PROBE_URL = "https://example.com/";
+    private static final String PROBE_URL = "http://10.0.2.2:8000/health/ready";
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
