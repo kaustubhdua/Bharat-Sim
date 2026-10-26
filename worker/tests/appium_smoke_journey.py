@@ -166,11 +166,11 @@ def find_element(session: str, using: str, value: str, timeout: int = 25) -> str
     raise RuntimeError(f"Could not find element ({using}={value}) within {timeout}s: {last_error}")
 
 
-def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 60) -> dict:
+def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 25) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
-        last_text = str(request("GET", f"/session/{session}/element/{element_id}/text").get("value", ""))
+        last_text = str(request("GET", f"/session/{session}/element/{element_id}/text", timeout=5).get("value", ""))
         match = PROBE_RE.fullmatch(last_text)
         if match and int(match.group(3)) > after_sequence:
             return {"duration_ms": int(match.group(1)), "transport": match.group(2), "sequence": int(match.group(3))}
