@@ -81,6 +81,16 @@ class EmulatorNetworkProfileTests(unittest.TestCase):
             {"http_status": 200, "duration_ms": 91, "transport": "CELLULAR"},
         )
 
+    def test_parse_fixture_probe_accepts_real_http_redirect_from_pinned_endpoint(self):
+        evidence = parse_fixture_network_probe(
+            "06-01 10:00:00.000 I BharatSimNetworkProbe: "
+            "BHARATSIM_NETWORK_PROBE status=HTTP_301 duration_ms=241 transport=CELLULAR"
+        )
+        self.assertEqual(
+            evidence,
+            {"http_status": 301, "duration_ms": 241, "transport": "CELLULAR"},
+        )
+
     def test_refuses_to_claim_emulator_controls_for_physical_device(self):
         with patch("worker.runner.run_cmd") as run:
             evidence = apply_emulator_network_profile("R58M123ABC", 180, 1200, 350, 0)
