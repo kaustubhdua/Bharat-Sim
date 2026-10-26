@@ -19,7 +19,7 @@ import java.net.URL;
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
-    private static final int PROBE_BYTES = 1_000_000;
+    private static final int PROBE_BYTES = 500_000;
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -86,7 +86,7 @@ public final class MainActivity extends Activity {
             try {
                 connection = (HttpURLConnection) new URL(PROBE_URL).openConnection();
                 connection.setConnectTimeout(5000);
-                connection.setReadTimeout(12000);
+                connection.setReadTimeout(30000);
                 connection.setRequestMethod("GET");
                 connection.setRequestProperty("Connection", "close");
                 connection.setRequestProperty("Accept-Encoding", "identity");
