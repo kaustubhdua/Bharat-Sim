@@ -340,7 +340,7 @@ def main() -> int:
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
             "probe_endpoint": "https://ipv4.lg.plutex.de/25MB.bin",
-            "probe_endpoint_scope": "public IPv4-only PLUTEX Looking Glass HTTPS test file; the fixture requests bytes 0-499,999 and measures real external traffic through the Android Emulator network stack, not arbitrary uploaded-app traffic",
+            "probe_endpoint_scope": "public IPv4-only PLUTEX Looking Glass HTTPS test file; the fixture requests bytes 0-249,999 and measures real external traffic through the Android Emulator network stack, not arbitrary uploaded-app traffic",
             "probe_payload_bytes": 250_000,
             "assertions": [
                 "primary action is located by stable accessibility identifier",
