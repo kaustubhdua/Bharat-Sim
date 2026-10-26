@@ -1,5 +1,7 @@
 plugins { id "com.android.application" }
+def probeUrl = System.getenv("BHARATSIM_PROBE_URL") ?: "https://speed.cloudflare.com/__down?bytes=2000000"
 android {
+    buildFeatures { buildConfig true }
     namespace "org.bharatsim.smokeapp"
     compileSdk 35
     defaultConfig {
@@ -8,6 +10,7 @@ android {
         targetSdk 28
         versionCode 1
         versionName "1.0"
+        buildConfigField "String", "PROBE_URL", "\"${probeUrl}\""
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
