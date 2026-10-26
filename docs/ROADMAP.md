@@ -16,6 +16,7 @@
 - [x] Security model, worker setup, open-source references, and explicit feature/limitation documentation.
 - [x] Network shaper apply parses and compares `tc`-reported delay, jitter, loss and rate settings.
 - [x] CI creates a disposable Linux network namespace and veth pair, measures actual ping RTT before and after shaping, requires the configured delay to be observable, and verifies qdisc cleanup. This proves the Linux prototype on that veth only.
+- [x] Pass server-authored persona network targets to the worker; apply Android Emulator console latency and upload/download speed controls, read back the configured values, and verify restoration to defaults after each run. The evidence proves emulator control-plane settings, not the active app traffic path.
 - [x] Add a separate CI workflow that boots an Android emulator, starts a local API and authenticated worker, verifies upload → queue → ADB execution → result callback → persisted report, then checks an Appium primary-action journey with a screenshot artifact.
 
 ## Remaining before calling execution fully functional
@@ -33,8 +34,8 @@
 
 - [x] Implement and pass the Appium/UiAutomator2 fixture journey with explicit steps, assertions, screenshots, and repeatable checkpoints.
 - [ ] Add app-specific journey authoring, broader assertions, and error-state coverage for arbitrary uploaded applications.
-- [ ] Wire network profiles to an isolated Android-emulator traffic path and verify actual emulator requests traverse the shaper. The current CI measurement proves only a dedicated Linux veth path, not emulator routing.
-- [ ] Run baseline, latency, bandwidth, packet-loss, outage, and recovery experiments; record requested vs verified conditions. The current runner now explicitly reports `constraints_applied=false` rather than implying persona constraints were enforced.
+- [ ] Verify that the app's active Android network interface is Ethernet/cellular and that its real requests traverse the applied emulator network controls. Current evidence is only emulator console control-plane readback; the documented controls affect Ethernet/cellular, and Wi-Fi may use a different path.
+- [ ] Run real app-request baseline, latency, bandwidth, packet-loss, outage, and recovery experiments; record requested vs verified conditions. Delay/bandwidth control readback exists, but packet loss and outage are not implemented, and `constraints_applied=false` remains until the full persona is enforced.
 - [ ] Add supported RAM/storage/CPU pressure controls or report those constraints as unsupported.
 - [ ] Validate at least one low-cost physical Android device before making real-device fidelity claims.
 
