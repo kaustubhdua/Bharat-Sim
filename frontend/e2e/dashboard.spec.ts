@@ -36,3 +36,14 @@ test("run registration is disabled until a real APK is selected", async ({ page 
   await expect(page.getByText("Choose an APK to enable run registration")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Test runs/ })).toContainText("0");
 });
+
+test("Configure a test navigates to the real APK registration form", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("API connected")).toBeVisible();
+
+  await page.getByRole("button", { name: /Configure a test/ }).click();
+  await expect(page.getByRole("heading", { name: "New test run" })).toBeVisible();
+  await expect(page.getByLabel("Testing persona")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Register test run/ })).toBeDisabled();
+  await expect(page.getByText("Choose an APK to enable run registration")).toBeVisible();
+});
