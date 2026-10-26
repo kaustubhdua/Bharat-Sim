@@ -121,9 +121,10 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> target.setText(message));
                 return;
             } catch (Exception exception) {
-                // Public DNS and routing can briefly fail in hosted CI. Retry bounded I/O
-                // failures with backoff; keep attempt counts in logcat and UI evidence.
-                // Malformed payloads are not retried, and a final failure is never a success.
+                // Transient host/emulator connection resets can occur in hosted CI. Retry
+                // bounded I/O failures with backoff; keep attempt counts in logcat
+                // and UI evidence. Malformed payloads are not retried, and a final
+                // failure is never reported as a successful measurement.
                 if (exception instanceof java.io.IOException && attempt < 4) {
                     Log.w(TAG, "BHARATSIM_NETWORK_PROBE retrying sequence=" + sequence
                             + " attempt=" + attempt + " after=" + exception.getClass().getSimpleName(), exception);
