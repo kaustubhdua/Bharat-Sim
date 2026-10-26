@@ -39,6 +39,20 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 7. Test stale leases, replayed callbacks, cross-run access, oversized results, expired artifacts, worker crashes, and malicious APK fixtures.
 8. Conduct a security review of the host isolation and egress policy before exposing the service to public users.
 
+## Assessment scope and upstream references
+
+BharatSim's install/launch/logcat smoke runner is an operational resilience test, not a mobile application security assessment and not an APK malware scanner. Do not advertise MASVS compliance or security certification based on a smoke run.
+
+Use established open-source standards and tools when designing separate security-analysis features:
+
+- [OWASP MASVS](https://github.com/OWASP/masvs) defines mobile application security verification controls.
+- [OWASP MASTG](https://mas.owasp.org/MASTG/) provides test procedures and evidence guidance for Android/iOS app security assessment.
+- [OWASP Mobile Application Security Testing guidance](https://owasp.github.io/DevSecOpsGuideline/2-Process/2-4-Test/2-4-3-Mobile-Application-Security-Test/) describes how static and dynamic tools fit into mobile security testing.
+- [Android app security best practices](https://source.android.com/docs/security/best-practices/app) documents Android sandbox and process-isolation principles.
+- [Appium UiAutomator2](https://appium.github.io/appium-uiautomator2-driver/) is the upstream UI automation driver used for the fixture journey.
+
+These references are guidance, not a certification of BharatSim. Any future APK security-analysis feature needs its own threat model, safe execution environment, validated tooling, and evidence-backed acceptance tests.
+
 ## Result integrity policy
 
 - An uploaded or registered APK is not an executed APK.
