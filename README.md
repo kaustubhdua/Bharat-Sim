@@ -8,13 +8,13 @@
 
 - Four named Bharat test personas and deterministic risk-ranked scenario planning.
 - APK upload size limits, APK-like ZIP structure checks, bounded archive metadata, and SHA-256 fingerprinting.
-- FastAPI endpoints with SQLite persistence for run metadata and log analyses.
-- Worker queue with authenticated job claims, short-lived leases, heartbeats, lease-bound APK downloads, SHA-256 evidence matching, result callbacks, stale-result rejection, and bounded inline report JSON.
+- FastAPI endpoints with SQLite persistence for run metadata and log analyses. A process-level integration test verifies that run metadata survives an API restart; worker state and full report/artifact durability across restarts are not yet proven.
+- Worker queue with authenticated job claims, short-lived leases, heartbeats, lease-bound APK downloads, SHA-256 evidence matching, result callbacks, stale-result rejection, and bounded inline report JSON. Protocol tests cover lease renewal, expired-lease reclamation, stale-token rejection, retry exhaustion, and duplicate result rejection.
 - Optional polling worker that refuses credential-bearing HTTP redirects, enforces same-origin `/internal/worker/` paths for job URLs, verifies APK hashes, and runs an explicitly enabled ADB smoke test against a configured disposable Android device. APK-derived package names are validated before use in ADB shell commands, and the runner attempts package cleanup after execution.
 - Deterministic logcat signal analysis, failure fingerprints, evidence-linked findings, and a transparent heuristic BharatScore.
 - React/Vite dashboard with run history, worker heartbeat status, log analysis, and report inspection.
 - Docker Compose setup for local API/dashboard deployment, with a loopback-only web binding by default.
-- CI for backend tests, frontend production build, worker safety guards, and container builds.
+- CI for backend tests, frontend production build, worker safety guards, and container builds, plus scheduled/PR-triggered Python and JavaScript dependency vulnerability audits. The audit passed on the merged revision; this is not a full security certification.
 - Dedicated Android emulator workflow that builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, verifies emulator console latency/bandwidth readback and confirms default network settings are restored. It also runs an isolated Linux network-namespace test that measures real ping traffic through a shaped veth. The CI fixture downloads a real 2,000,000-byte payload from Cloudflare's public speed endpoint over the emulator's cellular/Ethernet path. It compares three baseline requests against three latency-only requests (150 ms) and three bandwidth-only requests (3 Mbps), requires minimum measured effects, and verifies profile reset. This verifies only the source-built fixture path in CI, not arbitrary app traffic; the revised test is being revalidated.
 
 ## What is not complete
