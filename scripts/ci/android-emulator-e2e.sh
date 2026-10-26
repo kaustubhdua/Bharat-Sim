@@ -25,22 +25,6 @@ export BHARATSIM_WORKER_TOKEN="$(python -c 'import secrets; print(secrets.token_
 export BHARATSIM_DATA_DIR="$RUNNER_TEMP/bharatsim-api-data"
 
 mkdir -p artifacts
-python scripts/ci/network-probe-server.py > artifacts/network-probe-server.log 2>&1 &
-PROBE_PID=$!
-python - <<'PY'
-import time
-import urllib.request
-deadline = time.monotonic() + 20
-while time.monotonic() < deadline:
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:8001/health", timeout=2) as response:
-            if response.status == 200:
-                break
-    except Exception:
-        time.sleep(0.25)
-else:
-    raise SystemExit("Local CI network probe server did not become ready")
-PY
 (cd backend && exec uvicorn app.main:app --host 0.0.0.0 --port 8000) > artifacts/api.log 2>&1 &
 API_PID=$!
 WORKER_PID=
@@ -53,7 +37,6 @@ cleanup() {
   adb -s emulator-5554 shell svc data enable >/dev/null 2>&1 || true
   [ -z "$APPIUM_PID" ] || kill "$APPIUM_PID" 2>/dev/null || true
   [ -z "$WORKER_PID" ] || kill "$WORKER_PID" 2>/dev/null || true
-  [ -z "$PROBE_PID" ] || kill "$PROBE_PID" 2>/dev/null || true
   [ -z "$API_PID" ] || kill "$API_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
