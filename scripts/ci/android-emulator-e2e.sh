@@ -83,7 +83,12 @@ assert result.get("runner_return_code") == 0, result
 assert result.get("package_name") == "org.bharatsim.smokeapp", result.get("package_name")
 assert result.get("execution_scope") == "install_launch_logcat_smoke", result
 assert result.get("constraints_applied") is False, result
-assert result.get("constraint_verification") == "unsupported_not_applied", result
+assert str(result.get("constraint_verification", "")).startswith("partial_network_control_verified"), result
+network_profile = result.get("network_profile") or {}
+assert network_profile.get("control_plane", {}).get("status") == "verified", network_profile
+assert network_profile.get("network_constraints_applied") is True, network_profile
+assert network_profile.get("traffic_path_verified") is False, network_profile
+assert network_profile.get("reset", {}).get("status") == "verified", network_profile
 for step_name in ("install_apk", "launch_app", "collect_logcat"):
     step = next((s for s in result.get("steps", []) if s.get("name") == step_name), None)
     assert step and step.get("return_code") == 0, f"{step_name} failed: {step}"
