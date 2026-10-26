@@ -50,11 +50,13 @@ def adb(*args: str, timeout: int = 20) -> str:
 
 def set_network_profile(latency_ms: int | None) -> dict:
     """Configure the emulator and require exact console readback."""
-    # Keep the emulator's working default network enabled. Forcing simulated
-    # cellular mode made DNS resolution flaky in hosted CI. The experiment
-    # records the actual transport and requires it to remain stable across
-    # baseline and shaped requests rather than assuming a specific transport.
-    adb("shell", "svc", "wifi", "enable")
+    # Network delay/speed controls affect the emulator's simulated mobile
+    # network. Register cellular service and disable Wi-Fi so measurements
+    # cannot silently bypass the profile on the Wi-Fi path. The fixture probe
+    # uses a pinned IP with validated TLS SNI, avoiding cellular DNS dependency.
+    adb("emu", "gsm", "voice", "home")
+    adb("emu", "gsm", "data", "home")
+    adb("shell", "svc", "wifi", "disable")
     adb("shell", "svc", "data", "enable")
     if latency_ms is None:
         adb("emu", "network", "delay", "none")
@@ -222,8 +224,8 @@ def main() -> int:
         # Warm up DNS/TLS once; exclude this cold-start request from timing.
         request("POST", base + f"/element/{action_id}/click", {})
         warmup_probe = wait_for_probe(session_id, probe_id, after_sequence=0)
-        if warmup_probe["transport"] not in ("CELLULAR", "ETHERNET", "WIFI"):
-            raise RuntimeError(f"Warm-up request used unknown/unsupported transport: {warmup_probe}")
+        if warmup_probe["transport"] != "CELLULAR":
+            raise RuntimeError(f"Warm-up request did not use the controlled cellular transport: {warmup_probe}")
 
         baseline_probes = []
         last_sequence = warmup_probe["sequence"]
@@ -279,7 +281,7 @@ def main() -> int:
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
                 "baseline and shaped requests return real HTTP 200 responses from https://example.com/",
-                "all baseline and shaped requests use the same observed Android network transport",
+                "all baseline and shaped requests use the controlled cellular transport",
                 "emulator network console readback matches the configured profile",
                 "one cold-start warm-up was excluded, then three baseline and three shaped requests were measured on the same cellular/Ethernet transport",
                 "median shaped request is at least 100ms slower than median baseline",
