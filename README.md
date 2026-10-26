@@ -15,7 +15,7 @@
 - React/Vite dashboard with run history, worker heartbeat status, log analysis, and report inspection.
 - Docker Compose setup for local API/dashboard deployment, with a loopback-only web binding by default.
 - CI for backend tests, frontend production build, worker safety guards, and container builds.
-- Dedicated Android emulator workflow that builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, and uploads short-lived evidence. The latest recorded run passed. Do not interpret a smoke-completed status as proof of arbitrary-app health or persona constraint enforcement.
+- Dedicated Android emulator workflow that builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, runs an Appium UI assertion, and uploads short-lived evidence. It also runs an isolated Linux network-namespace test that measures real ping traffic through a shaped veth and checks cleanup. This validates the shaper in isolation, not Android-emulator traffic integration. Do not interpret a smoke-completed status as proof of arbitrary-app health or persona constraint enforcement.
 
 ## What is not complete
 
@@ -33,7 +33,7 @@
 - backend/tests/: backend, upload-security, and worker-protocol tests.
 - worker/agent.py: authenticated polling worker using Python's standard library.
 - worker/runner.py: bounded ADB install/launch/logcat smoke runner.
-- worker/network_shaper.py: guarded Linux tc/netem prototype; not integrated into job execution.
+- worker/network_shaper.py: guarded Linux tc/netem prototype; not integrated into Android job execution. `scripts/ci/network-shaper-e2e.sh` measures traffic across an isolated shaped veth in CI.
 - docs/: architecture, API, security, open-source references, and roadmap.
 
 ## Run locally
