@@ -202,6 +202,61 @@ Path("artifacts/api-run.report.json").write_text(json.dumps(report, indent=2))
 print(json.dumps(report, indent=2))
 PY
 
+# Exercise the real worker failure callback with an APK-shaped archive whose
+# manifest is deliberately invalid. It must end in a failed report and must
+# never be represented as a successful execution.
+python - <<'PYNEG'
+import zipfile
+from pathlib import Path
+with zipfile.ZipFile("artifacts/invalid-manifest.apk", "w", zipfile.ZIP_DEFLATED) as archive:
+    archive.writestr("AndroidManifest.xml", b"not a compiled Android manifest")
+    archive.writestr("classes.dex", b"not dex bytecode")
+PYNEG
+curl --fail --silent --show-error \
+  -F persona_id=baseline \
+  -F "apk=@artifacts/invalid-manifest.apk;type=application/vnd.android.package-archive" \
+  http://127.0.0.1:8000/api/v1/runs > artifacts/negative-upload-response.json
+
+python - <<'PYNEG'
+import json
+import time
+import urllib.request
+from pathlib import Path
+
+uploaded = json.loads(Path("artifacts/negative-upload-response.json").read_text())
+run_id = uploaded["id"]
+if uploaded["status"] != "queued":
+    raise SystemExit(f"Negative fixture was not queued: {uploaded}")
+deadline = time.monotonic() + 90
+final = None
+while time.monotonic() < deadline:
+    with urllib.request.urlopen(f"http://127.0.0.1:8000/api/v1/runs/{run_id}", timeout=5) as response:
+        final = json.load(response)
+    if final["status"] in ("completed", "failed"):
+        break
+    time.sleep(1)
+if not final or final["status"] != "failed":
+    raise SystemExit(f"Invalid APK fixture did not fail closed: {final}")
+result = final.get("result") or {}
+if result.get("status") != "failed":
+    raise SystemExit(f"Failure callback did not preserve runner failure: {result}")
+if result.get("runner_return_code", 0) == 0:
+    raise SystemExit(f"Invalid APK unexpectedly returned runner success: {result}")
+if not result.get("error"):
+    raise SystemExit(f"Failure report did not explain why execution failed: {result}")
+Path("artifacts/negative-run.report.json").write_text(json.dumps({
+    "status": final["status"],
+    "run_id": run_id,
+    "fixture_kind": "intentionally_invalid_apk_manifest",
+    "runner_return_code": result.get("runner_return_code"),
+    "error": result.get("error"),
+    "result_interpretation": result.get("result_interpretation"),
+    "constraints_applied": result.get("constraints_applied"),
+}, indent=2))
+print(json.dumps({"status": final["status"], "fixture_kind": "intentionally_invalid_apk_manifest",
+                  "runner_return_code": result.get("runner_return_code"), "error": result.get("error")}, indent=2))
+PYNEG
+
 # The Appium journey runs a warm-up plus three baseline, three latency-only,
 # and three bandwidth-only HTTP transfers of a controlled payload through the
 # emulator network stack, then verifies the emulator controls reset to defaults.
