@@ -14,6 +14,21 @@ class ExecutionScopeTruthfulnessTests(unittest.TestCase):
         self.assertEqual(report["constraint_verification"], "unsupported_not_applied")
         self.assertIn("does not prove the app is healthy", report["result_interpretation"])
 
+    def test_verified_network_control_remains_partial_and_does_not_claim_app_path(self):
+        report = {
+            "status": "completed",
+            "network_profile": {
+                "control_plane": {"status": "verified"},
+                "network_constraints_applied": True,
+                "traffic_path_verified": False,
+            },
+        }
+        annotate_execution_scope(report, {"persona_id": "baseline"})
+        self.assertFalse(report["constraints_applied"])
+        self.assertTrue(report["network_constraints_applied"])
+        self.assertIn("active app traffic path", report["constraint_verification"])
+        self.assertIn("not proven", report["result_interpretation"])
+
     def test_missing_persona_is_not_invented(self):
         report = {}
         annotate_execution_scope(report, {})
