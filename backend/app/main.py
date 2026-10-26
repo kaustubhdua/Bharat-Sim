@@ -314,7 +314,7 @@ def health_ready():
 @app.get("/__ci/network-payload", include_in_schema=False)
 def ci_network_payload():
     """Controlled payload for CI-only emulator traffic measurements; disabled by default."""
-    if os.getenv("BHARATSIM_ENABLE_TEST_NETWORK_PROBE") != "true":
+    if os.getenv("BHARATSIM_ENABLE_TEST_NETWORK_PROBE") != "true" or os.getenv("BHARATSIM_ENV") != "ci":
         raise HTTPException(status_code=404, detail="Not found")
     payload = b"B" * 2_000_000
     return Response(
