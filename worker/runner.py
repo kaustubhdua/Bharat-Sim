@@ -114,6 +114,17 @@ def apply_emulator_network_profile(
     return evidence
 
 
+def parse_fixture_network_probe(log_text: str) -> dict[str, object] | None:
+    """Extract only the fixture's explicit HTTP probe marker from real logcat output."""
+    match = re.search(
+        r"BHARATSIM_NETWORK_PROBE status=HTTP_200 duration_ms=(\\d+) transport=(CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER)",
+        log_text,
+    )
+    if not match:
+        return None
+    return {"http_status": 200, "duration_ms": int(match.group(1)), "transport": match.group(2)}
+
+
 def reset_emulator_network_profile(serial: str) -> dict[str, object]:
     """Restore the disposable emulator's default network settings after a run."""
     if not re.fullmatch(r"emulator-\d+", serial):
@@ -288,6 +299,19 @@ def main() -> int:
         report["logcat_artifact"] = str(log_path)
         report["logcat_bytes"] = len(logs.stdout.encode("utf-8", errors="replace"))
         report["fatal_exception_marker"] = bool(re.search(r"FATAL EXCEPTION|Fatal signal|SIGSEGV", logs.stdout, re.I))
+        network_probe = parse_fixture_network_probe(logs.stdout)
+        if isinstance(report.get("network_profile"), dict):
+            report["network_profile"]["traffic_probe"] = network_probe
+            requested = report["network_profile"].get("requested", {})
+            control = report["network_profile"].get("control_plane", {})
+            report["network_profile"]["traffic_path_verified"] = bool(
+                network_probe
+                and isinstance(requested, dict)
+                and isinstance(control, dict)
+                and control.get("status") == "verified"
+                and network_probe.get("transport") in ("CELLULAR", "ETHERNET")
+                and network_probe.get("duration_ms", 0) >= int(requested.get("latency_ms", 0))
+            )
         if report["fatal_exception_marker"]:
             report["status"] = "failed"
             report["error"] = "Fatal crash marker observed during the smoke-test observation window"
