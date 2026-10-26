@@ -117,12 +117,15 @@ def apply_emulator_network_profile(
 def parse_fixture_network_probe(log_text: str) -> dict[str, object] | None:
     """Extract only the fixture's explicit HTTP probe marker from real logcat output."""
     match = re.search(
-        r"BHARATSIM_NETWORK_PROBE status=HTTP_200 duration_ms=(\d+) transport=(CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER)",
+        r"BHARATSIM_NETWORK_PROBE status=HTTP_(\d{3}) duration_ms=(\d+) transport=(CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER)",
         log_text,
     )
     if not match:
         return None
-    return {"http_status": 200, "duration_ms": int(match.group(1)), "transport": match.group(2)}
+    status = int(match.group(1))
+    if not 200 <= status < 400:
+        return None
+    return {"http_status": status, "duration_ms": int(match.group(2)), "transport": match.group(3)}
 
 
 def reset_emulator_network_profile(serial: str) -> dict[str, object]:
