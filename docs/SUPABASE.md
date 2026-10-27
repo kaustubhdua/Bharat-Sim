@@ -10,7 +10,8 @@ The bharatsim schema is deliberately excluded from Supabase Data API exposure in
 
 The versioned schema migration is:
 
-- supabase/migrations/20261027110000_bharatsim_core.sql
+- `supabase/migrations/20261027054905_bharatsim_core.sql` — matches the already-applied core migration version in `common 1`.
+- `supabase/migrations/20261027060000_bharatsim_fk_indexes.sql` — additive indexes for the three BharatSim foreign-key paths reported by the performance advisor; apply only after reviewing the current migration history.
 
 It creates the durable run, analysis, worker, event, artifact, quota, and audit tables plus indexes and integrity constraints. It is designed to be additive and isolated. It does not create or modify Storage buckets, change Auth settings, alter GenomeGuard security, or enable public client access.
 
@@ -20,8 +21,8 @@ Apply the reviewed migration to the intended Supabase project through the Supaba
 
 Local development continues to use SQLite unless BHARATSIM_DATABASE_URL is set. To opt into the Supabase PostgreSQL path:
 
-1. Apply the reviewed migration first.
-2. Set BHARATSIM_DATABASE_URL in the **server environment only** to a TLS-enabled PostgreSQL connection string for the intended project.
+1. Apply the reviewed migrations in version order. The core schema version is already recorded by `common 1`; do not reapply it blindly. Verify migration history before applying the additive foreign-key index migration.
+2. Set `BHARATSIM_ENV=production` and `BHARATSIM_DATABASE_URL` in the **server environment only** to a TLS-enabled PostgreSQL connection string for the intended project. Remote/production URLs must explicitly set `sslmode=require` or stronger (`verify-full` with the appropriate CA is preferred). Production startup fails closed if the database URL is missing; plaintext remote connections are rejected. Local development/test PostgreSQL may explicitly use `sslmode=disable` only on loopback/local hosts.
 3. Use a dedicated least-privilege database login and a connection pooler where appropriate. Do not use the database-owner credential for a public service.
 4. Start the API. If the URL is set but bharatsim.runs is missing, startup fails instead of creating or silently mutating a production schema.
 5. Verify /health/ready, API persistence tests, worker claim/lease/result tests, and restart durability before switching traffic.
