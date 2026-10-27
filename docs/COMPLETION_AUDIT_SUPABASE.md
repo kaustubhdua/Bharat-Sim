@@ -62,11 +62,11 @@ Official implementation references:
 
 ### P0-B. Build a safe Supabase migration
 
-- [ ] Add Supabase CLI config and versioned migrations to this repository; CI must be able to create a clean local database and apply all migrations from zero.
+- [ ] Validate the new Supabase CLI config and versioned bharatsim schema migration from a clean local database; CI must apply all migrations from zero.
 - [ ] Create the isolated BharatSim schema and least-privileged roles/grants; do not touch `genomeguard` tables.
 - [ ] Define normalized tables for users/workspaces, runs, run events, test profiles, workers, leases/attempts, analyses, artifacts, quotas and audit events. Add foreign keys, uniqueness constraints, indexes, timestamps and state-transition constraints.
 - [ ] Use UUIDs or equivalent unguessable IDs for externally visible resources; every user-owned row has explicit owner/workspace identity.
-- [ ] Move SQLite reads/writes and transaction logic to Postgres. Use migrations—not ad-hoc production SQL—and provide an idempotent migration path.
+- [ ] Verify the opt-in PostgreSQL adapter and migrate all active production reads/writes from SQLite only after the migration has been applied and tested; provide a tested idempotent data migration and rollback path.
 - [ ] Design atomic claim/lease/reclaim/retry/ack operations; make result callbacks idempotent and reject stale leases or APK hash mismatches.
 - [ ] Use a durable queue (Supabase Queues/pgmq or a transactional Postgres queue); test visibility timeout, duplicate delivery, retries, poison jobs, archival and worker crash recovery.
 - [ ] Configure Auth, email confirmation/session expiry as appropriate, and verify JWT signature/issuer/audience/expiry on the FastAPI boundary.
