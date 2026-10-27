@@ -10,9 +10,10 @@ The bharatsim schema is deliberately excluded from Supabase Data API exposure in
 
 The versioned schema migration is:
 
-- supabase/migrations/20261027110000_bharatsim_core.sql
+- `supabase/migrations/20261027110000_bharatsim_core.sql`
+- `supabase/migrations/20261027060000_harden_bharatsim_rls_and_indexes.sql` (applies after the core migration in version order; see note below)
 
-It creates the durable run, analysis, worker, event, artifact, quota, and audit tables plus indexes and integrity constraints. It is designed to be additive and isolated. It does not create or modify Storage buckets, change Auth settings, alter GenomeGuard security, or enable public client access.
+It creates the durable run, analysis, worker, event, artifact, quota, and audit tables plus indexes and integrity constraints. The follow-up hardening migration adds explicit deny-all RLS policies for `anon` and `authenticated` on all seven tables and indexes the three foreign-key columns flagged by the live performance advisor. Both migrations are additive and scoped to `bharatsim`; they do not create or modify Storage buckets, change Auth settings, alter GenomeGuard security, or enable public client access. Keep migration filenames in ascending timestamp order; the hardening migration must run after the core migration.
 
 Apply the reviewed migration to the intended Supabase project through the Supabase migration workflow, then verify the resulting bharatsim tables and run both Supabase security and performance advisors. Do not apply it to a different project by accident.
 
@@ -39,10 +40,10 @@ The compatibility adapter translates existing parameterized SQLite-style placeho
 
 ## Verification checklist
 
-- [ ] Apply the migration to the intended project and verify all expected tables in the bharatsim schema.
-- [ ] Confirm bharatsim is not in the project's exposed Data API schemas.
-- [ ] Confirm anon and authenticated have no schema/table grants and cannot read/write the tables.
-- [ ] Run Supabase security and performance advisors and investigate every relevant finding.
+- [x] Apply the core and hardening migrations to the intended `common 1` project and verify the seven expected tables in the `bharatsim` schema.
+- [x] Confirm `bharatsim` is not in the project's exposed Data API schemas (`supabase/config.toml` exposes only `public` and `graphql_public`).
+- [x] Confirm `anon` and `authenticated` have no table grants; explicit deny-all RLS policies are also present for all seven tables after the hardening migration.
+- [ ] Re-run Supabase security and performance advisors after the hardening migration and confirm the seven no-policy findings and three missing foreign-key index findings are gone. Existing unrelated GenomeGuard advisor notices must be reviewed by the GenomeGuard owner, not changed by BharatSim.
 - [ ] Configure the server-only database URL and verify readiness and persisted run/analysis/worker records.
 - [ ] Test restart durability, duplicate callbacks, stale leases and cross-user access denial.
 - [ ] Do not mark the product production-ready until the explicit blockers above are closed.
