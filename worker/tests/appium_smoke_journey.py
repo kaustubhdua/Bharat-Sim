@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 BASE = "http://127.0.0.1:4723"
 ADB_SERIAL = "emulator-5554"
-PROBE_BYTES = 2_000_000
+PROBE_BYTES = 500_000
 ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
 PROBE_RE = re.compile(r"HTTP (200|206) · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER) · probe (\d+) · bytes (\d+) · attempts (\d+)")
 
@@ -202,7 +202,7 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
     }
 
 
-# A 2 MB fixture transfer should complete within this bound under the supported test profiles.
+# A 500 KB fixture transfer should complete within this bound under the supported test profiles.
 def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 60) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
@@ -296,11 +296,11 @@ def main() -> int:
         baseline_probes, last_sequence = take_samples("baseline", last_sequence)
         evidence["baseline_probes"] = baseline_probes
 
-        # Test bandwidth immediately after baseline with a custom 8 Mbps cap.
-        # The 2 MB transfer makes the expected throughput effect observable while
-        # avoiding the EDGE radio preset, which stalled the HTTPS request.
+        # Test bandwidth immediately after baseline with a 1 Mbps cap.
+        # A 500 KB transfer makes the throughput effect observable while keeping
+        # each request short enough for bounded retry and timeout handling.
         phase = "configure_bandwidth_profile"
-        bandwidth_profile = set_network_profile(None, "8000:8000")
+        bandwidth_profile = set_network_profile(None, "1000:1000")
         evidence["bandwidth_profile"] = bandwidth_profile
         phase = "bandwidth_samples"
         bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
