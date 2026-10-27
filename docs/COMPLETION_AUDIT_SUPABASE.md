@@ -1,7 +1,7 @@
 # BharatSim completion audit and Supabase migration plan
 
 **Audit date:** 2026-10-27  
-**Repository baseline inspected:** `main` at `6e03683d91078b14dbbac72f880a091daaf89505` (2026-10-27)  
+**Repository baseline inspected:** `main` at `cd152b415025611c4d782c3027b1642517044554` (2026-10-27)  
 **Supabase target requested:** project `common 1`, ref `hkyieaovolkethovyenb`, region `ap-south-1`  
 **Release decision:** **Not complete; not safe for public arbitrary-APK execution.**
 
@@ -12,14 +12,15 @@ This checklist distinguishes implementation from evidence. A checkbox is complet
 - FastAPI API, React/Vite dashboard, SQLite persistence, APK archive checks and hashing, lease-based worker protocol, worker heartbeats, report/log analysis, Docker Compose local stack and CI workflows exist.
 - The API still imports `sqlite3` for local mode and defaults to SQLite. A server-side opt-in PostgreSQL adapter (`BHARATSIM_DATABASE_URL`) is now implemented and covered by adapter tests, but the deployed application is not proven to use it until the server is configured with the database URL and an integration test confirms read/write behavior against the target project.
 - The UI intentionally labels sample logs and persona targets as illustrative/requested rather than measured device evidence. It also describes packet loss and CPU throttling as unsupported.
-- On `main` SHA `6e03683d91078b14dbbac72f880a091daaf89505`, standard CI and dependency audit passed, but Android emulator workflow run [40457448701](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/40457448701) failed: the uploaded fixture run remained `queued` for 180 seconds. The workflow must emit worker/API logs and worker registration state on timeout, then the worker claim failure must be corrected and re-tested.
-- The failed Android workflow built and booted the emulator, and the Linux netem integration step passed, but the uploaded test run remained `queued` until the runner's 180-second wait expired. This means the end-to-end queue → worker → callback → report path was not proven on that revision. Fix worker startup/registration/claiming rather than weakening the assertion.
-- Pull-request state changes over time; review the repository's live open-PR list and required checks before release. This document itself is tracked in PR #55 and must be reconciled with the current main revision before merging.
+- The earlier main-branch emulator run [40457448701](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/40457448701) failed because the fixture run remained `queued` for 180 seconds. The current candidate fixes the worker's direct-script import path, starts it as `python -m worker.agent`, and checks that an authenticated worker heartbeat is visible before upload. A later run completed the API → queue/lease → ADB install/launch/logcat → callback → persisted report path and also observed the deliberate install-signature-conflict failure as a failed run.
+- The complete emulator workflow is **still not green**. Run [40460130638](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/40460130638) failed in the Appium network experiment because the fixture UI remained `Network probe running` and no probe completed before timeout. The 500 KB transfer candidate also failed; a subsequent candidate adds logcat/connectivity evidence to diagnose the actual Android-side failure. Do not claim latency/bandwidth controls are verified until the exact latest candidate passes measured requests and reset checks.
+- The latest Supabase migration history was re-read live. The repository now carries matching filenames for `20261027054905_bharatsim_core` and `20261027061609_bharatsim_fk_indexes`. The PostgreSQL 17 CI job applies both from a clean database and verifies run metadata across an API restart. The API has not yet been configured against the live Supabase URL.
+- The current open-PR list and checks must be rechecked before release; no stale PR number should be treated as current.
 - Docker Compose is explicitly a loopback-only local evaluation stack. No verified public production deployment or physical-device test evidence was found in this audit.
 
 ## 2. Supabase discovery and safety boundary
 
-The requested Supabase project `common 1` (ref `hkyieaovolkethovyenb`) is active and healthy in `ap-south-1`. It is **not an empty BharatSim database**: inspection found an existing `genomeguard` schema and `public.genomeguard_deployment_status` table. Do not reuse, rename, drop or modify GenomeGuard objects for BharatSim. A dedicated `bharatsim` schema and seven tables are present, with RLS enabled, no schema usage or table SELECT grants for `anon`/`authenticated`, and `service_role` SELECT access. The remote migration history records `20261027054905_bharatsim_core`, while GitHub currently has `20261027110000_bharatsim_core.sql`; reconcile migration version drift before treating fresh-project deployment as reproducible.
+The requested Supabase project `common 1` (ref `hkyieaovolkethovyenb`) is active and healthy in `ap-south-1`. It is **not an empty BharatSim database**: inspection found an existing `genomeguard` schema and `public.genomeguard_deployment_status` table. Do not reuse, rename, drop or modify GenomeGuard objects for BharatSim. A dedicated `bharatsim` schema and seven tables are present, with RLS enabled, no schema usage or table SELECT grants for `anon`/`authenticated`, and `service_role` SELECT access. The remote migration history records `20261027054905_bharatsim_core` and `20261027061609_bharatsim_fk_indexes`; the candidate repository migration filenames now match both versions. The PostgreSQL 17 CI job applies these migrations from a clean database. This validates reproducible local migration behavior, not live application connectivity.
 
 **Critical finding:** Supabase table inspection reports RLS disabled on 13 existing `genomeguard` tables: `schema_migrations`, `cohort_metadata`, `donors`, `genotypes`, `variants`, `relationships`, `requesters`, `requests`, `decisions`, `epsilon_ledger`, `audit_log`, `donor_access`, and `alerts`. The table metadata response warns that client roles may be able to read/write those tables. The separate security-advisor call returned no lints, so the results are inconsistent; treat the explicit table-level RLS warning as unresolved and investigate it. Do not apply blanket RLS enablement to these existing tables without designing/testing their policies: enabling RLS with no suitable policies can break legitimate access. This finding belongs to the existing GenomeGuard data boundary and must be handled by its owner.
 
@@ -51,19 +52,19 @@ Official implementation references:
 
 ### P0-A. Fix the current failing real-worker test
 
-- [ ] Reproduce the latest main emulator workflow failure from its preserved logs/artifacts.
-- [ ] Find why a queued run is not claimed within 180 seconds: worker process start, worker token/config, API base URL, registration/heartbeat, queue claim loop, or lease protocol.
-- [ ] Make CI start a worker explicitly and assert a fresh heartbeat before uploading the test APK.
-- [ ] Add diagnostic state on timeout: worker list/status/last_seen, queue age, claim attempts, lease status, runner stdout/stderr and API logs. Do not emit secrets.
-- [ ] Require both a successful fixture journey and a deliberately failing journey to reach the correct terminal state.
-- [ ] Rerun Android emulator workflow on the candidate commit; preserve artifacts and inspect the report, APK hash, logs and assertion outcomes.
-- [ ] Review the live open pull requests and their required checks at release time; do not rely on stale PR numbers or status snapshots in this historical audit.
-- [ ] Consolidate or close superseded branches/PRs only after verifying their useful changes have been merged or intentionally discarded.
+- [x] Reproduce the queued-run failure from run [40457448701](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/40457448701).
+- [x] Fix the worker entrypoint/import path and require authenticated worker registration before uploading the fixture APK.
+- [x] Emit bounded worker/API/worker-status diagnostics on registration and run timeout without printing credentials.
+- [x] Verify a successful API → queue/lease → ADB → callback → persisted-report run and a deliberately failing install-signature-conflict run reach their expected terminal states.
+- [x] Preserve emulator logcat, connectivity state, and probe-tag diagnostics when Appium fails.
+- [ ] Rerun the full Android emulator workflow until the Appium network probe, latency/bandwidth assertions, and reset verification all pass on the same commit. Latest observed candidate run [40460130638](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/40460130638) failed because the probe remained in `Network probe running`.
+- [ ] Review live open pull requests and checks at release time; consolidate superseded branches only after verifying their changes are merged or intentionally discarded.
 
 ### P0-B. Build a safe Supabase migration
 
-- [ ] Validate the committed Supabase CLI config and versioned `bharatsim` schema migration from a clean local database; CI must apply all migrations from zero and migration history must match `common 1` without duplicate/conflicting version records.
-- [ ] Create the isolated BharatSim schema and least-privileged roles/grants; do not touch `genomeguard` tables.
+- [x] Apply the versioned core and foreign-key-index migrations from zero in PostgreSQL 17 CI and verify their versioned filenames match the live `common 1` migration history.
+- [x] Create the isolated `bharatsim` schema, enable RLS, and revoke schema/table grants from `anon` and `authenticated`; do not touch `genomeguard` tables.
+- [ ] Create/configure a dedicated least-privileged database login for the API and verify the live application read/write path using a server-only TLS database URL.
 - [ ] Define normalized tables for users/workspaces, runs, run events, test profiles, workers, leases/attempts, analyses, artifacts, quotas and audit events. Add foreign keys, uniqueness constraints, indexes, timestamps and state-transition constraints.
 - [ ] Use UUIDs or equivalent unguessable IDs for externally visible resources; every user-owned row has explicit owner/workspace identity.
 - [ ] Verify the opt-in PostgreSQL adapter and migrate all active production reads/writes from SQLite only after the migration has been applied and tested; provide a tested idempotent data migration and rollback path.
