@@ -22,9 +22,17 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+# Make both supported entry points work:
+#   python -m worker.agent
+#   python worker/agent.py
+# Direct script execution puts worker/ rather than the repository root on
+# sys.path, which otherwise breaks the absolute package import below.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from worker.condition_applicator import reset_target_safely
 
-ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "worker" / "runner.py"
 MAX_RESPONSE_BYTES = 300_000
 
