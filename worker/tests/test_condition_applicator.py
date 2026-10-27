@@ -127,9 +127,12 @@ MemAvailable:    2097152 kB
             "worker.condition_applicator.get_free_storage_mb", return_value=500
         ):
             res = apply_storage_pressure("emulator-5554", target_free_mb=600)
-            self.assertEqual(res["apply_status"], "applied")
+            self.assertEqual(res["apply_status"], "already_satisfied")
+            self.assertEqual(res["condition_state"], "preexisting_target_satisfied")
             self.assertEqual(res["allocated_mb"], 0)
             self.assertTrue(res["target_reached"])
+            self.assertFalse(res["bounded_pressure_applied"])
+            self.assertEqual(res["verification_status"], "verified")
             self.assertIn("already at or below target", res["reason"])
 
     def test_storage_pressure_target_successfully_reached(self):
