@@ -93,7 +93,7 @@ public final class MainActivity extends Activity {
 
     private void performNetworkProbe(TextView target, int sequence) {
         String transport = activeTransport();
-        for (int attempt = 1; attempt <= 3; attempt++) {
+        for (int attempt = 1; attempt <= 2; attempt++) {
             long started = SystemClock.elapsedRealtime();
             try {
                 ProbeResult result = performPinnedHttpsProbe(PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started);
@@ -107,7 +107,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> target.setText(message));
                 return;
             } catch (Exception exception) {
-                if (exception instanceof IOException && attempt < 3) {
+                if (exception instanceof IOException && attempt < 2) {
                     Log.w(TAG, "BHARATSIM_NETWORK_PROBE retrying sequence=" + sequence
                             + " attempt=" + attempt + " after=" + exception.getClass().getSimpleName(), exception);
                     try {
@@ -146,7 +146,7 @@ public final class MainActivity extends Activity {
             raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), 3000);
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
-                tls.setSoTimeout(12000);
+                tls.setSoTimeout(8000);
                 tls.startHandshake();
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE tls_handshake_completed endpoint_host=" + host);
                 if (!HttpsURLConnection.getDefaultHostnameVerifier().verify(host, tls.getSession())) {
