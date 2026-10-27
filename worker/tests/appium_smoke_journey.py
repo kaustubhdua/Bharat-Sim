@@ -430,8 +430,13 @@ def main() -> int:
         logcat_path = args.artifacts / "appium-failure-logcat.txt"
         try:
             logs = subprocess.run(["adb", "-s", ADB_SERIAL, "logcat", "-d", "-t", "2000", "-v", "threadtime"], capture_output=True, text=True, timeout=20, check=False)
-            logcat_path.write_text((logs.stdout + "\n" + logs.stderr)[-300000:], encoding="utf-8", errors="replace")
+            logcat_text = (logs.stdout + "\n" + logs.stderr)[-300000:]
+            logcat_path.write_text(logcat_text, encoding="utf-8", errors="replace")
+            probe_lines = [line for line in logcat_text.splitlines() if "BharatSimNetworkProbe" in line][-60:]
             evidence["failure_logcat_return_code"] = logs.returncode
+            evidence["network_probe_logcat_tail"] = probe_lines
+            if probe_lines:
+                print("Android network-probe diagnostic logcat:\n" + "\n".join(probe_lines), flush=True)
         except Exception as log_error:
             evidence["failure_logcat_error"] = str(log_error)
         (args.artifacts / "appium-journey.failure.json").write_text(json.dumps({
