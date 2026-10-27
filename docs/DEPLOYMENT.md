@@ -34,6 +34,8 @@ The key is passed to the API and the nginx container as a server-side environmen
 
 To run the default loopback-only local evaluation without this gate, leave `BHARATSIM_REQUIRE_API_KEY` unset. Do not expose the stack publicly.
 
+For production-mode configuration checks, set `BHARATSIM_ENV=production`. Startup then refuses to proceed unless `BHARATSIM_REQUIRE_API_KEY=true` and `BHARATSIM_API_KEY` is at least 32 characters. This guard prevents accidental open deployment; the shared key is still not multi-user authentication, and public arbitrary-APK execution remains blocked until the other production gates are met.
+
 ## Optional local worker
 
 The Compose stack does not run an Android emulator. Provision a disposable emulator separately and configure a random BHARATSIM_WORKER_TOKEN in the shell before starting the API. Use the same token on the worker. Start worker/agent.py on a host that can reach the published loopback port, with an explicit ANDROID_SERIAL and BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true. For loopback-only local testing, set BHARATSIM_API_URL=http://127.0.0.1:8080 and BHARATSIM_ALLOW_INSECURE_HTTP=true in the worker environment.
