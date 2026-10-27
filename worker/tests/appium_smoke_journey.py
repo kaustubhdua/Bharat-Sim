@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 BASE = "http://127.0.0.1:4723"
 ADB_SERIAL = "emulator-5554"
-PROBE_BYTES = 2_000_000
+PROBE_BYTES = 500_000
 ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
 PROBE_RE = re.compile(r"HTTP (200|206) · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER) · probe (\d+) · bytes (\d+) · attempts (\d+)")
 
@@ -202,8 +202,21 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
     }
 
 
-# A 500 KB fixture transfer should complete well below this bound, even under EDGE throttling.
-def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 60) -> dict:
+# A 500 KB fixture transfer should complete within this bound under the supported test profiles.
+# A 2 MB transfer at the supported 256 kbps profile needs about 63 seconds before RTT/retries.
+def network_probe_log_tail() -> str:
+    """Return real device-side probe diagnostics when a UI wait fails."""
+    try:
+        return adb(
+            "logcat", "-d", "-t", "1000", "-s",
+            "BharatSimNetworkProbe:I", "BharatSimNetworkProbe:W",
+            "BharatSimNetworkProbe:E", "*:S", timeout=10,
+        )[-6000:]
+    except Exception as exc:
+        return f"Could not collect device probe logcat: {exc}"
+
+
+def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 120) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
@@ -214,9 +227,9 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
                 raise RuntimeError(f"Fixture downloaded unexpected payload size: {probe['bytes_read']}")
             return probe
         if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
-            raise RuntimeError(f"Fixture network probe failed: {last_text}")
+            raise RuntimeError(f"Fixture network probe failed: {last_text}\\nDevice probe logcat:\\n{network_probe_log_tail()}")
         time.sleep(0.5)
-    raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}")
+    raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}\\nDevice probe logcat:\\n{network_probe_log_tail()}")
 
 
 def main() -> int:
@@ -296,11 +309,11 @@ def main() -> int:
         baseline_probes, last_sequence = take_samples("baseline", last_sequence)
         evidence["baseline_probes"] = baseline_probes
 
-        # Test bandwidth immediately after baseline with a custom 8 Mbps cap.
-        # The 2 MB transfer makes the expected throughput effect observable while
-        # avoiding the EDGE radio preset, which stalled the HTTPS request.
+        # Test bandwidth immediately after baseline with a 1 Mbps cap.
+        # A 500 KB transfer makes the throughput effect observable while keeping
+        # each request short enough for bounded retry and timeout handling.
         phase = "configure_bandwidth_profile"
-        bandwidth_profile = set_network_profile(None, "8000:8000")
+        bandwidth_profile = set_network_profile(None, "1000:1000")
         evidence["bandwidth_profile"] = bandwidth_profile
         phase = "bandwidth_samples"
         bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
