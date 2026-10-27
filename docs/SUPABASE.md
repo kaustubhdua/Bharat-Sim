@@ -11,17 +11,17 @@ The bharatsim schema is deliberately excluded from Supabase Data API exposure in
 The versioned schema migration is:
 
 - `supabase/migrations/20261027054905_bharatsim_core.sql` — matches the already-applied core migration version in `common 1`.
-- `supabase/migrations/20261027060000_bharatsim_fk_indexes.sql` — additive indexes for the three BharatSim foreign-key paths reported by the performance advisor; apply only after reviewing the current migration history.
+- `supabase/migrations/20261027061609_bharatsim_fk_indexes.sql` — additive indexes for the three BharatSim foreign-key paths reported by the performance advisor; matches the applied migration version in `common 1`.
 
 It creates the durable run, analysis, worker, event, artifact, quota, and audit tables plus indexes and integrity constraints. It is designed to be additive and isolated. It does not create or modify Storage buckets, change Auth settings, alter GenomeGuard security, or enable public client access.
 
-Apply the reviewed migration to the intended Supabase project through the Supabase migration workflow, then verify the resulting bharatsim tables and run both Supabase security and performance advisors. Do not apply it to a different project by accident.
+The core schema and additive foreign-key-index migrations are recorded in `common 1` at versions `20261027054905` and `20261027061609`. The repository filenames match that history. Recheck the live migration history before any future apply; do not apply these migrations to a different project by accident.
 
 ## Backend connection
 
 Local development continues to use SQLite unless BHARATSIM_DATABASE_URL is set. To opt into the Supabase PostgreSQL path:
 
-1. Apply the reviewed migrations in version order. The core schema version is already recorded by `common 1`; do not reapply it blindly. Verify migration history before applying the additive foreign-key index migration.
+1. Confirm the live migration history contains `20261027054905_bharatsim_core` and `20261027061609_bharatsim_fk_indexes`. Both are currently applied; do not reapply the core migration blindly.
 2. Set `BHARATSIM_ENV=production` and `BHARATSIM_DATABASE_URL` in the **server environment only** to a TLS-enabled PostgreSQL connection string for the intended project. Remote/production URLs must explicitly set `sslmode=require` or stronger (`verify-full` with the appropriate CA is preferred). Production startup fails closed if the database URL is missing; plaintext remote connections are rejected. Local development/test PostgreSQL may explicitly use `sslmode=disable` only on loopback/local hosts.
 3. Use a dedicated least-privilege database login and a connection pooler where appropriate. Do not use the database-owner credential for a public service.
 4. Start the API. If the URL is set but bharatsim.runs is missing, startup fails instead of creating or silently mutating a production schema.
@@ -40,7 +40,7 @@ The compatibility adapter translates existing parameterized SQLite-style placeho
 
 ## Verification checklist
 
-- [ ] Apply the migration to the intended project and verify all expected tables in the bharatsim schema.
+- [x] Apply and verify the isolated core schema and foreign-key index migrations in `common 1`; recheck live history before future schema changes.
 - [ ] Confirm bharatsim is not in the project's exposed Data API schemas.
 - [ ] Confirm anon and authenticated have no schema/table grants and cannot read/write the tables.
 - [ ] Run Supabase security and performance advisors and investigate every relevant finding.
