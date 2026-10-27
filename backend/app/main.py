@@ -24,6 +24,29 @@ DATA_DIR = Path(os.getenv("BHARATSIM_DATA_DIR", str(APP_DIR.parent / "data")))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "bharatsim.sqlite3"
 DATABASE_URL = os.getenv("BHARATSIM_DATABASE_URL", "").strip()
+
+
+def validate_runtime_security_config(environment: dict[str, str] | None = None) -> None:
+    """Refuse accidental production startup without the documented single-tenant API gate.
+
+    This shared-key gate is a controlled-beta safeguard, not multi-tenant authentication.
+    Production multi-user deployment still requires identity and per-run ownership checks.
+    """
+    values = os.environ if environment is None else environment
+    mode = values.get("BHARATSIM_ENV", "development").strip().lower()
+    if mode not in {"production", "prod"}:
+        return
+    if values.get("BHARATSIM_REQUIRE_API_KEY", "false").strip().lower() != "true":
+        raise RuntimeError(
+            "Production startup blocked: set BHARATSIM_REQUIRE_API_KEY=true and configure a strong server-side key"
+        )
+    if len(values.get("BHARATSIM_API_KEY", "")) < 32:
+        raise RuntimeError(
+            "Production startup blocked: BHARATSIM_API_KEY must contain at least 32 characters"
+        )
+
+
+validate_runtime_security_config()
 MAX_UPLOAD_BYTES = max(1, min(int(os.getenv("BHARATSIM_MAX_UPLOAD_MB", "150")), 150)) * 1024 * 1024
 MAX_APK_ENTRIES = 10000
 MAX_APK_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
