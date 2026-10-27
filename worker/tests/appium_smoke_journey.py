@@ -203,7 +203,8 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
 
 
 # A 500 KB fixture transfer should complete within this bound under the supported test profiles.
-def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 60) -> dict:
+# A 2 MB transfer at the supported 256 kbps profile needs about 63 seconds before RTT/retries.
+def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 120) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
