@@ -137,17 +137,42 @@ class WorkerResultRequest(BaseModel):
 def utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-class PostgresCompatConnection:
-    """Small adapter for the existing parameterized SQL while moving to PostgreSQL.
+def postgres_placeholders(query: str) -> str:
+    """Translate SQLite '?' placeholders without rewriting quoted SQL literals."""
+    output: list[str] = []
+    quote: str | None = None
+    index = 0
+    while index < len(query):
+        char = query[index]
+        if quote:
+            output.append(char)
+            if char == quote:
+                if index + 1 < len(query) and query[index + 1] == quote:
+                    output.append(query[index + 1])
+                    index += 1
+                else:
+                    quote = None
+        elif char in ("'", '"'):
+            quote = char
+            output.append(char)
+        elif char == "?":
+            output.append("%s")
+        else:
+            output.append(char)
+        index += 1
+    return "".join(output)
 
-    Query placeholders are translated only from the project's SQLite-style '?' form.
-    The application still must enforce user ownership before any customer data is enabled.
+
+class PostgresCompatConnection:
+    """Small adapter for existing parameterized SQL while moving to PostgreSQL.
+
+    The application still must enforce user ownership before customer data is enabled.
     """
     def __init__(self, connection):
         self._connection = connection
 
     def execute(self, query: str, parameters=()):
-        return self._connection.execute(query.replace("?", "%s"), parameters)
+        return self._connection.execute(postgres_placeholders(query), parameters)
 
     def commit(self):
         return self._connection.commit()
