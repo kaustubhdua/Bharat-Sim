@@ -1,7 +1,32 @@
+import os
+import subprocess
+import sys
 import unittest
 import urllib.request
+from pathlib import Path
 
 from worker.agent import NoRedirectHandler, WorkerError, annotate_execution_scope, persona_network_cli_args, redact_report_text, redact_sensitive_text, resolve_api_url
+
+
+class AgentEntrypointTests(unittest.TestCase):
+    def test_documented_direct_script_entrypoint_imports_package(self):
+        root = Path(__file__).resolve().parents[2]
+        env = os.environ.copy()
+        for key in ("BHARATSIM_API_URL", "BHARATSIM_WORKER_TOKEN", "ANDROID_SERIAL",
+                    "BHARATSIM_ENABLE_LOCAL_APK_EXECUTION", "BHARATSIM_ALLOW_INSECURE_HTTP"):
+            env.pop(key, None)
+        completed = subprocess.run(
+            [sys.executable, "worker/agent.py"],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("BHARATSIM_API_URL", completed.stderr)
+        self.assertNotIn("ModuleNotFoundError", completed.stderr)
 
 
 class ExecutionScopeTruthfulnessTests(unittest.TestCase):
