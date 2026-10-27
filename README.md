@@ -8,7 +8,7 @@
 
 - Four named Bharat test personas and deterministic risk-ranked scenario planning.
 - APK upload size limits, APK-like ZIP structure checks, bounded archive metadata, and SHA-256 fingerprinting.
-- FastAPI endpoints with SQLite persistence for run metadata and log analyses. A process-level integration test verifies that run metadata survives an API restart; worker heartbeat history and full report/artifact durability across restarts are not yet proven.
+- FastAPI endpoints with SQLite persistence by default for local development. An opt-in PostgreSQL adapter and isolated Supabase migration now exist, but the migration must be applied and the server-only database URL configured before PostgreSQL is active. A process-level integration test verifies SQLite run metadata survives an API restart; worker heartbeat history and full report/artifact durability across restarts are not yet proven.
 - Worker queue with authenticated job claims, short-lived leases, heartbeats, lease-bound APK downloads, SHA-256 evidence matching (completed results must include the matching APK hash), result callbacks, stale-result rejection, and bounded inline report JSON. Protocol tests cover lease renewal, expired-lease reclamation, stale-token rejection, retry exhaustion, and duplicate result rejection.
 - Optional polling worker that refuses credential-bearing HTTP redirects, enforces same-origin `/internal/worker/` paths for job URLs, verifies APK hashes, and runs an explicitly enabled ADB smoke test against a configured disposable Android device. APK-derived package names are validated before use in ADB shell commands, the runner attempts package cleanup after execution, and common secret patterns are redacted from report text before persistence (best effort, not exhaustive).
 - Deterministic logcat signal analysis, failure fingerprints, evidence-linked findings, and a transparent heuristic BharatScore. Worker reports also include bounded, line-addressable crash, ANR, OOM, network, and storage marker excerpts from actual collected logcat; markers remain diagnostic signals, not confirmed root causes.
@@ -23,12 +23,13 @@
 - A real disposable Android emulator workflow has passed for the source-built BharatSim fixture: upload → queue/lease → ADB install/launch/logcat → authenticated callback → persisted report, followed by an Appium UI action assertion and screenshot. This validates the fixture pipeline only; it does not validate arbitrary third-party APKs or production isolation.
 - Appium/UiAutomator2 is integrated for a fixture-app primary-action journey. Product-specific test-flow authoring, broader assertion coverage, and arbitrary-app compatibility remain incomplete.
 - Emulator console latency and upload/download bandwidth controls are wired to the worker and read back from the emulator. Battery-saver and bounded storage-pressure simulation are wired for disposable emulator targets with cleanup/readback evidence. Packet loss and CPU throttling remain unsupported, RAM is report-only, and arbitrary app traffic is not proven.
-- Multi-user identity, per-user run ownership, durable object storage, and production-grade sandbox isolation are not implemented.
+- Multi-user identity, per-user run ownership, durable object storage, and production-grade sandbox isolation are not implemented. The Supabase migration is committed but has not yet been applied to common 1 or verified against a configured PostgreSQL backend.
 - Sarvam translation is not wired into the product.
 
 ## Architecture
 
-- backend/: FastAPI API, SQLite persistence, upload handling, log analysis, run/job lifecycle, and worker callbacks.
+- backend/: FastAPI API, SQLite local persistence plus opt-in PostgreSQL adapter, upload handling, log analysis, run/job lifecycle, and worker callbacks.
+- supabase/: isolated BharatSim schema migration and local CLI configuration; this schema is not exposed to browser clients.
 - frontend/: Vite + React dashboard.
 - backend/tests/: backend, upload-security, and worker-protocol tests.
 - worker/agent.py: authenticated polling worker using Python's standard library.
