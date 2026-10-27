@@ -1,0 +1,18 @@
+project_id = "bharatsim-local"
+
+[api]
+enabled = true
+# Keep the BharatSim schema private. Only public and graphql_public are exposed.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = ["./migrations/*.sql"]
+
+[db.seed]
+enabled = false
