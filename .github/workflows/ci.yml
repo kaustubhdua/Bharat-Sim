@@ -47,6 +47,8 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r requirements-dev.txt
         working-directory: backend
+      - name: Install PostgreSQL client tools
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Prepare minimal Supabase-compatible auth roles for local Postgres
         run: |
           psql "$BHARATSIM_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
