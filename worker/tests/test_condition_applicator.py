@@ -135,6 +135,25 @@ MemAvailable:    2097152 kB
             self.assertEqual(res["verification_status"], "verified")
             self.assertIn("already at or below target", res["reason"])
 
+    def test_condition_manager_separates_preexisting_target_from_applied_constraints(self):
+        plan = plan_conditions(PERSONAS["baseline"], "emulator-5554")
+        manager = ConditionManager("emulator-5554", plan)
+        manager.condition_records = [{
+            "condition": "storage_pressure",
+            "requested": True,
+            "apply_status": "already_satisfied",
+            "verification_status": "verified",
+            "condition_state": "preexisting_target_satisfied",
+            "target_reached": True,
+            "bounded_pressure_applied": False,
+            "allocated_mb": 0,
+        }]
+        evidence = manager.get_evidence()
+        self.assertEqual(evidence["overall_status"], "already_satisfied")
+        self.assertEqual(evidence["applied_conditions_count"], 0)
+        self.assertEqual(evidence["preexisting_conditions_count"], 1)
+        self.assertFalse(evidence["constraints_applied"])
+
     def test_storage_pressure_target_successfully_reached(self):
         def mock_runner(args, timeout=15):
             cmd = " ".join(args)
