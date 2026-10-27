@@ -19,6 +19,12 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Support both `python -m worker.runner` and the documented `python worker/runner.py` entry point.
+# Direct script execution puts worker/ rather than the repository root on sys.path.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from worker.condition_planner import plan_conditions
 from worker.condition_applicator import ConditionManager
 
