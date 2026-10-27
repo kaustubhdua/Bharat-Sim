@@ -23,6 +23,7 @@ APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.getenv("BHARATSIM_DATA_DIR", str(APP_DIR.parent / "data")))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "bharatsim.sqlite3"
+DATABASE_URL = os.getenv("BHARATSIM_DATABASE_URL", "").strip()
 MAX_UPLOAD_BYTES = max(1, min(int(os.getenv("BHARATSIM_MAX_UPLOAD_MB", "150")), 150)) * 1024 * 1024
 MAX_APK_ENTRIES = 10000
 MAX_APK_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
@@ -136,17 +137,63 @@ class WorkerResultRequest(BaseModel):
 def utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
 
+class PostgresCompatConnection:
+    """Small adapter for the existing parameterized SQL while moving to PostgreSQL.
+
+    Query placeholders are translated only from the project's SQLite-style '?' form.
+    The application still must enforce user ownership before any customer data is enabled.
+    """
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, query: str, parameters=()):
+        return self._connection.execute(query.replace("?", "%s"), parameters)
+
+    def commit(self):
+        return self._connection.commit()
+
+    def rollback(self):
+        return self._connection.rollback()
+
+    def close(self):
+        return self._connection.close()
+
+
 @contextmanager
 def db():
-    conn = sqlite3.connect(DB_PATH, timeout=15)
-    conn.row_factory = sqlite3.Row
+    if DATABASE_URL:
+        try:
+            import psycopg
+            from psycopg.rows import dict_row
+        except ImportError as exc:
+            raise RuntimeError("BHARATSIM_DATABASE_URL requires the psycopg[binary] dependency") from exc
+        raw = psycopg.connect(DATABASE_URL, row_factory=dict_row, options="-c search_path=bharatsim,public")
+        conn = PostgresCompatConnection(raw)
+    else:
+        conn = sqlite3.connect(DB_PATH, timeout=15)
+        conn.row_factory = sqlite3.Row
     try:
         yield conn
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
+
 def init_db() -> None:
+    if DATABASE_URL:
+        # Schema is managed only by versioned Supabase migrations; never create or
+        # mutate production tables implicitly during application startup.
+        with db() as conn:
+            row = conn.execute("SELECT to_regclass('bharatsim.runs') AS runs").fetchone()
+            if not row or not row["runs"]:
+                raise RuntimeError(
+                    "Supabase is configured but bharatsim.runs is missing; apply the reviewed Supabase migration first"
+                )
+        return
+
     with db() as conn:
         conn.execute("""CREATE TABLE IF NOT EXISTS runs (
             id TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL,
@@ -161,7 +208,7 @@ def init_db() -> None:
             id TEXT PRIMARY KEY, last_seen TEXT NOT NULL, status TEXT NOT NULL,
             current_run_id TEXT
         )""")
-        # Backward-compatible schema migration for databases created by earlier MVP commits.
+        # Backward-compatible schema migration for local MVP databases.
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
         migrations = {
             "lease_token": "TEXT",
@@ -299,7 +346,7 @@ def health_ready():
         with db() as conn:
             conn.execute("SELECT 1").fetchone()
         database_ok = True
-    except sqlite3.Error:
+    except Exception:
         database_ok = False
     payload = {
         "status": "ready" if database_ok else "not_ready",
