@@ -29,6 +29,12 @@ API_PID=
 WORKER_PID=
 APPIUM_PID=
 cleanup() {
+  # Capture real emulator diagnostics before the emulator-runner action shuts the device down.
+  if adb -s emulator-5554 get-state >/dev/null 2>&1; then
+    adb -s emulator-5554 logcat -d -t 5000 -v threadtime > artifacts/emulator-logcat.txt 2>&1 || true
+    adb -s emulator-5554 shell dumpsys connectivity > artifacts/emulator-connectivity.txt 2>&1 || true
+    adb -s emulator-5554 shell getprop > artifacts/emulator-properties.txt 2>&1 || true
+  fi
   # Always restore network controls, even when Appium assertions fail.
   adb -s emulator-5554 emu network delay none >/dev/null 2>&1 || true
   adb -s emulator-5554 emu network speed full >/dev/null 2>&1 || true
