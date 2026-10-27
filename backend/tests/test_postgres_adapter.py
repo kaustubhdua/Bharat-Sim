@@ -1,4 +1,10 @@
-from app.main import PostgresCompatConnection, postgres_placeholders
+from app.main import (
+    PostgresCompatConnection,
+    postgres_placeholders,
+    validate_database_configuration,
+)
+
+import pytest
 
 
 class FakeConnection:
@@ -31,3 +37,37 @@ def test_postgres_connection_adapter_forwards_parameters_without_interpolation()
     conn = PostgresCompatConnection(raw)
     assert conn.execute("SELECT * FROM runs WHERE id=?", ("run-1",)) == "cursor"
     assert raw.calls == [("SELECT * FROM runs WHERE id=%s", ("run-1",))]
+
+
+
+def test_remote_postgres_requires_explicit_tls():
+    validate_database_configuration(
+        "postgresql://app:secret@db.example.supabase.co:5432/postgres?sslmode=require",
+        "production",
+    )
+    validate_database_configuration(
+        "postgresql://app:secret@db.example.supabase.co:5432/postgres?sslmode=verify-full",
+        "production",
+    )
+
+
+@pytest.mark.parametrize(
+    "url,environment",
+    [
+        ("postgresql://app:secret@db.example.supabase.co:5432/postgres", "production"),
+        ("postgresql://app:secret@db.example.supabase.co:5432/postgres?sslmode=prefer", "production"),
+        ("postgresql://app:secret@db.example.supabase.co:5432/postgres?sslmode=disable", "development"),
+        ("", "production"),
+        ("not-a-postgres-url", "development"),
+    ],
+)
+def test_unsafe_or_missing_database_configuration_fails_closed(url, environment):
+    with pytest.raises(RuntimeError):
+        validate_database_configuration(url, environment)
+
+
+def test_local_development_postgres_can_disable_tls_explicitly():
+    validate_database_configuration(
+        "postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable",
+        "development",
+    )
