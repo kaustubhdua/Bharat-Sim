@@ -7,6 +7,19 @@
 
 This checklist distinguishes implementation from evidence. A checkbox is complete only when the exact release commit has reproducible test evidence and the deployed service has been verified. This document is an audit and implementation contract, not a claim that these gates have already passed.
 
+## Live revalidation — 2026-10-27 11:45 IST
+
+This section supersedes stale observations below where the live state has since changed. It records the read-only checks performed against the connected Supabase project and the GitHub repository; it does not imply that the application is production-ready.
+
+- Repository main inspected at `cd152b415025611c4d782c3027b1642517044554`. Main CI passed on that SHA: backend, frontend build, browser E2E, worker guards, container build, and Compose smoke checks. The Android emulator workflow for that SHA was still running at the time of this revalidation; its result must be checked before release.
+- Supabase project `common 1` (`hkyieaovolkethovyenb`) is `ACTIVE_HEALTHY`, PostgreSQL 17, region `ap-south-1`.
+- Live migration history now contains `20261027054905_bharatsim_core` and `20261027061609_bharatsim_fk_indexes`. The three additive indexes `analyses_run_id_idx`, `artifacts_owner_id_idx`, and `workers_current_run_id_idx` exist in schema `bharatsim`. The earlier migration-version drift noted below has been reconciled in the live database and in the current PR branch; confirm the merged release commit retains the matching filenames.
+- Read-only privilege checks returned: `anon` schema usage=false, `authenticated` schema usage=false, `service_role` schema usage=true; `anon` SELECT on `bharatsim.runs`=false, `authenticated` SELECT=false, `service_role` SELECT=true. This is a private-schema posture; do not grant browser roles access until ownership policies and cross-user tests exist.
+- Supabase Security Advisor currently reports seven informational `rls_enabled_no_policy` findings for the private `bharatsim` tables. Since `anon` and `authenticated` have no schema usage or table SELECT grants, this is not evidence of public read access by itself. Keep the private schema unexposed; if access is later granted to client roles, add tested least-privilege RLS policies first. Do not modify existing `genomeguard` tables or their policies as part of BharatSim work.
+- The PostgreSQL adapter and clean-PostgreSQL restart test are in PR #57, which is open and not yet merged at this audit point. Until that change is merged and the exact latest revision passes CI, treat the live PostgreSQL adapter as not yet part of the released main branch.
+- No Vercel project matching BharatSim was found in the connected Vercel account, and no public deployment URL has been verified. Do not claim the website is deployed. The connected account only exposed a separate linked `nihdhoom` project.
+- Still not verified: application server configured with the live `BHARATSIM_DATABASE_URL`; Supabase Auth JWT validation and per-user run ownership; private artifact storage; VM-grade APK sandboxing/default-deny egress; quotas/cancellation/retention; physical low-cost device test; public deployment; and end-to-end evidence on the exact release SHA.
+
 ## 1. Current verified state
 
 - FastAPI API, React/Vite dashboard, SQLite persistence, APK archive checks and hashing, lease-based worker protocol, worker heartbeats, report/log analysis, Docker Compose local stack and CI workflows exist.
