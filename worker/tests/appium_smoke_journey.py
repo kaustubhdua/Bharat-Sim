@@ -202,7 +202,7 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
     }
 
 
-# A 500 KB fixture transfer should complete well below this bound, even under EDGE throttling.
+# A 2 MB fixture transfer should complete within this bound under the supported test profiles.
 def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 60) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
@@ -383,7 +383,7 @@ def main() -> int:
             "assertions": [
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe downloaded exactly 500,000 bytes from the public HTTPS endpoint through the Android Emulator network stack",
+                "each probe downloaded exactly 2,000,000 bytes from the public HTTPS endpoint through the Android Emulator network stack",
                 "per-request retry counts are captured in probe evidence",
                 "baseline, latency-only, and bandwidth-only probes used the same simulated cellular transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
