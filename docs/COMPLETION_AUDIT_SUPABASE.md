@@ -1,7 +1,7 @@
 # BharatSim completion audit and Supabase migration plan
 
 **Audit date:** 2026-10-27  
-**Repository baseline inspected:** `main` at `4cf06082bb2744dfbce51156a4bc4d57184c2449`  
+**Repository baseline inspected:** `main` at `6e03683d91078b14dbbac72f880a091daaf89505` (2026-10-27)  
 **Supabase target requested:** project `common 1`, ref `hkyieaovolkethovyenb`, region `ap-south-1`  
 **Release decision:** **Not complete; not safe for public arbitrary-APK execution.**
 
@@ -10,16 +10,16 @@ This checklist distinguishes implementation from evidence. A checkbox is complet
 ## 1. Current verified state
 
 - FastAPI API, React/Vite dashboard, SQLite persistence, APK archive checks and hashing, lease-based worker protocol, worker heartbeats, report/log analysis, Docker Compose local stack and CI workflows exist.
-- The API still imports `sqlite3` and uses `backend/data/bharatsim.sqlite3`. There is no completed Supabase-backed persistence path in the current `main` implementation.
+- The API still imports `sqlite3` for local mode and defaults to SQLite. A server-side opt-in PostgreSQL adapter (`BHARATSIM_DATABASE_URL`) is now implemented and covered by adapter tests, but the deployed application is not proven to use it until the server is configured with the database URL and an integration test confirms read/write behavior against the target project.
 - The UI intentionally labels sample logs and persona targets as illustrative/requested rather than measured device evidence. It also describes packet loss and CPU throttling as unsupported.
-- CI run for `main` at the audited SHA: backend/frontend/worker/container CI passed; dependency audit passed; Android emulator smoke failed.
+- On the inspected `main` revision, the standard CI and dependency audit passed. The Android emulator workflow for that exact SHA was still running when this audit was updated; prior revisions have had failures, so do not claim a release pass until the current run concludes successfully and its artifact is inspected.
 - The failed Android workflow did build and boot its test environment, but the uploaded test run remained `queued` until the runner's 180-second wait expired. This means the end-to-end queue → worker → callback → report path was not proven on that revision. Inspect the workflow artifact/logs and fix worker startup/registration/claiming rather than weakening the assertion.
-- PR #44 is closed and unmerged; do not assume its changes are present on `main`. PR #54 (`feature/frontend`) is open and its latest CI/dependency runs show `action_required`; review the reason, diff and checks before merging.
+- Pull-request state changes over time; review the repository's live open-PR list and required checks before release. This document itself is tracked in PR #55 and must be reconciled with the current main revision before merging.
 - Docker Compose is explicitly a loopback-only local evaluation stack. No verified public production deployment or physical-device test evidence was found in this audit.
 
 ## 2. Supabase discovery and safety boundary
 
-The requested Supabase project `common 1` is active and healthy in `ap-south-1`. It is **not an empty BharatSim database**: inspection found an existing `genomeguard` schema and `public.genomeguard_deployment_status` table. Do not reuse, rename, drop or modify GenomeGuard objects for BharatSim.
+The requested Supabase project `common 1` (ref `hkyieaovolkethovyenb`) is active and healthy in `ap-south-1`. It is **not an empty BharatSim database**: inspection found an existing `genomeguard` schema and `public.genomeguard_deployment_status` table. Do not reuse, rename, drop or modify GenomeGuard objects for BharatSim. A dedicated `bharatsim` schema and seven tables are present, with RLS enabled, no schema usage or table SELECT grants for `anon`/`authenticated`, and `service_role` SELECT access. The remote migration history records `20261027054905_bharatsim_core`, while GitHub currently has `20261027110000_bharatsim_core.sql`; reconcile migration version drift before treating fresh-project deployment as reproducible.
 
 **Critical finding:** Supabase table inspection reports RLS disabled on 13 existing `genomeguard` tables: `schema_migrations`, `cohort_metadata`, `donors`, `genotypes`, `variants`, `relationships`, `requesters`, `requests`, `decisions`, `epsilon_ledger`, `audit_log`, `donor_access`, and `alerts`. The table metadata response warns that client roles may be able to read/write those tables. The separate security-advisor call returned no lints, so the results are inconsistent; treat the explicit table-level RLS warning as unresolved and investigate it. Do not apply blanket RLS enablement to these existing tables without designing/testing their policies: enabling RLS with no suitable policies can break legitimate access. This finding belongs to the existing GenomeGuard data boundary and must be handled by its owner.
 
@@ -62,7 +62,7 @@ Official implementation references:
 
 ### P0-B. Build a safe Supabase migration
 
-- [ ] Validate the new Supabase CLI config and versioned bharatsim schema migration from a clean local database; CI must apply all migrations from zero.
+- [ ] Validate the committed Supabase CLI config and versioned `bharatsim` schema migration from a clean local database; CI must apply all migrations from zero and migration history must match `common 1` without duplicate/conflicting version records.
 - [ ] Create the isolated BharatSim schema and least-privileged roles/grants; do not touch `genomeguard` tables.
 - [ ] Define normalized tables for users/workspaces, runs, run events, test profiles, workers, leases/attempts, analyses, artifacts, quotas and audit events. Add foreign keys, uniqueness constraints, indexes, timestamps and state-transition constraints.
 - [ ] Use UUIDs or equivalent unguessable IDs for externally visible resources; every user-owned row has explicit owner/workspace identity.
