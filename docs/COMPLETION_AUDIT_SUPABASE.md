@@ -12,8 +12,8 @@ This checklist distinguishes implementation from evidence. A checkbox is complet
 - FastAPI API, React/Vite dashboard, SQLite persistence, APK archive checks and hashing, lease-based worker protocol, worker heartbeats, report/log analysis, Docker Compose local stack and CI workflows exist.
 - The API still imports `sqlite3` for local mode and defaults to SQLite. A server-side opt-in PostgreSQL adapter (`BHARATSIM_DATABASE_URL`) is now implemented and covered by adapter tests, but the deployed application is not proven to use it until the server is configured with the database URL and an integration test confirms read/write behavior against the target project.
 - The UI intentionally labels sample logs and persona targets as illustrative/requested rather than measured device evidence. It also describes packet loss and CPU throttling as unsupported.
-- On the inspected `main` revision, the standard CI and dependency audit passed. The Android emulator workflow for that exact SHA was still running when this audit was updated; prior revisions have had failures, so do not claim a release pass until the current run concludes successfully and its artifact is inspected.
-- The failed Android workflow did build and boot its test environment, but the uploaded test run remained `queued` until the runner's 180-second wait expired. This means the end-to-end queue → worker → callback → report path was not proven on that revision. Inspect the workflow artifact/logs and fix worker startup/registration/claiming rather than weakening the assertion.
+- On `main` SHA `6e03683d91078b14dbbac72f880a091daaf89505`, standard CI and dependency audit passed, but Android emulator workflow run [40457448701](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/40457448701) failed: the uploaded fixture run remained `queued` for 180 seconds. The workflow must emit worker/API logs and worker registration state on timeout, then the worker claim failure must be corrected and re-tested.
+- The failed Android workflow built and booted the emulator, and the Linux netem integration step passed, but the uploaded test run remained `queued` until the runner's 180-second wait expired. This means the end-to-end queue → worker → callback → report path was not proven on that revision. Fix worker startup/registration/claiming rather than weakening the assertion.
 - Pull-request state changes over time; review the repository's live open-PR list and required checks before release. This document itself is tracked in PR #55 and must be reconciled with the current main revision before merging.
 - Docker Compose is explicitly a loopback-only local evaluation stack. No verified public production deployment or physical-device test evidence was found in this audit.
 
@@ -57,7 +57,7 @@ Official implementation references:
 - [ ] Add diagnostic state on timeout: worker list/status/last_seen, queue age, claim attempts, lease status, runner stdout/stderr and API logs. Do not emit secrets.
 - [ ] Require both a successful fixture journey and a deliberately failing journey to reach the correct terminal state.
 - [ ] Rerun Android emulator workflow on the candidate commit; preserve artifacts and inspect the report, APK hash, logs and assertion outcomes.
-- [ ] Review PR #54, resolve `action_required`/failed checks, verify it contains the intended frontend work, and merge only after its checks and review pass.
+- [ ] Review the live open pull requests and their required checks at release time; do not rely on stale PR numbers or status snapshots in this historical audit.
 - [ ] Consolidate or close superseded branches/PRs only after verifying their useful changes have been merged or intentionally discarded.
 
 ### P0-B. Build a safe Supabase migration
