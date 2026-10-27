@@ -65,7 +65,7 @@ jobs:
         run: |
           psql "$BHARATSIM_DATABASE_URL" -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20261027054905_bharatsim_core.sql \
-            -f supabase/migrations/20261027060000_bharatsim_fk_indexes.sql
+            -f supabase/migrations/20261027061609_bharatsim_fk_indexes.sql
         env:
           PGPASSWORD: postgres
           BHARATSIM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
