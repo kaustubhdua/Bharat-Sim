@@ -60,7 +60,7 @@ else:
     raise SystemExit("BharatSim API did not become ready")
 PY
 
-python worker/agent.py > artifacts/worker.log 2>&1 &
+python -m worker.agent > artifacts/worker.log 2>&1 &
 WORKER_PID=$!
 
 # Do not enqueue APKs until the real worker has authenticated and registered.
