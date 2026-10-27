@@ -20,6 +20,10 @@ To delete all local persisted data too:
 
     docker compose down -v
 
+## Runtime mode and production guard
+
+The default Compose configuration is for loopback-only local development (`BHARATSIM_ENV=development`). If `BHARATSIM_ENV=production`, the API refuses to start unless `BHARATSIM_REQUIRE_API_KEY=true` and `BHARATSIM_API_KEY` is at least 32 characters. Production mode also requires `BHARATSIM_DATABASE_URL` and an explicit TLS mode for remote PostgreSQL. These checks reduce accidental exposure; they do **not** provide multi-user authentication or make public arbitrary-APK execution safe.
+
 ## Optional single-tenant API key
 
 For a private single-operator instance, enable the shared API key before starting the stack:
@@ -33,8 +37,6 @@ docker compose up --build -d
 The key is passed to the API and the nginx container as a server-side environment variable. Nginx injects it only on proxied `/api/` requests; it is not embedded in the Vite bundle or returned to browser JavaScript. Keep the key private and rotate it by restarting the stack with a new value. This is a **shared single-tenant gate**, not user identity, tenant isolation, or a substitute for a production authentication system. If the key is required but missing or shorter than 32 characters, the API fails closed.
 
 To run the default loopback-only local evaluation without this gate, leave `BHARATSIM_REQUIRE_API_KEY` unset. Do not expose the stack publicly.
-
-For production-mode configuration checks, set `BHARATSIM_ENV=production`. Startup then refuses to proceed unless `BHARATSIM_REQUIRE_API_KEY=true` and `BHARATSIM_API_KEY` is at least 32 characters. This guard prevents accidental open deployment; the shared key is still not multi-user authentication, and public arbitrary-APK execution remains blocked until the other production gates are met.
 
 ## Optional local worker
 
