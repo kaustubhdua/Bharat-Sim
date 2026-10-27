@@ -34,7 +34,7 @@ import javax.net.ssl.SSLPeerUnverifiedException;
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
-    private static final int PROBE_BYTES = 2_000_000;
+    private static final int PROBE_BYTES = 500_000;
     private int probeSequence = 0;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -93,7 +93,7 @@ public final class MainActivity extends Activity {
 
     private void performNetworkProbe(TextView target, int sequence) {
         String transport = activeTransport();
-        for (int attempt = 1; attempt <= 4; attempt++) {
+        for (int attempt = 1; attempt <= 2; attempt++) {
             long started = SystemClock.elapsedRealtime();
             try {
                 ProbeResult result = performPinnedHttpsProbe(PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started);
@@ -107,7 +107,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> target.setText(message));
                 return;
             } catch (Exception exception) {
-                if (exception instanceof IOException && attempt < 4) {
+                if (exception instanceof IOException && attempt < 2) {
                     Log.w(TAG, "BHARATSIM_NETWORK_PROBE retrying sequence=" + sequence
                             + " attempt=" + attempt + " after=" + exception.getClass().getSimpleName(), exception);
                     try {
@@ -143,10 +143,10 @@ public final class MainActivity extends Activity {
         // hostname so SNI and the normal certificate hostname verifier remain active.
         Log.i(TAG, "BHARATSIM_NETWORK_PROBE request_started endpoint_host=" + host + " endpoint_ip=" + pinnedIp);
         try (Socket raw = new Socket()) {
-            raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), 5000);
+            raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), 3000);
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
-                tls.setSoTimeout(30000);
+                tls.setSoTimeout(8000);
                 tls.startHandshake();
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE tls_handshake_completed endpoint_host=" + host);
                 if (!HttpsURLConnection.getDefaultHostnameVerifier().verify(host, tls.getSession())) {

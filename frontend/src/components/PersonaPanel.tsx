@@ -101,8 +101,8 @@ export default function PersonaPanel({
               </b>
             </span>
             <span>
-              <small>PACKET LOSS</small>
-              <b>{persona.packet_loss_pct}%</b>
+              <small>PACKET LOSS · NOT APPLIED</small>
+              <b>{persona.packet_loss_pct}% target</b>
             </span>
             <span>
               <small>RISK LEVEL</small>

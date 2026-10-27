@@ -7,6 +7,8 @@ test("dashboard connects to the real API and renders authored profiles", async (
   await expect(page.getByText("Budget Android", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Profiles loaded from connected API/)).toBeVisible();
   await expect(page.getByText(/not measurements from physical devices/)).toBeVisible();
+  await expect(page.getByText("PACKET LOSS · NOT APPLIED")).toBeVisible();
+  await expect(page.getByText("2% target", { exact: true })).toBeVisible();
 });
 
 test("log analysis reports findings from submitted evidence and preserves source lines", async ({ page }) => {

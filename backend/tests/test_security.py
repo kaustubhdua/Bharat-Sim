@@ -54,16 +54,23 @@ def test_api_key_gate_fails_closed_without_configured_key(monkeypatch):
     assert response.status_code == 503
 
 
+
 def test_production_config_refuses_disabled_api_auth():
     import pytest
     with pytest.raises(RuntimeError, match="BHARATSIM_REQUIRE_API_KEY=true"):
-        validate_runtime_security_config({"BHARATSIM_ENV": "production", "BHARATSIM_REQUIRE_API_KEY": "false"})
+        validate_runtime_security_config({
+            "BHARATSIM_ENV": "production",
+            "BHARATSIM_REQUIRE_API_KEY": "false",
+        })
 
 
 def test_production_config_refuses_missing_or_weak_api_key():
     import pytest
     with pytest.raises(RuntimeError, match="at least 32 characters"):
-        validate_runtime_security_config({"BHARATSIM_ENV": "production", "BHARATSIM_REQUIRE_API_KEY": "true"})
+        validate_runtime_security_config({
+            "BHARATSIM_ENV": "production",
+            "BHARATSIM_REQUIRE_API_KEY": "true",
+        })
     with pytest.raises(RuntimeError, match="at least 32 characters"):
         validate_runtime_security_config({
             "BHARATSIM_ENV": "production",
