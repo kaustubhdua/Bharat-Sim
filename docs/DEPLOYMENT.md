@@ -20,6 +20,10 @@ To delete all local persisted data too:
 
     docker compose down -v
 
+## Runtime mode and production guard
+
+The default Compose configuration is for loopback-only local development (`BHARATSIM_ENV=development`). If `BHARATSIM_ENV=production`, the API refuses to start unless `BHARATSIM_REQUIRE_API_KEY=true` and `BHARATSIM_API_KEY` is at least 32 characters. Production mode also requires `BHARATSIM_DATABASE_URL` and an explicit TLS mode for remote PostgreSQL. These checks reduce accidental exposure; they do **not** provide multi-user authentication or make public arbitrary-APK execution safe.
+
 ## Optional single-tenant API key
 
 For a private single-operator instance, enable the shared API key before starting the stack:
