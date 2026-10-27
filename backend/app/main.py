@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import parse_qs, urlsplit
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
@@ -24,7 +25,35 @@ DATA_DIR = Path(os.getenv("BHARATSIM_DATA_DIR", str(APP_DIR.parent / "data")))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "bharatsim.sqlite3"
 DATABASE_URL = os.getenv("BHARATSIM_DATABASE_URL", "").strip()
+APP_ENV = os.getenv("BHARATSIM_ENV", "development").strip().lower()
 
+
+def validate_database_configuration(database_url: str, app_env: str) -> None:
+    """Fail closed on missing production persistence or plaintext remote PostgreSQL."""
+    production = app_env in {"production", "prod"}
+    if production and not database_url:
+        raise RuntimeError(
+            "BHARATSIM_ENV=production requires BHARATSIM_DATABASE_URL; refusing to start with local SQLite"
+        )
+    if not database_url:
+        return
+
+    parsed = urlsplit(database_url)
+    if parsed.scheme not in {"postgres", "postgresql"} or not parsed.hostname:
+        raise RuntimeError("BHARATSIM_DATABASE_URL must be a valid PostgreSQL URL")
+    query = parse_qs(parsed.query)
+    sslmode = query.get("sslmode", ["prefer"])[-1].lower()
+    host = parsed.hostname.lower().strip("[]")
+    local_hosts = {"localhost", "127.0.0.1", "::1", "postgres"}
+    secure_modes = {"require", "verify-ca", "verify-full"}
+    if sslmode not in secure_modes and (production or host not in local_hosts):
+        raise RuntimeError(
+            "Remote/production PostgreSQL connections must set sslmode=require or stronger; "
+            "use sslmode=disable only for local development/test databases"
+        )
+
+
+validate_database_configuration(DATABASE_URL, APP_ENV)
 
 def validate_runtime_security_config(environment: dict[str, str] | None = None) -> None:
     """Refuse accidental production startup without the documented single-tenant API gate.
