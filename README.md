@@ -23,7 +23,7 @@
 - A real disposable Android emulator workflow has passed for the source-built BharatSim fixture: upload → queue/lease → ADB install/launch/logcat → authenticated callback → persisted report, followed by an Appium UI action assertion and screenshot. This validates the fixture pipeline only; it does not validate arbitrary third-party APKs or production isolation.
 - Appium/UiAutomator2 is integrated for a fixture-app primary-action journey. Product-specific test-flow authoring, broader assertion coverage, and arbitrary-app compatibility remain incomplete.
 - Emulator console latency and upload/download bandwidth controls are wired to the worker and read back from the emulator. Battery-saver and bounded storage-pressure simulation are wired for disposable emulator targets with cleanup/readback evidence. Packet loss and CPU throttling remain unsupported, RAM is report-only, and arbitrary app traffic is not proven.
-- Multi-user identity, per-user run ownership, durable object storage, and production-grade sandbox isolation are not implemented. The Supabase migration is committed but has not yet been applied to common 1 or verified against a configured PostgreSQL backend.
+- Multi-user identity, per-user run ownership, durable object storage, and production-grade sandbox isolation are not implemented. The Supabase schema is present in common 1, but the application has not been verified against a configured PostgreSQL backend. Migration-history alignment, server-side database configuration, and real Postgres read/write/restart tests remain release gates.
 - Sarvam translation is not wired into the product.
 
 ## Architecture
