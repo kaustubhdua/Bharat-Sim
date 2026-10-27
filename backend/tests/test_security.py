@@ -4,7 +4,7 @@ import zipfile
 
 from fastapi.testclient import TestClient
 
-from app.main import app, validate_apk_archive
+from app.main import app, validate_apk_archive, validate_runtime_security_config
 
 client = TestClient(app)
 
@@ -52,3 +52,33 @@ def test_api_key_gate_fails_closed_without_configured_key(monkeypatch):
     monkeypatch.delenv("BHARATSIM_API_KEY", raising=False)
     response = client.get("/api/v1/personas")
     assert response.status_code == 503
+
+
+def test_production_config_refuses_disabled_api_auth():
+    import pytest
+    with pytest.raises(RuntimeError, match="BHARATSIM_REQUIRE_API_KEY=true"):
+        validate_runtime_security_config({"BHARATSIM_ENV": "production", "BHARATSIM_REQUIRE_API_KEY": "false"})
+
+
+def test_production_config_refuses_missing_or_weak_api_key():
+    import pytest
+    with pytest.raises(RuntimeError, match="at least 32 characters"):
+        validate_runtime_security_config({"BHARATSIM_ENV": "production", "BHARATSIM_REQUIRE_API_KEY": "true"})
+    with pytest.raises(RuntimeError, match="at least 32 characters"):
+        validate_runtime_security_config({
+            "BHARATSIM_ENV": "production",
+            "BHARATSIM_REQUIRE_API_KEY": "true",
+            "BHARATSIM_API_KEY": "short",
+        })
+
+
+def test_production_config_accepts_strong_server_side_key():
+    validate_runtime_security_config({
+        "BHARATSIM_ENV": "production",
+        "BHARATSIM_REQUIRE_API_KEY": "true",
+        "BHARATSIM_API_KEY": "k" * 40,
+    })
+
+
+def test_development_config_remains_available_without_shared_key():
+    validate_runtime_security_config({"BHARATSIM_ENV": "development"})
