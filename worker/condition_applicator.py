@@ -237,10 +237,13 @@ def apply_storage_pressure(
 
     if initial_free <= target_free_mb:
         return {
-            "apply_status": "applied",
+            # The target state already exists. Do not claim BharatSim applied
+            # pressure when it did not write any bytes to the device.
+            "apply_status": "already_satisfied",
             "verification_status": "verified",
+            "condition_state": "preexisting_target_satisfied",
             "target_reached": True,
-            "bounded_pressure_applied": True,
+            "bounded_pressure_applied": False,
             "allocated_mb": 0,
             "requested_target_mb": target_free_mb,
             "actual_achieved_free_mb": initial_free,
