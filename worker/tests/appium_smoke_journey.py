@@ -204,6 +204,18 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
 
 # A 500 KB fixture transfer should complete within this bound under the supported test profiles.
 # A 2 MB transfer at the supported 256 kbps profile needs about 63 seconds before RTT/retries.
+def network_probe_log_tail() -> str:
+    """Return real device-side probe diagnostics when a UI wait fails."""
+    try:
+        return adb(
+            "logcat", "-d", "-t", "1000", "-s",
+            "BharatSimNetworkProbe:I", "BharatSimNetworkProbe:W",
+            "BharatSimNetworkProbe:E", "*:S", timeout=10,
+        )[-6000:]
+    except Exception as exc:
+        return f"Could not collect device probe logcat: {exc}"
+
+
 def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 120) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
@@ -215,9 +227,9 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
                 raise RuntimeError(f"Fixture downloaded unexpected payload size: {probe['bytes_read']}")
             return probe
         if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
-            raise RuntimeError(f"Fixture network probe failed: {last_text}")
+            raise RuntimeError(f"Fixture network probe failed: {last_text}\\nDevice probe logcat:\\n{network_probe_log_tail()}")
         time.sleep(0.5)
-    raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}")
+    raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}\\nDevice probe logcat:\\n{network_probe_log_tail()}")
 
 
 def main() -> int:
