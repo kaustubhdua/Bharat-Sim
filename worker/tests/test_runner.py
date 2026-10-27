@@ -1,4 +1,7 @@
+import subprocess
+import sys
 import unittest
+from pathlib import Path
 from subprocess import CompletedProcess
 from unittest.mock import patch
 
@@ -15,6 +18,17 @@ from worker.runner import (
 )
 
 
+
+
+class RunnerEntrypointTests(unittest.TestCase):
+    def test_direct_script_entrypoint_resolves_package_imports(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        completed = subprocess.run(
+            [sys.executable, str(repo_root / "worker" / "runner.py"), "--help"],
+            cwd=repo_root, capture_output=True, text=True, timeout=10, check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("Bounded local APK smoke runner", completed.stdout)
 
 
 class AppiumProbeStatusParserTests(unittest.TestCase):
