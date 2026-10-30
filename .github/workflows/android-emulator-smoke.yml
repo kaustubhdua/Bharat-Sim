@@ -111,7 +111,7 @@ jobs:
         env:
           BHARATSIM_PROBE_URL: https://speed.cloudflare.com/__down?bytes=500000
           BHARATSIM_PROBE_IP: ${{ steps.probe-address.outputs.ip }}
-        run: gradle --no-daemon assembleDebug
+        run: gradle --no-daemon testDebugUnitTest assembleDebug
       - name: Add Android build-tools to PATH
         shell: bash
         run: |

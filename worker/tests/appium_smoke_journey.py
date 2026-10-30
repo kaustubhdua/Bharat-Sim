@@ -75,6 +75,8 @@ def prepare_supported_transport() -> None:
     adb("emu", "gsm", "voice", "home")
     adb("emu", "gsm", "data", "home")
     adb("shell", "svc", "wifi", "disable")
+    adb("shell", "settings", "put", "global", "auto_sync", "0")
+    adb("shell", "settings", "put", "system", "auto_sync", "0")
 
     deadline = time.monotonic() + 30
     last_route = ""
@@ -361,7 +363,7 @@ def main() -> int:
         # A 500 KB transfer makes the throughput effect observable while keeping
         # each request short enough for bounded retry and timeout handling.
         phase = "configure_bandwidth_profile"
-        bandwidth_profile = set_network_profile(None, "5000:5000")
+        bandwidth_profile = set_network_profile(None, "2000:2000")
         evidence["bandwidth_profile"] = bandwidth_profile
         phase = "bandwidth_samples"
         bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)

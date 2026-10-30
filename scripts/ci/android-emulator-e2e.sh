@@ -41,6 +41,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Tune host socket buffers to avoid packet drops during throttled slirp proxying
+sudo sysctl -w net.core.rmem_max=16777216 >/dev/null 2>&1 || true
+sudo sysctl -w net.core.wmem_max=16777216 >/dev/null 2>&1 || true
+sudo sysctl -w net.ipv4.tcp_rmem="4096 87380 16777216" >/dev/null 2>&1 || true
+sudo sysctl -w net.ipv4.tcp_wmem="4096 65536 16777216" >/dev/null 2>&1 || true
+
 # The fixture uses a CI-host-resolved IPv4 address and validates TLS against the
 # HTTPS hostname, so the real transfer does not depend on emulator DNS resolution.
 

@@ -17,6 +17,8 @@ import java.net.URL;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.InputStream;
@@ -35,9 +37,10 @@ public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
     private static final int PROBE_BYTES = 500_000;
-    private static final int PROBE_TIMEOUT_MS = 45_000;
-    private static final int ATTEMPT_TIMEOUT_MS = 20_000;
-    private static final int SOCKET_READ_TIMEOUT_MS = 10_000;
+    static final int PROBE_TIMEOUT_MS = 45_000;
+    static final int ATTEMPT_TIMEOUT_MS = 20_000;
+    static final int SOCKET_READ_TIMEOUT_MS = 15_000;
+    static final int SOCKET_BUFFER_BYTES = 16_384;
     private static final int MAX_HTTP_LINE_BYTES = 8_192;
     private static final int MAX_HTTP_HEADER_COUNT = 100;
     private static final int MAX_HTTP_HEADER_BYTES = 32_768;
@@ -112,9 +115,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> target.setText(message));
                 return;
             }
-            long attemptBudget = (attempt < 2)
-                    ? Math.min(ATTEMPT_TIMEOUT_MS, Math.max(1000L, remainingOverall - 2000L))
-                    : Math.min(ATTEMPT_TIMEOUT_MS, remainingOverall);
+            long attemptBudget = calculateAttemptBudget(attempt, remainingOverall, ATTEMPT_TIMEOUT_MS);
             long attemptDeadline = now + attemptBudget;
             try {
                 ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
@@ -138,7 +139,7 @@ public final class MainActivity extends Activity {
                 return;
             } catch (Exception exception) {
                 long nowAfterCatch = SystemClock.elapsedRealtime();
-                if (exception instanceof IOException && attempt < 2 && nowAfterCatch < (probeDeadline - 1000L)) {
+                if (isRetryableException(exception) && attempt < 2 && nowAfterCatch < (probeDeadline - 1000L)) {
                     Log.w(TAG, "BHARATSIM_NETWORK_PROBE retrying sequence=" + sequence
                             + " attempt=" + attempt + " after=" + exception.getClass().getSimpleName()
                             + " message=\"" + exception.getMessage() + "\"", exception);
@@ -162,6 +163,26 @@ public final class MainActivity extends Activity {
         }
     }
 
+    static long calculateAttemptBudget(int attempt, long remainingOverall, int maxAttemptTimeoutMs) {
+        if (attempt < 2) {
+            return Math.min(maxAttemptTimeoutMs, Math.max(1000L, remainingOverall - 2000L));
+        } else {
+            return Math.min(maxAttemptTimeoutMs, remainingOverall);
+        }
+    }
+
+    static boolean isRetryableException(Exception exception) {
+        if (exception instanceof SSLPeerUnverifiedException) {
+            return false;
+        }
+        if (exception instanceof SocketTimeoutException
+                || exception instanceof SocketException
+                || exception instanceof EOFException) {
+            return true;
+        }
+        return exception instanceof IOException;
+    }
+
     private static ProbeResult performPinnedHttpsProbe(Network activeNetwork, String urlText, String pinnedIp, int expectedBytes, long startedAt, long attemptDeadline, long probeDeadline) throws IOException {
         URL url = new URL(urlText);
         if (!"https".equalsIgnoreCase(url.getProtocol()) || pinnedIp.equals("0.0.0.0")) {
@@ -176,12 +197,18 @@ public final class MainActivity extends Activity {
         Log.i(TAG, "BHARATSIM_NETWORK_PROBE request_started endpoint_host=" + host + " endpoint_ip=" + pinnedIp);
         // Bind the socket to the Network whose transport is reported below. A generic
         // Socket() can bypass Android's per-network policy-routing table in emulators.
+        // Clamping socket receive and send buffers constrains the TCP advertised window,
+        // preventing sender packet bursts from overflowing the emulator's token-bucket queue.
         try (Socket raw = activeNetwork.getSocketFactory().createSocket()) {
             raw.setTcpNoDelay(true);
+            raw.setReceiveBufferSize(SOCKET_BUFFER_BYTES);
+            raw.setSendBufferSize(SOCKET_BUFFER_BYTES);
             raw.setSoTimeout(remainingTimeoutMs(attemptDeadline, probeDeadline));
             raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), Math.min(8000, remainingTimeoutMs(attemptDeadline, probeDeadline)));
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
+                tls.setReceiveBufferSize(SOCKET_BUFFER_BYTES);
+                tls.setSendBufferSize(SOCKET_BUFFER_BYTES);
                 // A 500 KB sample can take several seconds on a shaped route; allow
                 // headroom for TLS/header delays while keeping the read bounded.
                 tls.setSoTimeout(remainingTimeoutMs(attemptDeadline, probeDeadline));
@@ -248,6 +275,7 @@ public final class MainActivity extends Activity {
                         throw new IOException("Malformed Content-Length header", badLength);
                     }
                 }
+
                 int bytesRead = transferEncoding.contains("chunked")
                         ? readChunkedBody(tls, input, expectedBytes, startedAt, attemptDeadline, probeDeadline)
                         : readFixedBody(tls, input, expectedBytes, startedAt, attemptDeadline, probeDeadline);
@@ -325,17 +353,20 @@ public final class MainActivity extends Activity {
                 + " throughput_bytes_per_second=" + bytesPerSecond);
     }
 
-    private static int remainingTimeoutMs(long attemptDeadline, long probeDeadline) throws IOException {
-        long now = SystemClock.elapsedRealtime();
+    static int remainingTimeoutMs(long attemptDeadline, long probeDeadline, long now, int socketReadTimeoutMs) throws IOException {
         long overallRemaining = probeDeadline - now;
         if (overallRemaining <= 0) {
-            throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 45-second overall deadline");
+            throw new SocketTimeoutException("Android HTTPS probe exceeded its 45-second overall deadline");
         }
         long attemptRemaining = attemptDeadline - now;
         if (attemptRemaining <= 0) {
-            throw new java.net.SocketTimeoutException("Probe attempt exceeded its 20-second deadline");
+            throw new SocketTimeoutException("Probe attempt exceeded its 20-second deadline");
         }
-        return (int) Math.max(1, Math.min(SOCKET_READ_TIMEOUT_MS, Math.min(attemptRemaining, overallRemaining)));
+        return (int) Math.max(1, Math.min(socketReadTimeoutMs, Math.min(attemptRemaining, overallRemaining)));
+    }
+
+    private static int remainingTimeoutMs(long attemptDeadline, long probeDeadline) throws IOException {
+        return remainingTimeoutMs(attemptDeadline, probeDeadline, SystemClock.elapsedRealtime(), SOCKET_READ_TIMEOUT_MS);
     }
 
     private static String readHttpLine(SSLSocket socket, InputStream input, long attemptDeadline, long probeDeadline) throws IOException {
