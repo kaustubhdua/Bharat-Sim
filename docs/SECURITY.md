@@ -15,7 +15,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - APK-derived Android package names are strictly validated before being passed to an ADB shell command, and the worker agent refuses HTTP redirects and rejects absolute, external, or non-worker route URLs in server-provided job fields before attaching worker credentials.
 - Completed worker callbacks require a valid 64-character APK SHA-256 matching the leased artifact; failure callbacks may omit the hash when failure happens before download or runner execution.
 - The smoke runner attempts to uninstall the test package after execution and fails the run if cleanup fails, warning that a disposable VM reset is still the stronger isolation boundary.
-- The network shaper is guarded and only accepts dedicated test interface names. Its apply action parses reported qdisc delay/jitter/loss/rate and compares them with requested values; this is configuration evidence, not proof of end-to-end emulator traffic conditions.
+- The guarded network shaper is limited to dedicated test interfaces. Its apply action parses reported qdisc delay/jitter/loss/rate and compares them with requested values; this is configuration evidence, not proof of end-to-end emulator traffic.
 
 ## Not yet implemented / not sufficient for public execution
 
@@ -60,4 +60,4 @@ These references are guidance, not a certification of BharatSim. Any future APK 
 - A completed smoke run means the runner completed its configured install/launch/observation/log-collection workflow; it is not proof that all app journeys passed.
 - Log markers are heuristic evidence, not proof of root cause.
 - Worker report redaction is a best-effort defense-in-depth control, not a guarantee that all application-specific secrets or personal data are removed.
-- Emulator network delay and upload/download bandwidth controls can be applied and read back on a disposable Android Emulator. The fixture CI journey separately measures repeated real HTTPS requests before and after shaping and verifies reset; this is evidence for the source-built fixture and CI emulator only. Packet loss, CPU/RAM/storage pressure, and battery-saver constraints remain unsupported. Control-plane readback alone is not proof of the active traffic path, and neither result establishes arbitrary APK health.
+- Network latency and download/upload bandwidth controls can be applied and read back on a disposable Android Emulator; fixture CI additionally checks measured traffic behavior and reset for the source-built fixture only. The worker documents battery-saver and bounded storage-pressure operations with readback and cleanup, but these do not create a complete low-end-device persona or prove arbitrary APK behavior. Packet loss, CPU throttling and RAM restriction remain unsupported. Emulator control-plane readback alone is not proof that arbitrary application traffic traversed the shaped path.
