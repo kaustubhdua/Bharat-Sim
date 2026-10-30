@@ -20,7 +20,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 ## Not yet implemented / not sufficient for public execution
 
 - The local API container runs as a non-root user with a read-only root filesystem, dropped Linux capabilities, no-new-privileges, and configured PID/memory limits. These reduce container privileges but are not an APK sandbox.
-- The shared API key and worker token are not user authentication, tenant isolation, or per-run user authorization.
+- The API now has an opt-in Supabase Auth JWT verification gate for customer-data endpoints. It verifies asymmetric ES256/RS256 tokens against the project's JWKS, validates issuer/audience/expiry/subject, rejects anonymous tokens, and scopes run/analysis reads and writes by the verified `sub` UUID. The local SQLite adapter adds nullable `owner_id` columns; the existing Supabase core schema already contains the matching owner columns.\n- The frontend login/session flow is not yet integrated, so enabling `BHARATSIM_AUTH_REQUIRED=true` currently requires a trusted client to send a Supabase access token. Do not treat this backend PR alone as a complete customer-facing multi-user launch.\n- The optional shared API key and worker token are not user authentication, tenant isolation, or per-run user authorization.
 - APK archive checks are not malware scanning and do not make an APK safe.
 - The worker agent and runner do not create a sandbox by themselves. A compromised APK may act with the privileges of the Android guest and potentially attack reachable infrastructure.
 - There is no per-run disposable VM snapshot/revert, hardened container/VM policy, verified network egress isolation, or complete cancellation of active device operations.
@@ -30,7 +30,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 
 ## Before public APK execution
 
-1. Add real user identity and per-run ownership; deny cross-user reads and downloads.
+1. Integrate Supabase Auth sign-in/session refresh into the frontend, send access tokens only in Authorization headers, and test account lifecycle. Backend JWT verification and owner-scoped run/analysis access are now implemented behind `BHARATSIM_AUTH_REQUIRED=true`.
 2. Place execution on a disposable VM or equivalent isolation boundary with no host secrets, no privileged container, no Docker socket, strict CPU/RAM/disk/time quotas, and restricted outbound network access.
 3. Validate emulator and ADB boundaries; do not accept arbitrary shell commands, host paths, or device serials from API callers.
 4. Store artifacts in private object storage using generated names, short-lived authorized downloads, encryption where appropriate, and documented deletion/retention.
