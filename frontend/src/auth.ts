@@ -76,9 +76,10 @@ export async function signOut(): Promise<void> {
       await fetch(SUPABASE_URL + "/auth/v1/logout", {
         method: "POST",
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + current.access_token },
-      });
+      }).catch(() => undefined);
     }
   } finally {
+    // Local logout must complete even if the Auth server is temporarily unreachable.
     sessionStorage.removeItem(SESSION_KEY);
   }
 }
