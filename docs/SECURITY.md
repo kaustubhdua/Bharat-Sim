@@ -10,7 +10,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - Expired leases are retried up to three claims. Stale/duplicate results are rejected.
 - Inline worker result JSON is capped at 250 KB.
 - Before submitting worker evidence, common bearer credentials, key/token/password/secret key-value fields, secret query parameters, and JWT-shaped strings are redacted recursively from report text.
-- Uploaded APKs are deleted after terminal worker results when filesystem cleanup succeeds; abandoned uploads expire after 24 hours during startup, run creation, or worker claim requests.
+- When server-side Supabase Storage credentials are configured, APKs are streamed into the private `bharatsim-private` bucket using generated `runs/<uuid>/input.apk` object paths; worker downloads are proxied through the authenticated lease endpoint, and terminal results trigger object deletion. Local development without Storage credentials retains the local-filesystem path. Abandoned local/private uploads expire after 24 hours when cleanup is invoked during startup, run creation, or worker claim requests.
 - The runner has an explicit opt-in environment guard, explicit Android serial, bounded duration, APK size limit, bounded archive metadata checks, and command timeouts.
 - APK-derived Android package names are strictly validated before being passed to an ADB shell command, and the worker agent refuses HTTP redirects and rejects absolute, external, or non-worker route URLs in server-provided job fields before attaching worker credentials.
 - Completed worker callbacks require a valid 64-character APK SHA-256 matching the leased artifact; failure callbacks may omit the hash when failure happens before download or runner execution.
@@ -24,7 +24,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - APK archive checks are not malware scanning and do not make an APK safe.
 - The worker agent and runner do not create a sandbox by themselves. A compromised APK may act with the privileges of the Android guest and potentially attack reachable infrastructure.
 - There is no per-run disposable VM snapshot/revert, hardened container/VM policy, verified network egress isolation, or complete cancellation of active device operations.
-- Inline logcat evidence is bounded and common credential patterns are redacted, but pattern-based redaction is not exhaustive and logs are not stored in dedicated private object storage with lifecycle/retention controls. The 24-hour upload expiry is request/startup-driven, not a background scheduler.
+- Inline logcat evidence and worker reports remain bounded JSON in the database; they are not yet separate object artifacts. APK upload expiry is 24 hours but cleanup is request/startup-driven, not a background scheduler. Storage lifecycle rules and a user-facing artifact deletion workflow are not yet configured.
 - There are no quotas, billing controls, per-user limits, or full audit trail for a multi-user service.
 - A configured worker token means dispatch is configured; it does not prove a live worker or emulator exists.
 
@@ -33,7 +33,7 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 1. Integrate Supabase Auth sign-in/session refresh into the frontend, send access tokens only in Authorization headers, and test account lifecycle. Backend JWT verification and owner-scoped run/analysis access are now implemented behind `BHARATSIM_AUTH_REQUIRED=true`.
 2. Place execution on a disposable VM or equivalent isolation boundary with no host secrets, no privileged container, no Docker socket, strict CPU/RAM/disk/time quotas, and restricted outbound network access.
 3. Validate emulator and ADB boundaries; do not accept arbitrary shell commands, host paths, or device serials from API callers.
-4. Store artifacts in private object storage using generated names, short-lived authorized downloads, encryption where appropriate, and documented deletion/retention.
+4. APK input artifacts now use the private `bharatsim-private` bucket and authenticated worker proxy; extend this to reports/logcat/screenshots, add short-lived user-authorized downloads, lifecycle rules, and documented deletion/retention.
 5. Add upload/job quotas, concurrency limits, abuse monitoring, cancellation, and audit events.
 6. Protect API and worker credentials, rotate them, and never put them in frontend environment variables or logs.
 7. Test stale leases, replayed callbacks, cross-run access, oversized results, expired artifacts, worker crashes, and malicious APK fixtures.
