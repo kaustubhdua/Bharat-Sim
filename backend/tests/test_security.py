@@ -79,11 +79,13 @@ def test_production_config_refuses_missing_or_weak_api_key():
         })
 
 
-def test_production_config_accepts_strong_server_side_key():
+def test_production_config_accepts_strong_server_side_key_and_user_auth():
     validate_runtime_security_config({
         "BHARATSIM_ENV": "production",
         "BHARATSIM_REQUIRE_API_KEY": "true",
         "BHARATSIM_API_KEY": "k" * 40,
+        "BHARATSIM_AUTH_REQUIRED": "true",
+        "SUPABASE_URL": "https://example.supabase.co",
     })
 
 
