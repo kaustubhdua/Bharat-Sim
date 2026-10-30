@@ -43,7 +43,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install API dependencies
-        run: python -m pip install -r backend/requirements.txt
+        run: python -m pip install -r backend/requirements.txt cryptography
       - name: Verify real traffic through isolated Linux netem interface
         run: |
           sudo apt-get update
@@ -92,7 +92,7 @@ jobs:
           fi
           "$SDKMANAGER" --list_installed | grep -F "system-images;android-35;google_apis;x86_64"
       - name: Generate CI TLS probe certificates
-        run: python scripts/ci/generate_certs.py
+        run: python -m pip install cryptography && python scripts/ci/generate_certs.py
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
