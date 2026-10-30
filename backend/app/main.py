@@ -198,7 +198,7 @@ def delete_private_object(object_path: str) -> None:
         connection.request("DELETE", endpoint, body=payload, headers=headers)
         response = connection.getresponse()
         body = response.read(2048)
-        if response.status not in (200, 204):
+        if response.status not in (200, 204, 404):
             raise RuntimeError(f"Supabase Storage delete failed ({response.status}): {body.decode('utf-8', 'replace')}")
     finally:
         connection.close()
@@ -670,7 +670,10 @@ async def create_run(
             validate_apk_archive(target)
             if STORAGE_ENABLED:
                 apk_storage_path = f"runs/{run_id}/input.apk"
-                upload_private_object(target, apk_storage_path)
+                try:
+                    upload_private_object(target, apk_storage_path)
+                except Exception as exc:
+                    raise HTTPException(status_code=503, detail="Private APK storage is unavailable; upload was not queued") from exc
                 target.unlink(missing_ok=True)
             else:
                 apk_path = str(target)
@@ -887,6 +890,9 @@ def worker_submit_result(run_id: str, request: Request, payload: WorkerResultReq
             apk_deleted = True
         except Exception:
             apk_deleted = False
+    if apk_deleted:
+        with db() as conn:
+            conn.execute("UPDATE runs SET apk_path=NULL,apk_storage_path=NULL WHERE id=?", (run_id,))
     return {"id": run_id, "status": payload.status, "evidence_saved": True, "apk_deleted": apk_deleted}
 
 
