@@ -24,3 +24,7 @@ smoke-android/build/
 .pytest_tmp/
 .tmp_pytest/
 *.tsbuildinfo
+
+# Playwright-generated output is local test state, never source evidence.
+frontend/playwright-report/
+frontend/test-results/
