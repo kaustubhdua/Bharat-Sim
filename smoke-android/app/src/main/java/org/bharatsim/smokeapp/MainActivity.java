@@ -36,6 +36,7 @@ public final class MainActivity extends Activity {
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
     private static final int PROBE_BYTES = 500_000;
     private static final int PROBE_TIMEOUT_MS = 45_000;
+    private static final int SOCKET_TIMEOUT_MS = 30_000;
     private static final int MAX_HTTP_LINE_BYTES = 8_192;
     private static final int MAX_HTTP_HEADER_COUNT = 100;
     private static final int MAX_HTTP_HEADER_BYTES = 32_768;
@@ -159,6 +160,7 @@ public final class MainActivity extends Activity {
         // Bind the socket to the Network whose transport is reported below. A generic
         // Socket() can bypass Android's per-network policy-routing table in emulators.
         try (Socket raw = activeNetwork.getSocketFactory().createSocket()) {
+            raw.setSoTimeout(remainingTimeoutMs(deadlineAt));
             raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
@@ -174,6 +176,7 @@ public final class MainActivity extends Activity {
                 OutputStream output = tls.getOutputStream();
                 String request = "GET " + requestPath + " HTTP/1.1\r\n"
                         + "Host: " + host + "\r\n"
+                        + "User-Agent: BharatSim-Smoke/1.0\r\n"
                         + "Connection: close\r\n"
                         + "Accept-Encoding: identity\r\n"
                         + "Cache-Control: no-cache\r\n"
@@ -309,7 +312,7 @@ public final class MainActivity extends Activity {
         if (remaining <= 0) {
             throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 45-second overall deadline");
         }
-        return (int) Math.max(1, Math.min(Integer.MAX_VALUE, remaining));
+        return (int) Math.max(1, Math.min(SOCKET_TIMEOUT_MS, remaining));
     }
 
     private static String readHttpLine(SSLSocket socket, InputStream input, long deadlineAt) throws IOException {
