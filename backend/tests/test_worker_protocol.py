@@ -389,3 +389,81 @@ def test_heartbeat_rejects_lease_replaced_after_initial_validation(monkeypatch, 
         row = conn.execute("SELECT status, lease_until FROM runs WHERE id=?", (run_id,)).fetchone()
     assert row["status"] == "leased"
     assert row["lease_until"] == job["lease_until"]
+
+
+def test_private_storage_apk_upload_download_and_cleanup(monkeypatch, tmp_path):
+    client = prepare_isolated_db(monkeypatch, tmp_path)
+    monkeypatch.setattr(main, "STORAGE_ENABLED", True)
+    uploaded = []
+    deleted = []
+    monkeypatch.setattr(
+        main, "upload_private_object",
+        lambda source, object_path: uploaded.append((source.read_bytes(), object_path)),
+    )
+    monkeypatch.setattr(main, "delete_private_object", lambda object_path: deleted.append(object_path))
+
+    class FakeStorageResponse:
+        def __init__(self, payload):
+            self.payload = payload
+            self.closed = False
+
+        def read(self, size=-1):
+            if not self.payload:
+                return b""
+            chunk, self.payload = self.payload[:size], self.payload[size:]
+            return chunk
+
+        def getheader(self, name):
+            return str(len(apk_bytes())) if name.lower() == "content-length" else None
+
+        def close(self):
+            self.closed = True
+
+    class FakeConnection:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    payload = apk_bytes()
+    fake_response = FakeStorageResponse(payload)
+    fake_connection = FakeConnection()
+    monkeypatch.setattr(main, "open_private_object", lambda object_path: (fake_connection, fake_response))
+
+    created = client.post(
+        "/api/v1/runs",
+        data={"persona_id": "baseline"},
+        files={"apk": ("private-storage.apk", payload, "application/vnd.android.package-archive")},
+    )
+    assert created.status_code == 200
+    run = created.json()
+    assert run["status"] == "queued"
+    run_id = run["id"]
+    assert uploaded == [(payload, f"runs/{run_id}/input.apk")]
+    with main.db() as conn:
+        row = conn.execute("SELECT apk_path,apk_storage_path FROM runs WHERE id=?", (run_id,)).fetchone()
+    assert row["apk_path"] is None
+    assert row["apk_storage_path"] == f"runs/{run_id}/input.apk"
+    assert not (main.UPLOAD_DIR / f"{run_id}.apk").exists()
+
+    headers = {"X-BharatSim-Worker-Token": os.environ["BHARATSIM_WORKER_TOKEN"]}
+    job = client.post("/internal/worker/claim", headers=headers, json={"worker_id": "storage-worker"}).json()["job"]
+    downloaded = client.get(
+        f"/internal/worker/runs/{run_id}/apk",
+        headers={**headers, "X-BharatSim-Lease-Token": job["lease_token"]},
+    )
+    assert downloaded.status_code == 200
+    assert downloaded.content == payload
+    assert fake_response.closed is True
+    assert fake_connection.closed is True
+
+    report = {"status": "completed", "apk_sha256": run["apk"]["sha256"]}
+    submitted = client.post(
+        f"/internal/worker/runs/{run_id}/result",
+        headers=headers,
+        json={"lease_token": job["lease_token"], "status": "completed", "result": report},
+    )
+    assert submitted.status_code == 200
+    assert submitted.json()["apk_deleted"] is True
+    assert deleted == [f"runs/{run_id}/input.apk"]

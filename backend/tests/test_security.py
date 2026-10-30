@@ -86,6 +86,8 @@ def test_production_config_accepts_strong_server_side_key_and_user_auth():
         "BHARATSIM_API_KEY": "k" * 40,
         "BHARATSIM_AUTH_REQUIRED": "true",
         "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "s" * 40,
+        "BHARATSIM_STORAGE_BUCKET": "bharatsim-private",
     })
 
 

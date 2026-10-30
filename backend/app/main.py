@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import http.client
 import json
 import os
 import re
@@ -14,14 +15,14 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 import jwt
 from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -32,6 +33,9 @@ DB_PATH = DATA_DIR / "bharatsim.sqlite3"
 DATABASE_URL = os.getenv("BHARATSIM_DATABASE_URL", "").strip()
 APP_ENV = os.getenv("BHARATSIM_ENV", "development").strip().lower()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+STORAGE_BUCKET = os.getenv("BHARATSIM_STORAGE_BUCKET", "bharatsim-private").strip()
+STORAGE_ENABLED = bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and STORAGE_BUCKET)
 AUTH_REQUIRED = os.getenv("BHARATSIM_AUTH_REQUIRED", "false").strip().lower() == "true"
 _jwks_client: PyJWKClient | None = None
 
@@ -113,7 +117,11 @@ def validate_runtime_security_config(environment: dict[str, str] | None = None) 
     if values.get("BHARATSIM_AUTH_REQUIRED", "false").strip().lower() != "true":
         raise RuntimeError("Production startup blocked: enable BHARATSIM_AUTH_REQUIRED=true")
     if not values.get("SUPABASE_URL", "").strip().startswith("https://"):
-        raise RuntimeError("Production startup blocked: configure SUPABASE_URL for Supabase Auth")
+        raise RuntimeError("Production startup blocked: configure SUPABASE_URL for Supabase Auth and Storage")
+    if len(values.get("SUPABASE_SERVICE_ROLE_KEY", "")) < 32:
+        raise RuntimeError("Production startup blocked: configure a server-only SUPABASE_SERVICE_ROLE_KEY for private artifact storage")
+    if not values.get("BHARATSIM_STORAGE_BUCKET", "bharatsim-private").strip():
+        raise RuntimeError("Production startup blocked: configure BHARATSIM_STORAGE_BUCKET")
 
 
 validate_runtime_security_config()
@@ -122,6 +130,81 @@ MAX_UPLOAD_BYTES = max(1, min(int(os.getenv("BHARATSIM_MAX_UPLOAD_MB", "150")), 
 MAX_APK_ENTRIES = 10000
 MAX_APK_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
 MAX_APK_COMPRESSION_RATIO = 1000
+
+
+def _storage_connection_and_path(object_path: str):
+    if not STORAGE_ENABLED or not SUPABASE_URL.startswith("https://"):
+        raise RuntimeError("Private Supabase Storage is not configured")
+    parsed = urlsplit(SUPABASE_URL)
+    encoded_bucket = quote(STORAGE_BUCKET, safe="")
+    encoded_path = "/".join(quote(part, safe="") for part in object_path.split("/"))
+    endpoint = f"/storage/v1/object/{encoded_bucket}/{encoded_path}"
+    return http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=180), endpoint
+
+
+def _storage_headers(content_type: str = "application/octet-stream") -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": content_type,
+    }
+
+
+def upload_private_object(source: Path, object_path: str) -> None:
+    """Stream an APK into the private bucket without loading it into memory."""
+    connection, endpoint = _storage_connection_and_path(object_path)
+    try:
+        connection.putrequest("POST", endpoint)
+        headers = _storage_headers("application/vnd.android.package-archive")
+        headers["Content-Length"] = str(source.stat().st_size)
+        headers["x-upsert"] = "false"
+        for name, value in headers.items():
+            connection.putheader(name, value)
+        connection.endheaders()
+        with source.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                connection.send(chunk)
+        response = connection.getresponse()
+        body = response.read(2048)
+        if response.status not in (200, 201):
+            raise RuntimeError(f"Supabase Storage upload failed ({response.status}): {body.decode('utf-8', 'replace')}")
+    finally:
+        connection.close()
+
+
+def open_private_object(object_path: str):
+    """Open a private object response for a worker-only streamed download."""
+    connection, endpoint = _storage_connection_and_path(object_path)
+    try:
+        connection.request("GET", endpoint, headers=_storage_headers())
+        response = connection.getresponse()
+        if response.status != 200:
+            body = response.read(2048)
+            raise RuntimeError(f"Supabase Storage download failed ({response.status}): {body.decode('utf-8', 'replace')}")
+        return connection, response
+    except Exception:
+        connection.close()
+        raise
+
+
+def delete_private_object(object_path: str) -> None:
+    """Delete an object by path using the private server credential."""
+    if not STORAGE_ENABLED:
+        raise RuntimeError("Private Supabase Storage is not configured")
+    parsed = urlsplit(SUPABASE_URL)
+    connection = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=60)
+    endpoint = f"/storage/v1/object/{quote(STORAGE_BUCKET, safe='')}"
+    payload = json.dumps({"prefixes": [object_path]}).encode("utf-8")
+    headers = _storage_headers("application/json")
+    headers["Content-Length"] = str(len(payload))
+    try:
+        connection.request("DELETE", endpoint, body=payload, headers=headers)
+        response = connection.getresponse()
+        body = response.read(2048)
+        if response.status not in (200, 204, 404):
+            raise RuntimeError(f"Supabase Storage delete failed ({response.status}): {body.decode('utf-8', 'replace')}")
+    finally:
+        connection.close()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -349,6 +432,7 @@ def init_db() -> None:
             "updated_at": "TEXT",
             "attempts": "INTEGER NOT NULL DEFAULT 0",
             "owner_id": "TEXT",
+            "apk_storage_path": "TEXT",
         }
         analysis_columns = {row["name"] for row in conn.execute("PRAGMA table_info(analyses)").fetchall()}
         if "owner_id" not in analysis_columns:
@@ -367,27 +451,33 @@ def cleanup_expired_uploads() -> None:
     now_text = now.isoformat()
     with db() as conn:
         rows = conn.execute(
-            "SELECT id,apk_path,status,lease_until FROM runs WHERE apk_path IS NOT NULL AND created_at < ?",
+            "SELECT id,apk_path,apk_storage_path,status,lease_until FROM runs WHERE (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) AND created_at < ?",
             (cutoff,),
         ).fetchall()
         for row in rows:
             if row["status"] == "leased" and row["lease_until"] and row["lease_until"] >= now_text:
                 continue
-            path = Path(row["apk_path"]).resolve()
-            if path.parent != UPLOAD_DIR.resolve():
-                continue
-            try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                continue
+            if row["apk_path"]:
+                path = Path(row["apk_path"]).resolve()
+                if path.parent != UPLOAD_DIR.resolve():
+                    continue
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    continue
+            if row["apk_storage_path"]:
+                try:
+                    delete_private_object(row["apk_storage_path"])
+                except Exception:
+                    continue
             if row["status"] in ("awaiting_worker", "queued", "leased"):
                 conn.execute(
-                    "UPDATE runs SET status='failed',error='APK upload expired before execution',apk_path=NULL,"
+                    "UPDATE runs SET status='failed',error='APK upload expired before execution',apk_path=NULL,apk_storage_path=NULL,"
                     "lease_token=NULL,lease_until=NULL,updated_at=? WHERE id=?",
                     (now_text, row["id"]),
                 )
             else:
-                conn.execute("UPDATE runs SET apk_path=NULL WHERE id=?", (row["id"],))
+                conn.execute("UPDATE runs SET apk_path=NULL,apk_storage_path=NULL WHERE id=?", (row["id"],))
 
 
 cleanup_expired_uploads()
@@ -558,6 +648,7 @@ async def create_run(
     apk_name = None
     apk_hash = None
     apk_path = None
+    apk_storage_path = None
     if apk is not None and apk.filename:
         safe_name = Path(apk.filename).name[:180]
         if not safe_name.lower().endswith(".apk"):
@@ -580,18 +671,42 @@ async def create_run(
                 target.unlink(missing_ok=True)
                 raise HTTPException(status_code=415, detail="File does not look like a ZIP-based APK (missing PK header)")
             validate_apk_archive(target)
+            if STORAGE_ENABLED:
+                apk_storage_path = f"runs/{run_id}/input.apk"
+                try:
+                    await asyncio.to_thread(upload_private_object, target, apk_storage_path)
+                except Exception as exc:
+                    raise HTTPException(status_code=503, detail="Private APK storage is unavailable; upload was not queued") from exc
+                target.unlink(missing_ok=True)
+            else:
+                apk_path = str(target)
         except Exception:
             target.unlink(missing_ok=True)
+            if apk_storage_path:
+                try:
+                    delete_private_object(apk_storage_path)
+                except Exception:
+                    pass
             raise
-        apk_name, apk_hash, apk_path = safe_name, digest.hexdigest(), str(target)
+        apk_name, apk_hash = safe_name, digest.hexdigest()
     worker_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
-    status = "queued" if apk_path and worker_configured else "awaiting_worker"
+    status = "queued" if (apk_path or apk_storage_path) and worker_configured else "awaiting_worker"
     created = utcnow()
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-            (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, getattr(request.state, "owner_id", None)),
-        )
+    try:
+        with db() as conn:
+            conn.execute(
+                "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, getattr(request.state, "owner_id", None), apk_storage_path),
+            )
+    except Exception:
+        if apk_storage_path:
+            try:
+                delete_private_object(apk_storage_path)
+            except Exception:
+                pass
+        if apk_path:
+            Path(apk_path).unlink(missing_ok=True)
+        raise
     message = (
         "APK queued for an authenticated worker. Execution is not complete until the worker submits evidence."
         if status == "queued" else
@@ -650,7 +765,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
         )
         row = conn.execute(
             "SELECT id,apk_name,apk_sha256,persona_id,attempts FROM runs "
-            "WHERE status='queued' AND apk_path IS NOT NULL ORDER BY created_at ASC LIMIT 1"
+            "WHERE status='queued' AND (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) ORDER BY created_at ASC LIMIT 1"
         ).fetchone()
         if row is None:
             return {"job": None}
@@ -678,7 +793,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
 
 def require_live_lease(conn: sqlite3.Connection, run_id: str, lease_token: str) -> sqlite3.Row:
     row = conn.execute(
-        "SELECT id,status,lease_token,lease_until,apk_path,apk_sha256 FROM runs WHERE id=?", (run_id,)
+        "SELECT id,status,lease_token,lease_until,apk_path,apk_storage_path,apk_sha256 FROM runs WHERE id=?", (run_id,)
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -694,6 +809,25 @@ def worker_download_apk(run_id: str, request: Request, lease_token: str = Header
     require_worker_token(request)
     with db() as conn:
         row = require_live_lease(conn, run_id, lease_token)
+        if row["apk_storage_path"]:
+            try:
+                connection, response = open_private_object(row["apk_storage_path"])
+            except Exception as exc:
+                raise HTTPException(status_code=502, detail="Private APK artifact could not be retrieved") from exc
+            def stream_object():
+                try:
+                    while chunk := response.read(1024 * 1024):
+                        yield chunk
+                finally:
+                    response.close()
+                    connection.close()
+            headers = {"Content-Disposition": f'attachment; filename="{run_id}.apk"'}
+            length = response.getheader("Content-Length")
+            if length:
+                headers["Content-Length"] = length
+            return StreamingResponse(stream_object(), media_type="application/vnd.android.package-archive", headers=headers)
+        if not row["apk_path"]:
+            raise HTTPException(status_code=410, detail="APK artifact is no longer available")
         path = Path(row["apk_path"]).resolve()
         if not path.is_file() or path.parent != UPLOAD_DIR.resolve():
             raise HTTPException(status_code=410, detail="APK artifact is no longer available")
@@ -759,14 +893,24 @@ def worker_submit_result(run_id: str, request: Request, payload: WorkerResultReq
                 (now_text, worker["worker_id"]),
             )
         apk_path = Path(lease["apk_path"]).resolve() if lease["apk_path"] else None
+    apk_storage_path = lease["apk_storage_path"]
     # The bounded report is persisted first; remove the uploaded executable after the terminal result.
-    apk_deleted = False
+    apk_deleted = not apk_storage_path and not apk_path
     if apk_path and apk_path.parent == UPLOAD_DIR.resolve():
         try:
             apk_path.unlink(missing_ok=True)
             apk_deleted = not apk_path.exists()
         except OSError:
             apk_deleted = False
+    if apk_storage_path:
+        try:
+            delete_private_object(apk_storage_path)
+            apk_deleted = True
+        except Exception:
+            apk_deleted = False
+    if apk_deleted:
+        with db() as conn:
+            conn.execute("UPDATE runs SET apk_path=NULL,apk_storage_path=NULL WHERE id=?", (run_id,))
     return {"id": run_id, "status": payload.status, "evidence_saved": True, "apk_deleted": apk_deleted}
 
 
