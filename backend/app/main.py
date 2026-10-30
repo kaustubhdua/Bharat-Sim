@@ -620,15 +620,19 @@ def worker_heartbeat(run_id: str, request: Request, payload: WorkerHeartbeatRequ
     require_worker_token(request)
     now = datetime.now(timezone.utc)
     new_lease = datetime.fromtimestamp(now.timestamp() + 300, timezone.utc).isoformat()
+    now_text = now.isoformat()
     with db() as conn:
         require_live_lease(conn, run_id, payload.lease_token)
-        conn.execute(
-            "UPDATE runs SET lease_until=?, updated_at=? WHERE id=? AND status='leased' AND lease_token=?",
-            (new_lease, now.isoformat(), run_id, payload.lease_token),
+        updated = conn.execute(
+            "UPDATE runs SET lease_until=?, updated_at=? "
+            "WHERE id=? AND status='leased' AND lease_token=? AND lease_until IS NOT NULL AND lease_until>=?",
+            (new_lease, now_text, run_id, payload.lease_token, now_text),
         )
+        if updated.rowcount != 1:
+            raise HTTPException(status_code=409, detail="Worker lease changed or expired before heartbeat")
         conn.execute(
             "UPDATE workers SET last_seen=?,status='running',current_run_id=? WHERE id=(SELECT worker_id FROM runs WHERE id=?)",
-            (now.isoformat(), run_id, run_id),
+            (now_text, run_id, run_id),
         )
     return {"ok": True, "lease_until": new_lease}
 
@@ -655,15 +659,19 @@ def worker_submit_result(run_id: str, request: Request, payload: WorkerResultReq
             or not hmac.compare_digest(reported_hash, str(lease["apk_sha256"] or ""))
         ):
             raise HTTPException(status_code=422, detail="Worker report APK SHA-256 does not match the queued artifact")
+        now_text = utcnow()
         worker = conn.execute("SELECT worker_id FROM runs WHERE id=?", (run_id,)).fetchone()
-        conn.execute(
-            "UPDATE runs SET status=?, result_json=?, error=?, lease_token=NULL, lease_until=NULL, updated_at=? WHERE id=?",
-            (payload.status, encoded, payload.error, utcnow(), run_id),
+        updated = conn.execute(
+            "UPDATE runs SET status=?, result_json=?, error=?, lease_token=NULL, lease_until=NULL, updated_at=? "
+            "WHERE id=? AND status='leased' AND lease_token=? AND lease_until IS NOT NULL AND lease_until>=?",
+            (payload.status, encoded, payload.error, now_text, run_id, payload.lease_token, now_text),
         )
+        if updated.rowcount != 1:
+            raise HTTPException(status_code=409, detail="Worker lease changed or expired before result submission")
         if worker and worker["worker_id"]:
             conn.execute(
                 "UPDATE workers SET last_seen=?,status='idle',current_run_id=NULL WHERE id=?",
-                (utcnow(), worker["worker_id"]),
+                (now_text, worker["worker_id"]),
             )
         apk_path = Path(lease["apk_path"]).resolve() if lease["apk_path"] else None
     # The bounded report is persisted first; remove the uploaded executable after the terminal result.
