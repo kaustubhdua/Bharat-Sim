@@ -139,7 +139,7 @@ def _storage_connection_and_path(object_path: str):
     encoded_bucket = quote(STORAGE_BUCKET, safe="")
     encoded_path = "/".join(quote(part, safe="") for part in object_path.split("/"))
     endpoint = f"/storage/v1/object/{encoded_bucket}/{encoded_path}"
-    return http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=60), endpoint
+    return http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=180), endpoint
 
 
 def _storage_headers(content_type: str = "application/octet-stream") -> dict[str, str]:
@@ -175,13 +175,16 @@ def upload_private_object(source: Path, object_path: str) -> None:
 def open_private_object(object_path: str):
     """Open a private object response for a worker-only streamed download."""
     connection, endpoint = _storage_connection_and_path(object_path)
-    connection.request("GET", endpoint, headers=_storage_headers())
-    response = connection.getresponse()
-    if response.status != 200:
-        body = response.read(2048)
+    try:
+        connection.request("GET", endpoint, headers=_storage_headers())
+        response = connection.getresponse()
+        if response.status != 200:
+            body = response.read(2048)
+            raise RuntimeError(f"Supabase Storage download failed ({response.status}): {body.decode('utf-8', 'replace')}")
+        return connection, response
+    except Exception:
         connection.close()
-        raise RuntimeError(f"Supabase Storage download failed ({response.status}): {body.decode('utf-8', 'replace')}")
-    return connection, response
+        raise
 
 
 def delete_private_object(object_path: str) -> None:
@@ -189,7 +192,7 @@ def delete_private_object(object_path: str) -> None:
     if not STORAGE_ENABLED:
         raise RuntimeError("Private Supabase Storage is not configured")
     parsed = urlsplit(SUPABASE_URL)
-    connection = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=30)
+    connection = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=60)
     endpoint = f"/storage/v1/object/{quote(STORAGE_BUCKET, safe='')}"
     payload = json.dumps({"prefixes": [object_path]}).encode("utf-8")
     headers = _storage_headers("application/json")
@@ -671,7 +674,7 @@ async def create_run(
             if STORAGE_ENABLED:
                 apk_storage_path = f"runs/{run_id}/input.apk"
                 try:
-                    upload_private_object(target, apk_storage_path)
+                    await asyncio.to_thread(upload_private_object, target, apk_storage_path)
                 except Exception as exc:
                     raise HTTPException(status_code=503, detail="Private APK storage is unavailable; upload was not queued") from exc
                 target.unlink(missing_ok=True)
