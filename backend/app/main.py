@@ -679,7 +679,7 @@ async def create_run(
             raise
         apk_name, apk_hash = safe_name, digest.hexdigest()
     worker_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
-    status = "queued" if apk_path and worker_configured else "awaiting_worker"
+    status = "queued" if (apk_path or apk_storage_path) and worker_configured else "awaiting_worker"
     created = utcnow()
     with db() as conn:
         conn.execute(
