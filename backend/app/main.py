@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import parse_qs, urlsplit
 
+import jwt
+from jwt import PyJWKClient
+from jwt.exceptions import InvalidTokenError
+
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +30,38 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "bharatsim.sqlite3"
 DATABASE_URL = os.getenv("BHARATSIM_DATABASE_URL", "").strip()
 APP_ENV = os.getenv("BHARATSIM_ENV", "development").strip().lower()
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+AUTH_REQUIRED = os.getenv("BHARATSIM_AUTH_REQUIRED", "false").strip().lower() == "true"
+_jwks_client: PyJWKClient | None = None
+
+
+def verify_supabase_access_token(token: str) -> str:
+    """Verify a Supabase user access token against the project's asymmetric JWKS."""
+    global _jwks_client
+    if not SUPABASE_URL.startswith("https://"):
+        raise ValueError("SUPABASE_URL must be an HTTPS URL")
+    if _jwks_client is None:
+        _jwks_client = PyJWKClient(
+            f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json",
+            cache_jwk_set=True, lifespan=600, timeout=5,
+        )
+    signing_key = _jwks_client.get_signing_key_from_jwt(token)
+    claims = jwt.decode(
+        token, signing_key.key, algorithms=["ES256", "RS256"],
+        audience="authenticated", issuer=f"{SUPABASE_URL}/auth/v1",
+        options={"require": ["exp", "iat", "sub", "iss", "aud"]}, leeway=5,
+    )
+    if claims.get("role") != "authenticated" or claims.get("is_anonymous") is True:
+        raise InvalidTokenError("A non-anonymous authenticated user token is required")
+    return str(uuid.UUID(str(claims["sub"])))
+
+
+def validate_auth_configuration(environment: dict[str, str] | None = None) -> None:
+    values = os.environ if environment is None else environment
+    if values.get("BHARATSIM_AUTH_REQUIRED", "false").strip().lower() == "true":
+        if not values.get("SUPABASE_URL", "").strip().startswith("https://"):
+            raise RuntimeError("BHARATSIM_AUTH_REQUIRED=true requires an HTTPS SUPABASE_URL")
+
 
 
 def validate_database_configuration(database_url: str, app_env: str) -> None:
@@ -76,6 +112,7 @@ def validate_runtime_security_config(environment: dict[str, str] | None = None) 
 
 
 validate_runtime_security_config()
+validate_auth_configuration()
 MAX_UPLOAD_BYTES = max(1, min(int(os.getenv("BHARATSIM_MAX_UPLOAD_MB", "150")), 150)) * 1024 * 1024
 MAX_APK_ENTRIES = 10000
 MAX_APK_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
@@ -98,15 +135,28 @@ app.add_middleware(
 )
 
 @app.middleware("http")
-async def enforce_shared_api_key(request: Request, call_next):
-    """Optional single shared-key gate for private deployments; not multi-tenant auth."""
+async def enforce_api_authentication(request: Request, call_next):
+    """Enforce private API key and optional Supabase identity on customer-data routes."""
     if request.url.path.startswith("/api/v1/") and os.getenv("BHARATSIM_REQUIRE_API_KEY", "false").lower() == "true":
         expected = os.getenv("BHARATSIM_API_KEY", "")
         if len(expected) < 32:
-            return JSONResponse(status_code=503, content={"detail": "API authentication is required but BHARATSIM_API_KEY is not configured safely"})
+            return JSONResponse(status_code=503, content={"detail": "Private API key is not configured safely"})
         supplied = request.headers.get("X-BharatSim-API-Key", "")
         if not hmac.compare_digest(supplied, expected):
             return JSONResponse(status_code=401, content={"detail": "Missing or invalid API key"})
+    protected = (
+        request.url.path == "/api/v1/runs"
+        or request.url.path.startswith("/api/v1/runs/")
+        or request.url.path in {"/api/v1/analyze/logs", "/api/v1/analyses", "/api/v1/workers"}
+    )
+    if AUTH_REQUIRED and protected:
+        scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+        if scheme.lower() != "bearer" or not token.strip():
+            return JSONResponse(status_code=401, content={"detail": "Supabase access token required"}, headers={"WWW-Authenticate": "Bearer"})
+        try:
+            request.state.owner_id = verify_supabase_access_token(token.strip())
+        except Exception:
+            return JSONResponse(status_code=401, content={"detail": "Invalid or expired Supabase access token"}, headers={"WWW-Authenticate": "Bearer"})
     return await call_next(request)
 
 
@@ -293,7 +343,11 @@ def init_db() -> None:
             "worker_id": "TEXT",
             "updated_at": "TEXT",
             "attempts": "INTEGER NOT NULL DEFAULT 0",
+            "owner_id": "TEXT",
         }
+        analysis_columns = {row["name"] for row in conn.execute("PRAGMA table_info(analyses)").fetchall()}
+        if "owner_id" not in analysis_columns:
+            conn.execute("ALTER TABLE analyses ADD COLUMN owner_id TEXT")
         for column, definition in migrations.items():
             if column not in columns:
                 conn.execute(f"ALTER TABLE runs ADD COLUMN {column} {definition}")
@@ -486,6 +540,7 @@ def create_plan(request: PlanRequest):
 
 @app.post("/api/v1/runs")
 async def create_run(
+    request: Request,
     persona_id: str = Form("budget-android"),
     apk: UploadFile = File(...),
 ):
@@ -529,8 +584,8 @@ async def create_run(
     created = utcnow()
     with db() as conn:
         conn.execute(
-            "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
-            (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created),
+            "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, getattr(request.state, "owner_id", None)),
         )
     message = (
         "APK queued for an authenticated worker. Execution is not complete until the worker submits evidence."
@@ -545,10 +600,13 @@ async def create_run(
     }
 
 @app.get("/api/v1/runs")
-def list_runs(limit: int = 25):
+def list_runs(request: Request, limit: int = 25):
     limit = max(1, min(limit, 100))
     with db() as conn:
-        rows = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,error FROM runs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        if AUTH_REQUIRED:
+            rows = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,error FROM runs WHERE owner_id=? ORDER BY created_at DESC LIMIT ?", (request.state.owner_id, limit)).fetchall()
+        else:
+            rows = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,error FROM runs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
     return {"items": [dict(row) for row in rows]}
 
 def require_worker_token(request: Request) -> None:
@@ -725,9 +783,12 @@ def worker_status():
 
 
 @app.get("/api/v1/runs/{run_id}")
-def get_run(run_id: str):
+def get_run(run_id: str, request: Request):
     with db() as conn:
-        row = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,result_json,error FROM runs WHERE id=?", (run_id,)).fetchone()
+        if AUTH_REQUIRED:
+            row = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,result_json,error FROM runs WHERE id=? AND owner_id=?", (run_id, request.state.owner_id)).fetchone()
+        else:
+            row = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,result_json,error FROM runs WHERE id=?", (run_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Run not found")
     result = dict(row)
@@ -735,20 +796,28 @@ def get_run(run_id: str):
     return result
 
 @app.post("/api/v1/analyze/logs")
-def analyze_logs(request: LogAnalysisRequest):
-    if request.persona_id not in PERSONAS:
+def analyze_logs(payload: LogAnalysisRequest, request: Request):
+    if payload.persona_id not in PERSONAS:
         raise HTTPException(status_code=422, detail="Unknown persona_id")
-    result = analyze_log_text(request.text, request.persona_id)
+    if AUTH_REQUIRED and payload.run_id:
+        with db() as conn:
+            owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (payload.run_id, request.state.owner_id)).fetchone()
+        if not owned:
+            raise HTTPException(status_code=404, detail="Run not found")
+    result = analyze_log_text(payload.text, payload.persona_id)
     with db() as conn:
-        conn.execute("INSERT INTO analyses(id,created_at,run_id,persona_id,result_json) VALUES(?,?,?,?,?)",
-                     (result["id"], result["created_at"], request.run_id, request.persona_id, json.dumps(result)))
+        conn.execute("INSERT INTO analyses(id,created_at,run_id,persona_id,result_json,owner_id) VALUES(?,?,?,?,?,?)",
+                     (result["id"], result["created_at"], payload.run_id, payload.persona_id, json.dumps(result), getattr(request.state, "owner_id", None)))
     return result
 
 @app.get("/api/v1/analyses")
-def list_analyses(limit: int = 20):
+def list_analyses(request: Request, limit: int = 20):
     limit = max(1, min(limit, 100))
     with db() as conn:
-        rows = conn.execute("SELECT result_json FROM analyses ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        if AUTH_REQUIRED:
+            rows = conn.execute("SELECT result_json FROM analyses WHERE owner_id=? ORDER BY created_at DESC LIMIT ?", (request.state.owner_id, limit)).fetchall()
+        else:
+            rows = conn.execute("SELECT result_json FROM analyses ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
     return {"items": [json.loads(row["result_json"]) for row in rows]}
 
 @app.get("/api/v1/capabilities")
