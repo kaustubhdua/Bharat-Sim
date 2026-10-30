@@ -1,6 +1,8 @@
 import io
 import zipfile
 
+import pytest
+
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -166,3 +168,40 @@ def test_supabase_auth_rejects_invalid_access_tokens(monkeypatch):
     monkeypatch.setattr(main, "verify_supabase_access_token", lambda token: (_ for _ in ()).throw(ValueError("bad token")))
     response = client.get("/api/v1/runs", headers={"Authorization": "Bearer invalid"})
     assert response.status_code == 401
+
+
+def test_supabase_jwt_verifier_checks_signature_and_required_claims(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from app import main
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    monkeypatch.setattr(main, "SUPABASE_URL", "https://example.supabase.co")
+
+    class FakeJwks:
+        def get_signing_key_from_jwt(self, token):
+            return SimpleNamespace(key=private_key.public_key())
+
+    monkeypatch.setattr(main, "_jwks_client", FakeJwks())
+    claims = {
+        "sub": "33333333-3333-4333-8333-333333333333",
+        "iss": "https://example.supabase.co/auth/v1",
+        "aud": "authenticated",
+        "role": "authenticated",
+        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "exp": int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp()),
+        "is_anonymous": False,
+    }
+    token = main.jwt.encode(claims, private_key, algorithm="ES256", headers={"kid": "unit-test"})
+    assert main.verify_supabase_access_token(token) == claims["sub"]
+
+    anonymous = {**claims, "role": "authenticated", "is_anonymous": True}
+    anonymous_token = main.jwt.encode(anonymous, private_key, algorithm="ES256", headers={"kid": "unit-test"})
+    with pytest.raises(main.InvalidTokenError):
+        main.verify_supabase_access_token(anonymous_token)
+
+    wrong_audience = {**claims, "aud": "other"}
+    bad_token = main.jwt.encode(wrong_audience, private_key, algorithm="ES256", headers={"kid": "unit-test"})
+    with pytest.raises(main.InvalidTokenError):
+        main.verify_supabase_access_token(bad_token)
