@@ -71,6 +71,8 @@ def prepare_supported_transport() -> None:
     # The global setting alone does not guarantee the framework has processed the radio state.
     adb("shell", "cmd", "connectivity", "airplane-mode", "disable")
     adb("shell", "settings", "put", "global", "mobile_data", "1")
+    # svc data drives the Android telephony service; the settings value alone is not sufficient.
+    adb("shell", "svc", "data", "enable")
     adb("shell", "cmd", "phone", "data", "enable")
     adb("emu", "gsm", "voice", "home")
     adb("emu", "gsm", "data", "home")
