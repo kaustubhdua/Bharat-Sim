@@ -750,7 +750,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
         )
         row = conn.execute(
             "SELECT id,apk_name,apk_sha256,persona_id,attempts FROM runs "
-            "WHERE status='queued' AND apk_path IS NOT NULL ORDER BY created_at ASC LIMIT 1"
+            "WHERE status='queued' AND (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) ORDER BY created_at ASC LIMIT 1"
         ).fetchone()
         if row is None:
             return {"job": None}
