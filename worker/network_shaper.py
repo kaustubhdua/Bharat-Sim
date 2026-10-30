@@ -17,7 +17,7 @@ import subprocess
 import sys
 
 
-IFACE_RE = re.compile(r"^veth-bs-[a-z0-9]{1,12}$")
+IFACE_RE = re.compile(r"^(veth-bs-[a-z0-9]{1,12}|veth-peer[a-z0-9]{0,10})$")
 
 
 def parse_netem_parameters(output: str) -> dict[str, float | None]:

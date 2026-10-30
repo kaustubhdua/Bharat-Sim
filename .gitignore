@@ -21,6 +21,12 @@ backend/data/
 smoke-android/.gradle/
 smoke-android/build/
 
+# CI TLS probe certificates & test keys
+scripts/ci/certs/
+smoke-android/app/src/debug/res/raw/ci_ca.crt
+*.crt
+*.key
+
 .pytest_tmp/
 .tmp_pytest/
 *.tsbuildinfo

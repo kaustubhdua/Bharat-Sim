@@ -28,6 +28,8 @@ mkdir -p artifacts
 API_PID=
 WORKER_PID=
 APPIUM_PID=
+PROBE_PID=
+FORWARD_PID=
 cleanup() {
   # Always restore network controls, even when Appium assertions fail.
   adb -s emulator-5554 emu network delay none >/dev/null 2>&1 || true
@@ -37,6 +39,8 @@ cleanup() {
   [ -z "$APPIUM_PID" ] || kill "$APPIUM_PID" 2>/dev/null || true
   [ -z "$WORKER_PID" ] || kill "$WORKER_PID" 2>/dev/null || true
   [ -z "$API_PID" ] || kill "$API_PID" 2>/dev/null || true
+  [ -z "$FORWARD_PID" ] || kill "$FORWARD_PID" 2>/dev/null || true
+  [ -z "$PROBE_PID" ] || kill "$PROBE_PID" 2>/dev/null || true
   rm -f "$RUNNER_TEMP/alternate-signing.jks" "$RUNNER_TEMP/alternate-signing.jks.old"
 }
 trap cleanup EXIT
@@ -47,8 +51,38 @@ sudo sysctl -w net.core.wmem_max=16777216 >/dev/null 2>&1 || true
 sudo sysctl -w net.ipv4.tcp_rmem="4096 87380 16777216" >/dev/null 2>&1 || true
 sudo sysctl -w net.ipv4.tcp_wmem="4096 65536 16777216" >/dev/null 2>&1 || true
 
-# The fixture uses a CI-host-resolved IPv4 address and validates TLS against the
-# HTTPS hostname, so the real transfer does not depend on emulator DNS resolution.
+# Start the local HTTPS probe server inside the shaped peer namespace.
+# The server serves 500,000 bytes with genuine TLS certificate validation.
+sudo ip netns exec bharatsim-netem-e2e python3 scripts/ci/network-probe-server.py \
+  --host 198.18.77.2 --port 8443 --bytes 500000 \
+  --cert scripts/ci/certs/server.crt --key scripts/ci/certs/server.key \
+  > artifacts/probe-server.log 2>&1 &
+PROBE_PID=$!
+
+# Start host TCP forwarder on port 8443 to route any host/10.0.2.2 connections through veth-bs-run01
+python3 scripts/ci/tcp-forwarder.py \
+  --listen-host 0.0.0.0 --listen-port 8443 \
+  --target-host 198.18.77.2 --target-port 8443 \
+  > artifacts/forwarder.log 2>&1 &
+FORWARD_PID=$!
+
+# Confirm host-to-namespace TLS reachability before proceeding
+python3 - <<'PYCHECK'
+import ssl, time, urllib.request
+ctx = ssl.create_default_context(cafile="scripts/ci/certs/ca.crt")
+deadline = time.monotonic() + 30
+while time.monotonic() < deadline:
+    try:
+        req = urllib.request.Request("https://198.18.77.2:8443/health", headers={"Host": "probe.bharatsim.local"})
+        with urllib.request.urlopen(req, context=ctx, timeout=2) as resp:
+            if resp.read() == b"ok\n":
+                print("Local HTTPS probe server verified healthy in namespace bharatsim-netem-e2e")
+                break
+    except Exception:
+        time.sleep(1)
+else:
+    raise SystemExit("Local HTTPS probe server in namespace did not become ready")
+PYCHECK
 
 (cd backend && exec uvicorn app.main:app --host 0.0.0.0 --port 8000) > artifacts/api.log 2>&1 &
 API_PID=$!

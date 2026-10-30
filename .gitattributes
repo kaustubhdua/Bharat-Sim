@@ -1,0 +1,6 @@
+*.sh text eol=lf
+*.py text
+*.java text
+*.xml text
+*.gradle text
+*.yml text

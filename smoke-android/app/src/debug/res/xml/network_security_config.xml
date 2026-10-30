@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="true">probe.bharatsim.local</domain>
+        <trust-anchors>
+            <certificates src="@raw/ci_ca" />
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+    <base-config>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/ci_ca" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

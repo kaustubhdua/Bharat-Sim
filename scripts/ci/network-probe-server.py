@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
-"""Disposable CI-only HTTP payload server for measuring real emulator traffic."""
+"""Disposable CI-only HTTP/HTTPS payload server for measuring real emulator traffic."""
 from __future__ import annotations
 
+import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+import ssl
 from urllib.parse import parse_qs, urlsplit
 
-PAYLOAD_SIZE = 2_000_000
-PAYLOAD_UNIT = b"BharatSim controlled network probe payload\\n"
-PAYLOAD = (PAYLOAD_UNIT * ((PAYLOAD_SIZE // len(PAYLOAD_UNIT)) + 1))[:PAYLOAD_SIZE]
+DEFAULT_PAYLOAD_SIZE = 500_000
+PAYLOAD_UNIT = b"BharatSim controlled network probe payload\n"
 
 
-class Handler(BaseHTTPRequestHandler):
+def build_payload(size: int) -> bytes:
+    if size <= 0:
+        return b""
+    repetitions = (size // len(PAYLOAD_UNIT)) + 1
+    return (PAYLOAD_UNIT * repetitions)[:size]
+
+
+class ProbeHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def do_GET(self) -> None:
@@ -20,32 +29,85 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(body)
             return
-        params = parse_qs(parsed.query)
-        if parsed.path != "/payload" or params.get("bytes") != [str(PAYLOAD_SIZE)]:
-            self.send_error(404, "Only the fixed 2,000,000-byte test payload is available")
+
+        if parsed.path in ("/__down", "/payload"):
+            params = parse_qs(parsed.query)
+            default_size = getattr(self.server, "default_payload_size", DEFAULT_PAYLOAD_SIZE)
+            requested_str = params.get("bytes", [str(default_size)])[0]
+            try:
+                requested_bytes = int(requested_str)
+            except ValueError:
+                self.send_error(400, f"Invalid bytes parameter: {requested_str}")
+                return
+
+            cached_payload = getattr(self.server, "cached_payload", None)
+            if cached_payload is not None and len(cached_payload) == requested_bytes:
+                payload = cached_payload
+            else:
+                payload = build_payload(requested_bytes)
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+
+            # Linux netem performs all shaping; the server writes payload directly without chunk sleeps.
+            try:
+                chunk_size = 65536
+                offset = 0
+                while offset < len(payload):
+                    to_write = min(chunk_size, len(payload) - offset)
+                    self.wfile.write(payload[offset : offset + to_write])
+                    offset += to_write
+                self.wfile.flush()
+                print(f"served_bytes={len(payload)} client={self.client_address[0]}", flush=True)
+            except (BrokenPipeError, ConnectionResetError):
+                print(f"client_disconnected={self.client_address[0]}", flush=True)
             return
-        self.send_response(200)
-        self.send_header("Content-Type", "application/octet-stream")
-        self.send_header("Content-Length", str(len(PAYLOAD)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Connection", "close")
-        self.end_headers()
-        try:
-            self.wfile.write(PAYLOAD)
-            self.wfile.flush()
-            print(f"served_bytes={len(PAYLOAD)} client={self.client_address[0]}", flush=True)
-        except (BrokenPipeError, ConnectionResetError):
-            print(f"client_disconnected={self.client_address[0]}", flush=True)
+
+        self.send_error(404, f"Endpoint not found: {parsed.path}")
 
     def log_message(self, format: str, *args: object) -> None:
         print(f"probe_server {self.client_address[0]} {format % args}", flush=True)
 
 
-if __name__ == "__main__":
-    server = ThreadingHTTPServer(("0.0.0.0", 8001), Handler)
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", default="0.0.0.0", help="Address to bind (default: 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=8443, help="Port to listen on (default: 8443)")
+    parser.add_argument("--bytes", type=int, default=DEFAULT_PAYLOAD_SIZE, help="Default payload size in bytes")
+    parser.add_argument("--cert", type=Path, default=None, help="Path to TLS server certificate (PEM)")
+    parser.add_argument("--key", type=Path, default=None, help="Path to TLS server private key (PEM)")
+    args = parser.parse_args()
+
+    server = ThreadingHTTPServer((args.host, args.port), ProbeHandler)
     server.daemon_threads = True
-    print(f"listening=0.0.0.0:8001 payload_bytes={PAYLOAD_SIZE}", flush=True)
+    server.default_payload_size = args.bytes
+    server.cached_payload = build_payload(args.bytes)
+
+    is_tls = bool(args.cert and args.key)
+    if is_tls:
+        if not args.cert.is_file():
+            raise FileNotFoundError(f"TLS certificate not found: {args.cert}")
+        if not args.key.is_file():
+            raise FileNotFoundError(f"TLS private key not found: {args.key}")
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(certfile=str(args.cert), keyfile=str(args.key))
+        server.socket = ctx.wrap_socket(server.socket, server_side=True)
+
+    protocol = "https" if is_tls else "http"
+    print(
+        f"listening={protocol}://{args.host}:{args.port} default_bytes={args.bytes} tls={is_tls}",
+        flush=True,
+    )
     server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

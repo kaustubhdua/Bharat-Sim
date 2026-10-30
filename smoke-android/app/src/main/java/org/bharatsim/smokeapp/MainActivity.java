@@ -31,6 +31,7 @@ import java.io.IOException;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 
 public final class MainActivity extends Activity {
@@ -172,15 +173,19 @@ public final class MainActivity extends Activity {
     }
 
     static boolean isRetryableException(Exception exception) {
-        if (exception instanceof SSLPeerUnverifiedException) {
+        if (exception == null) {
             return false;
         }
-        if (exception instanceof SocketTimeoutException
-                || exception instanceof SocketException
-                || exception instanceof EOFException) {
-            return true;
+        // Traverse causal chain to reject permanent TLS/SSL certificate, handshake, or protocol configuration failures
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SSLException) {
+                return false;
+            }
         }
-        return exception instanceof IOException;
+        // Retry only genuine transient socket/network transport failures
+        return exception instanceof SocketTimeoutException
+                || exception instanceof SocketException
+                || exception instanceof EOFException;
     }
 
     private static ProbeResult performPinnedHttpsProbe(Network activeNetwork, String urlText, String pinnedIp, int expectedBytes, long startedAt, long attemptDeadline, long probeDeadline) throws IOException {

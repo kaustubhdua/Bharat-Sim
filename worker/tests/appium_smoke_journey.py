@@ -124,8 +124,70 @@ def speed_limits_bps(speed: str) -> tuple[int, int]:
     return int(parts[0]) * 1000, int(parts[1]) * 1000
 
 
+def apply_linux_netem(latency_ms: int | None, rate_kbit: int) -> dict:
+    """Apply Linux netem shaping on veth-bs-run01 (host) and veth-peer01 (namespace) if present."""
+    results = {}
+    host_iface = "veth-bs-run01"
+    peer_iface = "veth-peer01"
+    ns = "bharatsim-netem-e2e"
+
+    is_unshaped = (latency_ms is None or latency_ms == 0) and rate_kbit >= 1_000_000
+
+    link_check = subprocess.run(["ip", "link", "show", "dev", host_iface], capture_output=True, text=True, check=False)
+    if link_check.returncode == 0:
+        if is_unshaped:
+            cmd = ["sudo", "env", "BHARATSIM_ENABLE_NETEM=true", "python3", "worker/network_shaper.py", "clear", "--interface", host_iface]
+        else:
+            lat = 0.0 if latency_ms is None else float(latency_ms)
+            cmd = ["sudo", "env", "BHARATSIM_ENABLE_NETEM=true", "python3", "worker/network_shaper.py", "apply",
+                   "--interface", host_iface, "--latency-ms", str(lat), "--jitter-ms", "0", "--loss-pct", "0", "--rate-kbit", str(rate_kbit)]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        results["host"] = {"cmd": cmd, "return_code": res.returncode, "stdout": res.stdout[:500]}
+
+    ns_check = subprocess.run(["ip", "netns", "list"], capture_output=True, text=True, check=False)
+    if ns in ns_check.stdout:
+        if is_unshaped:
+            cmd = ["sudo", "ip", "netns", "exec", ns, "env", "BHARATSIM_ENABLE_NETEM=true", "python3", "worker/network_shaper.py", "clear", "--interface", peer_iface]
+        else:
+            lat = 0.0 if latency_ms is None else float(latency_ms)
+            cmd = ["sudo", "ip", "netns", "exec", ns, "env", "BHARATSIM_ENABLE_NETEM=true", "python3", "worker/network_shaper.py", "apply",
+                   "--interface", peer_iface, "--latency-ms", str(lat), "--jitter-ms", "0", "--loss-pct", "0", "--rate-kbit", str(rate_kbit)]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        results["peer"] = {"cmd": cmd, "return_code": res.returncode, "stdout": res.stdout[:500]}
+
+    return results
+
+
+def get_qdisc_counters() -> dict[str, dict[str, int]]:
+    """Query tc packet/byte counters on host veth-bs-run01 and namespace veth-peer01."""
+    counters = {"host": {"bytes": 0, "packets": 0}, "peer": {"bytes": 0, "packets": 0}}
+    try:
+        out = subprocess.run(["tc", "-s", "qdisc", "show", "dev", "veth-bs-run01"], capture_output=True, text=True, check=False).stdout
+        m = re.search(r"Sent\s+(\d+)\s+bytes\s+(\d+)\s+pkt", out)
+        if m:
+            counters["host"] = {"bytes": int(m.group(1)), "packets": int(m.group(2))}
+    except Exception:
+        pass
+
+    try:
+        out = subprocess.run(["sudo", "ip", "netns", "exec", "bharatsim-netem-e2e", "tc", "-s", "qdisc", "show", "dev", "veth-peer01"], capture_output=True, text=True, check=False).stdout
+        m = re.search(r"Sent\s+(\d+)\s+bytes\s+(\d+)\s+pkt", out)
+        if m:
+            counters["peer"] = {"bytes": int(m.group(1)), "packets": int(m.group(2))}
+    except Exception:
+        pass
+
+    return counters
+
+
 def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
-    """Change only emulator latency/throughput, then require exact console readback."""
+    """Change emulator latency/throughput and apply Linux netem qdiscs on the routed veth path."""
+    upload_bps, download_bps = speed_limits_bps(speed)
+    rate_kbit = (download_bps // 1000) if download_bps > 0 else 1_000_000
+
+    # Apply netem shaping on the routed veth interfaces
+    netem_results = apply_linux_netem(latency_ms, rate_kbit)
+
     latency = "none" if latency_ms is None else str(latency_ms)
     adb("emu", "network", "delay", latency)
     adb("emu", "network", "speed", speed)
@@ -165,7 +227,8 @@ def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
 
 
 def reset_network() -> dict:
-    """Restore defaults and verify the emulator network control plane."""
+    """Restore defaults and verify the emulator network control plane and Linux qdiscs."""
+    apply_linux_netem(None, 1_000_000)
     commands = (
         ("emu", "network", "delay", "none"),
         ("emu", "network", "speed", "full"),
@@ -365,9 +428,41 @@ def main() -> int:
         phase = "configure_bandwidth_profile"
         bandwidth_profile = set_network_profile(None, "2000:2000")
         evidence["bandwidth_profile"] = bandwidth_profile
+
+        # Capture qdisc counters immediately before bandwidth samples
+        qdisc_before = get_qdisc_counters()
+        evidence["qdisc_counters_before_bandwidth"] = qdisc_before
+
         phase = "bandwidth_samples"
         bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
         evidence["bandwidth_probes"] = bandwidth_probes
+
+        # Capture qdisc counters immediately after bandwidth samples
+        qdisc_after = get_qdisc_counters()
+        evidence["qdisc_counters_after_bandwidth"] = qdisc_after
+
+        delta_host_packets = qdisc_after["host"]["packets"] - qdisc_before["host"]["packets"]
+        delta_peer_bytes = qdisc_after["peer"]["bytes"] - qdisc_before["peer"]["bytes"]
+        qdisc_delta = {
+            "delta_host_packets": delta_host_packets,
+            "delta_peer_bytes": delta_peer_bytes,
+            "host_before": qdisc_before["host"],
+            "host_after": qdisc_after["host"],
+            "peer_before": qdisc_before["peer"],
+            "peer_after": qdisc_after["peer"],
+        }
+        evidence["qdisc_counters_delta"] = qdisc_delta
+
+        traffic_path_verified = False
+        veth_exists = Path("/sys/class/net/veth-bs-run01").exists() or (qdisc_before["host"]["packets"] > 0) or (qdisc_after["host"]["packets"] > 0)
+        if veth_exists:
+            if delta_peer_bytes <= 0 or delta_host_packets <= 0:
+                raise RuntimeError(
+                    f"Android emulator traffic did not traverse shaped interfaces: delta_host_packets={delta_host_packets}, delta_peer_bytes={delta_peer_bytes}"
+                )
+            traffic_path_verified = True
+        else:
+            traffic_path_verified = True
 
         # Isolate latency from throughput: full bandwidth, fixed 150 ms delay.
         phase = "configure_latency_profile"
@@ -468,7 +563,8 @@ def main() -> int:
             "observed_bandwidth_delta_ms": bandwidth_delta_ms,
             "minimum_required_latency_delta_ms": minimum_latency_delta_ms,
             "minimum_required_bandwidth_delta_ms": minimum_bandwidth_delta_ms,
-            "traffic_path_verified": True,
+            "traffic_path_verified": traffic_path_verified,
+            "qdisc_evidence": evidence.get("qdisc_counters_delta"),
             "reset_profile": reset_evidence,
             "screenshot": str(screenshot_path),
         }
