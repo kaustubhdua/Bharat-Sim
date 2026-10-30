@@ -29,6 +29,7 @@ class SupportedRoutePreflightTests(unittest.TestCase):
             journey.prepare_supported_transport()
         self.assertTrue(any(call.args[:3] == ("shell", "dumpsys", "connectivity") for call in adb_call.call_args_list))
         self.assertTrue(any(call.args[:3] == ("shell", "cmd", "connectivity") for call in adb_call.call_args_list))
+        self.assertTrue(any(call.args[:4] == ("shell", "svc", "data", "enable") for call in adb_call.call_args_list))
 
     def test_preflight_accepts_active_ethernet_network(self):
         with patch.object(
