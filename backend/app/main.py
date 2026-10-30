@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -155,10 +156,10 @@ async def enforce_api_authentication(request: Request, call_next):
     )
     if AUTH_REQUIRED and protected:
         scheme, _, token = request.headers.get("Authorization", "").partition(" ")
-        if scheme.lower() != "bearer" or not token.strip():
-            return JSONResponse(status_code=401, content={"detail": "Supabase access token required"}, headers={"WWW-Authenticate": "Bearer"})
+        if scheme.lower() != "bearer" or not token.strip() or len(token) > 16384:
+            return JSONResponse(status_code=401, content={"detail": "A valid Supabase access token is required"}, headers={"WWW-Authenticate": "Bearer"})
         try:
-            request.state.owner_id = verify_supabase_access_token(token.strip())
+            request.state.owner_id = await asyncio.to_thread(verify_supabase_access_token, token.strip())
         except Exception:
             return JSONResponse(status_code=401, content={"detail": "Invalid or expired Supabase access token"}, headers={"WWW-Authenticate": "Bearer"})
     return await call_next(request)
