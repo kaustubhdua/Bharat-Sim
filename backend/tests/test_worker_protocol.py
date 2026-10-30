@@ -308,3 +308,84 @@ def test_completed_worker_result_requires_matching_apk_hash(monkeypatch, tmp_pat
     current = client.get(f"/api/v1/runs/{run['id']}").json()
     assert current["status"] == "leased"
     assert current.get("result") is None
+
+
+
+def test_result_submission_rejects_lease_replaced_after_initial_validation(monkeypatch, tmp_path):
+    client = prepare_isolated_db(monkeypatch, tmp_path)
+    headers = {"X-BharatSim-Worker-Token": os.environ["BHARATSIM_WORKER_TOKEN"]}
+    created = client.post(
+        "/api/v1/runs",
+        data={"persona_id": "baseline"},
+        files={"apk": ("race.apk", apk_bytes(), "application/vnd.android.package-archive")},
+    )
+    run = created.json()
+    job = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "race-worker"}
+    ).json()["job"]
+
+    original = main.require_live_lease
+
+    def replace_lease_after_read(conn, run_id, lease_token):
+        lease = original(conn, run_id, lease_token)
+        # Simulate another claimant/expiry transition winning between the
+        # initial read and the terminal UPDATE.
+        with main.db() as concurrent:
+            concurrent.execute(
+                "UPDATE runs SET lease_token=? WHERE id=?",
+                ("replacement-lease-token-" + "x" * 32, run_id),
+            )
+        return lease
+
+    monkeypatch.setattr(main, "require_live_lease", replace_lease_after_read)
+    response = client.post(
+        f"/internal/worker/runs/{run['id']}/result",
+        headers=headers,
+        json={
+            "lease_token": job["lease_token"],
+            "status": "failed",
+            "result": {"status": "failed"},
+            "error": "simulated race",
+        },
+    )
+    assert response.status_code == 409
+    current = client.get(f"/api/v1/runs/{run['id']}").json()
+    assert current["status"] == "leased"
+    assert current.get("result") is None
+
+
+def test_heartbeat_rejects_lease_replaced_after_initial_validation(monkeypatch, tmp_path):
+    client = prepare_isolated_db(monkeypatch, tmp_path)
+    headers = {"X-BharatSim-Worker-Token": os.environ["BHARATSIM_WORKER_TOKEN"]}
+    created = client.post(
+        "/api/v1/runs",
+        data={"persona_id": "baseline"},
+        files={"apk": ("heartbeat-race.apk", apk_bytes(), "application/vnd.android.package-archive")},
+    )
+    run_id = created.json()["id"]
+    job = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "heartbeat-race-worker"}
+    ).json()["job"]
+
+    original = main.require_live_lease
+
+    def replace_lease_after_read(conn, requested_run_id, lease_token):
+        lease = original(conn, requested_run_id, lease_token)
+        with main.db() as concurrent:
+            concurrent.execute(
+                "UPDATE runs SET lease_token=? WHERE id=?",
+                ("replacement-lease-token-" + "y" * 32, requested_run_id),
+            )
+        return lease
+
+    monkeypatch.setattr(main, "require_live_lease", replace_lease_after_read)
+    response = client.post(
+        f"/internal/worker/runs/{run_id}/heartbeat",
+        headers=headers,
+        json={"lease_token": job["lease_token"]},
+    )
+    assert response.status_code == 409
+    with main.db() as conn:
+        row = conn.execute("SELECT status, lease_until FROM runs WHERE id=?", (run_id,)).fetchone()
+    assert row["status"] == "leased"
+    assert row["lease_until"] == job["lease_until"]
