@@ -687,11 +687,21 @@ async def create_run(
     worker_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
     status = "queued" if (apk_path or apk_storage_path) and worker_configured else "awaiting_worker"
     created = utcnow()
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-            (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, getattr(request.state, "owner_id", None), apk_storage_path),
-        )
+    try:
+        with db() as conn:
+            conn.execute(
+                "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, getattr(request.state, "owner_id", None), apk_storage_path),
+            )
+    except Exception:
+        if apk_storage_path:
+            try:
+                delete_private_object(apk_storage_path)
+            except Exception:
+                pass
+        if apk_path:
+            Path(apk_path).unlink(missing_ok=True)
+        raise
     message = (
         "APK queued for an authenticated worker. Execution is not complete until the worker submits evidence."
         if status == "queued" else
