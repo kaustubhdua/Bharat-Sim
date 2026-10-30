@@ -419,16 +419,38 @@ def health_live():
 
 @app.get("/health/ready")
 def health_ready():
+    worker_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
+    worker_online = False
     try:
         with db() as conn:
             conn.execute("SELECT 1").fetchone()
-        database_ok = True
+            database_ok = True
+            if worker_configured:
+                rows = conn.execute("SELECT last_seen,status FROM workers ORDER BY last_seen DESC LIMIT 50").fetchall()
+                now = datetime.now(timezone.utc)
+                for row in rows:
+                    try:
+                        seen = datetime.fromisoformat(row["last_seen"])
+                        if seen.tzinfo is None:
+                            seen = seen.replace(tzinfo=timezone.utc)
+                        if (now - seen).total_seconds() <= 90 and row["status"] != "offline":
+                            worker_online = True
+                            break
+                    except (TypeError, ValueError):
+                        continue
     except Exception:
         database_ok = False
+        worker_online = False
+    worker_state = "online" if worker_online else "offline" if worker_configured else "not_configured"
     payload = {
+        # API readiness is deliberately separate from execution readiness:
+        # an available API must never imply that an Android worker is alive.
         "status": "ready" if database_ok else "not_ready",
+        "api_readiness": "ready" if database_ok else "not_ready",
+        "execution_readiness": "ready" if database_ok and worker_online else "not_ready",
         "database": "available" if database_ok else "unavailable",
-        "apk_execution_worker": "configured" if len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32 else "not_configured",
+        "apk_execution_worker": worker_state,
+        "worker_online": worker_online,
         "execution_capability": "external-worker-required",
         "authentication_required": os.getenv("BHARATSIM_REQUIRE_API_KEY", "false").lower() == "true",
         "timestamp": utcnow(),
