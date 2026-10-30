@@ -63,3 +63,43 @@ def test_run_registration_requires_an_apk():
     response = client.post("/api/v1/runs", data={"persona_id": "baseline"})
     assert response.status_code == 422
     assert any(item.get("loc", [])[-1:] == ["apk"] for item in response.json()["detail"])
+
+
+def test_readiness_does_not_confuse_worker_configuration_with_liveness(monkeypatch, tmp_path):
+    from app import main
+
+    data_dir = tmp_path / "readiness-data"
+    data_dir.mkdir()
+    monkeypatch.setattr(main, "DB_PATH", data_dir / "readiness.sqlite3")
+    monkeypatch.setattr(main, "DATA_DIR", data_dir)
+    monkeypatch.setattr(main, "UPLOAD_DIR", data_dir / "uploads")
+    main.UPLOAD_DIR.mkdir()
+    main.init_db()
+    monkeypatch.setenv("BHARATSIM_WORKER_TOKEN", "worker-readiness-secret-" + "x" * 32)
+
+    offline = client.get("/health/ready")
+    assert offline.status_code == 200
+    assert offline.json()["api_readiness"] == "ready"
+    assert offline.json()["execution_readiness"] == "not_ready"
+    assert offline.json()["apk_execution_worker"] == "offline"
+    assert offline.json()["worker_online"] is False
+
+    with main.db() as conn:
+        conn.execute(
+            "INSERT INTO workers(id,last_seen,status,current_run_id) VALUES(?,?,?,NULL)",
+            ("readiness-test-worker", main.utcnow(), "idle"),
+        )
+    online = client.get("/health/ready")
+    assert online.status_code == 200
+    assert online.json()["execution_readiness"] == "ready"
+    assert online.json()["apk_execution_worker"] == "online"
+    assert online.json()["worker_online"] is True
+
+
+def test_readiness_reports_worker_not_configured(monkeypatch):
+    monkeypatch.delenv("BHARATSIM_WORKER_TOKEN", raising=False)
+    response = client.get("/health/ready")
+    assert response.status_code == 200
+    assert response.json()["api_readiness"] == "ready"
+    assert response.json()["execution_readiness"] == "not_ready"
+    assert response.json()["apk_execution_worker"] == "not_configured"
