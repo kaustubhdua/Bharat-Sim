@@ -682,6 +682,11 @@ async def create_run(
                 apk_path = str(target)
         except Exception:
             target.unlink(missing_ok=True)
+            if apk_storage_path:
+                try:
+                    delete_private_object(apk_storage_path)
+                except Exception:
+                    pass
             raise
         apk_name, apk_hash = safe_name, digest.hexdigest()
     worker_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
