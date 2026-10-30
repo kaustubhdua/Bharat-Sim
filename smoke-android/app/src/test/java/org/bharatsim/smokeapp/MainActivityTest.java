@@ -137,8 +137,10 @@ public class MainActivityTest {
                 MainActivity.isRetryableException(new SSLPeerUnverifiedException("Certificate hostname mismatch")));
         assertFalse("SSLProtocolException must not be retryable",
                 MainActivity.isRetryableException(new SSLProtocolException("Cannot negotiate protocol")));
+        SocketException wrappedSocketEx = new SocketException("Handshake failed");
+        wrappedSocketEx.initCause(new SSLHandshakeException("Untrusted"));
         assertFalse("SocketException wrapping SSLException must not be retryable",
-                MainActivity.isRetryableException(new SocketException("Handshake failed", new SSLHandshakeException("Untrusted"))));
+                MainActivity.isRetryableException(wrappedSocketEx));
         assertFalse("IOException wrapping SSLException must not be retryable",
                 MainActivity.isRetryableException(new IOException("TLS error", new SSLException("Internal error"))));
 
