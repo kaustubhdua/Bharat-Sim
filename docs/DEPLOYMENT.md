@@ -22,7 +22,7 @@ To delete all local persisted data too:
 
 ## Runtime mode and production guard
 
-The default Compose configuration is for loopback-only local development (`BHARATSIM_ENV=development`). If `BHARATSIM_ENV=production`, the API refuses to start unless `BHARATSIM_REQUIRE_API_KEY=true` and `BHARATSIM_API_KEY` is at least 32 characters. Production mode also requires `BHARATSIM_DATABASE_URL` and an explicit TLS mode for remote PostgreSQL. These checks reduce accidental exposure; they do **not** provide multi-user authentication or make public arbitrary-APK execution safe.
+The default Compose configuration is for loopback-only local development (`BHARATSIM_ENV=development`). If `BHARATSIM_ENV=production`, the API refuses to start unless `BHARATSIM_REQUIRE_API_KEY=true`, `BHARATSIM_API_KEY` is at least 32 characters, `BHARATSIM_AUTH_REQUIRED=true`, and `SUPABASE_URL` is an HTTPS project URL. Production mode also requires `BHARATSIM_DATABASE_URL` and an explicit TLS mode for remote PostgreSQL. The auth gate verifies Supabase asymmetric JWTs against the project's JWKS and scopes run/analysis access by user UUID. The dashboard includes email/password sign-in and account creation when built with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (publishable/legacy anon key only). Configure the matching server-side `SUPABASE_URL` and `BHARATSIM_AUTH_REQUIRED=true`. Never expose a service-role/secret key. Verify the project's email-confirmation and allowed redirect settings before launch. These checks do **not** make public arbitrary-APK execution safe.
 
 ## Optional single-tenant API key
 
@@ -46,4 +46,4 @@ Do not use plain HTTP for remote workers. Use HTTPS and a restricted network pat
 
 ## Production deployment blockers
 
-Do not expose this stack directly to the public internet. Before public use, implement real user authentication and run ownership, rate limits and quotas, private artifact storage and retention, strict worker VM isolation, egress restrictions, audit logging, backups, monitoring, and a reviewed TLS/reverse-proxy configuration. The shared worker token protects machine-to-machine endpoints; it is not user authentication. The local Compose UI binds to 127.0.0.1 by design.
+Do not expose this stack directly to the public internet. Before public use, integrate Supabase Auth sign-in/session refresh into the frontend, verify account lifecycle and cross-user isolation end to end, add rate limits and quotas, private artifact storage and retention, strict worker VM isolation, egress restrictions, audit logging, backups, monitoring, and a reviewed TLS/reverse-proxy configuration. The shared worker token protects machine-to-machine endpoints; it is not user authentication. The local Compose UI binds to 127.0.0.1 by design.

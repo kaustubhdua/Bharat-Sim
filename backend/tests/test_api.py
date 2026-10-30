@@ -1,3 +1,8 @@
+import io
+import zipfile
+
+import pytest
+
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -103,3 +108,100 @@ def test_readiness_reports_worker_not_configured(monkeypatch):
     assert response.json()["api_readiness"] == "ready"
     assert response.json()["execution_readiness"] == "not_ready"
     assert response.json()["apk_execution_worker"] == "not_configured"
+
+
+def test_supabase_auth_required_and_run_data_is_owner_scoped(monkeypatch, tmp_path):
+    from app import main
+
+    data_dir = tmp_path / "auth-data"
+    data_dir.mkdir()
+    monkeypatch.setattr(main, "DB_PATH", data_dir / "auth.sqlite3")
+    monkeypatch.setattr(main, "DATA_DIR", data_dir)
+    monkeypatch.setattr(main, "UPLOAD_DIR", data_dir / "uploads")
+    main.UPLOAD_DIR.mkdir()
+    main.init_db()
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setenv("BHARATSIM_REQUIRE_API_KEY", "false")
+    monkeypatch.setattr(
+        main, "verify_supabase_access_token",
+        lambda token: {
+            "user-a-token": "11111111-1111-4111-8111-111111111111",
+            "user-b-token": "22222222-2222-4222-8222-222222222222",
+        }[token],
+    )
+
+    assert client.get("/api/v1/runs").status_code == 401
+    user_a = {"Authorization": "Bearer user-a-token"}
+    user_b = {"Authorization": "Bearer user-b-token"}
+
+    apk = io.BytesIO()
+    with zipfile.ZipFile(apk, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("AndroidManifest.xml", b"fixture")
+        archive.writestr("classes.dex", b"fixture")
+    created = client.post(
+        "/api/v1/runs",
+        headers=user_a,
+        data={"persona_id": "baseline"},
+        files={"apk": ("owner-test.apk", apk.getvalue(), "application/vnd.android.package-archive")},
+    )
+    assert created.status_code == 200
+    run_id = created.json()["id"]
+
+    assert [item["id"] for item in client.get("/api/v1/runs", headers=user_a).json()["items"]] == [run_id]
+    assert client.get("/api/v1/runs", headers=user_b).json()["items"] == []
+    assert client.get(f"/api/v1/runs/{run_id}", headers=user_a).status_code == 200
+    assert client.get(f"/api/v1/runs/{run_id}", headers=user_b).status_code == 404
+
+    analysis_a = client.post(
+        "/api/v1/analyze/logs", headers=user_a,
+        json={"text": "FATAL EXCEPTION: main", "persona_id": "baseline"},
+    )
+    assert analysis_a.status_code == 200
+    assert len(client.get("/api/v1/analyses", headers=user_a).json()["items"]) == 1
+    assert client.get("/api/v1/analyses", headers=user_b).json()["items"] == []
+
+
+def test_supabase_auth_rejects_invalid_access_tokens(monkeypatch):
+    from app import main
+
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setattr(main, "verify_supabase_access_token", lambda token: (_ for _ in ()).throw(ValueError("bad token")))
+    response = client.get("/api/v1/runs", headers={"Authorization": "Bearer invalid"})
+    assert response.status_code == 401
+
+
+def test_supabase_jwt_verifier_checks_signature_and_required_claims(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from app import main
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    monkeypatch.setattr(main, "SUPABASE_URL", "https://example.supabase.co")
+
+    class FakeJwks:
+        def get_signing_key_from_jwt(self, token):
+            return SimpleNamespace(key=private_key.public_key())
+
+    monkeypatch.setattr(main, "_jwks_client", FakeJwks())
+    claims = {
+        "sub": "33333333-3333-4333-8333-333333333333",
+        "iss": "https://example.supabase.co/auth/v1",
+        "aud": "authenticated",
+        "role": "authenticated",
+        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "exp": int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp()),
+        "is_anonymous": False,
+    }
+    token = main.jwt.encode(claims, private_key, algorithm="ES256", headers={"kid": "unit-test"})
+    assert main.verify_supabase_access_token(token) == claims["sub"]
+
+    anonymous = {**claims, "role": "authenticated", "is_anonymous": True}
+    anonymous_token = main.jwt.encode(anonymous, private_key, algorithm="ES256", headers={"kid": "unit-test"})
+    with pytest.raises(main.InvalidTokenError):
+        main.verify_supabase_access_token(anonymous_token)
+
+    wrong_audience = {**claims, "aud": "other"}
+    bad_token = main.jwt.encode(wrong_audience, private_key, algorithm="ES256", headers={"kid": "unit-test"})
+    with pytest.raises(main.InvalidTokenError):
+        main.verify_supabase_access_token(bad_token)
