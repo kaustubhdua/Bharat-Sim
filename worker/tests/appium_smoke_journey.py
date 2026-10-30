@@ -162,7 +162,7 @@ def get_qdisc_counters() -> dict[str, dict[str, int]]:
     """Query tc packet/byte counters on host veth-bs-run01 and namespace veth-peer01."""
     counters = {"host": {"bytes": 0, "packets": 0}, "peer": {"bytes": 0, "packets": 0}}
     try:
-        out = subprocess.run(["tc", "-s", "qdisc", "show", "dev", "veth-bs-run01"], capture_output=True, text=True, check=False).stdout
+        out = subprocess.run(["sudo", "tc", "-s", "qdisc", "show", "dev", "veth-bs-run01"], capture_output=True, text=True, check=False).stdout
         m = re.search(r"Sent\s+(\d+)\s+bytes\s+(\d+)\s+pkt", out)
         if m:
             counters["host"] = {"bytes": int(m.group(1)), "packets": int(m.group(2))}

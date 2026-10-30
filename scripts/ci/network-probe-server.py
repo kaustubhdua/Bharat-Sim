@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import socket
 import ssl
+import struct
 from urllib.parse import parse_qs, urlsplit
 
 DEFAULT_PAYLOAD_SIZE = 500_000
@@ -50,6 +52,11 @@ class ProbeHandler(BaseHTTPRequestHandler):
             else:
                 payload = build_payload(requested_bytes)
 
+            try:
+                self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 30))
+            except Exception:
+                pass
+
             self.send_response(200)
             self.send_header("Content-Type", "application/octet-stream")
             self.send_header("Content-Length", str(len(payload)))
@@ -59,7 +66,7 @@ class ProbeHandler(BaseHTTPRequestHandler):
 
             # Linux netem performs all shaping; the server writes payload directly without chunk sleeps.
             try:
-                chunk_size = 65536
+                chunk_size = 16384
                 offset = 0
                 while offset < len(payload):
                     to_write = min(chunk_size, len(payload) - offset)
@@ -67,6 +74,13 @@ class ProbeHandler(BaseHTTPRequestHandler):
                     offset += to_write
                 self.wfile.flush()
                 print(f"served_bytes={len(payload)} client={self.client_address[0]}", flush=True)
+
+                # Keep connection alive while client drains through shaped link until client closes
+                try:
+                    self.connection.settimeout(15.0)
+                    self.rfile.read(1)
+                except Exception:
+                    pass
             except (BrokenPipeError, ConnectionResetError):
                 print(f"client_disconnected={self.client_address[0]}", flush=True)
             return

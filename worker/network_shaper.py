@@ -83,7 +83,7 @@ def main() -> int:
         parser.error("dedicated test interface does not exist")
 
     if args.action == "apply":
-        command = ["tc", "qdisc", "replace", "dev", args.interface, "root", "netem"]
+        command = ["tc", "qdisc", "replace", "dev", args.interface, "root", "netem", "limit", "5000"]
         if args.latency_ms > 0:
             command += ["delay", f"{args.latency_ms:g}ms", f"{args.jitter_ms:g}ms"]
         if args.loss_pct > 0:

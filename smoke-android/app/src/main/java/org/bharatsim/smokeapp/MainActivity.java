@@ -39,9 +39,9 @@ public final class MainActivity extends Activity {
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
     private static final int PROBE_BYTES = 500_000;
     static final int PROBE_TIMEOUT_MS = 45_000;
-    static final int ATTEMPT_TIMEOUT_MS = 20_000;
-    static final int SOCKET_READ_TIMEOUT_MS = 15_000;
-    static final int SOCKET_BUFFER_BYTES = 16_384;
+    static final int ATTEMPT_TIMEOUT_MS = 18_000;
+    static final int SOCKET_READ_TIMEOUT_MS = 10_000;
+    static final int SOCKET_BUFFER_BYTES = 262_144;
     private static final int MAX_HTTP_LINE_BYTES = 8_192;
     private static final int MAX_HTTP_HEADER_COUNT = 100;
     private static final int MAX_HTTP_HEADER_BYTES = 32_768;
@@ -214,9 +214,9 @@ public final class MainActivity extends Activity {
                     .createSocket(raw, host, port, true)) {
                 tls.setReceiveBufferSize(SOCKET_BUFFER_BYTES);
                 tls.setSendBufferSize(SOCKET_BUFFER_BYTES);
-                // A 500 KB sample can take several seconds on a shaped route; allow
-                // headroom for TLS/header delays while keeping the read bounded.
-                tls.setSoTimeout(remainingTimeoutMs(attemptDeadline, probeDeadline));
+                int initialTimeout = remainingTimeoutMs(attemptDeadline, probeDeadline);
+                raw.setSoTimeout(initialTimeout);
+                tls.setSoTimeout(initialTimeout);
                 tls.startHandshake();
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE tls_handshake_completed endpoint_host=" + host);
                 if (!HttpsURLConnection.getDefaultHostnameVerifier().verify(host, tls.getSession())) {
@@ -235,7 +235,7 @@ public final class MainActivity extends Activity {
                 output.flush();
 
                 InputStream input = tls.getInputStream();
-                String statusLine = readHttpLine(tls, input, attemptDeadline, probeDeadline);
+                String statusLine = readHttpLine(raw, tls, input, attemptDeadline, probeDeadline);
                 String[] statusParts = statusLine.split(" ", 3);
                 if (statusParts.length < 2 || !statusParts[0].startsWith("HTTP/")) {
                     throw new IOException("Malformed HTTP status line: " + statusLine);
@@ -256,7 +256,7 @@ public final class MainActivity extends Activity {
                 int headerCount = 0;
                 int headerBytes = 0;
                 while (true) {
-                    headerLine = readHttpLine(tls, input, attemptDeadline, probeDeadline);
+                    headerLine = readHttpLine(raw, tls, input, attemptDeadline, probeDeadline);
                     if (headerLine.isEmpty()) break;
                     headerCount++;
                     headerBytes += headerLine.length();
@@ -282,8 +282,8 @@ public final class MainActivity extends Activity {
                 }
 
                 int bytesRead = transferEncoding.contains("chunked")
-                        ? readChunkedBody(tls, input, expectedBytes, startedAt, attemptDeadline, probeDeadline)
-                        : readFixedBody(tls, input, expectedBytes, startedAt, attemptDeadline, probeDeadline);
+                        ? readChunkedBody(raw, tls, input, expectedBytes, startedAt, attemptDeadline, probeDeadline)
+                        : readFixedBody(raw, tls, input, expectedBytes, startedAt, attemptDeadline, probeDeadline);
                 if (bytesRead != expectedBytes) {
                     throw new IOException("Expected " + expectedBytes + " probe bytes, received " + bytesRead);
                 }
@@ -292,11 +292,13 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private static int readFixedBody(SSLSocket socket, InputStream input, int expectedBytes, long startedAt, long attemptDeadline, long probeDeadline) throws IOException {
-        byte[] buffer = new byte[8192];
+    private static int readFixedBody(Socket raw, SSLSocket socket, InputStream input, int expectedBytes, long startedAt, long attemptDeadline, long probeDeadline) throws IOException {
+        byte[] buffer = new byte[16384];
         int total = 0;
         while (total < expectedBytes) {
-            socket.setSoTimeout(remainingTimeoutMs(attemptDeadline, probeDeadline));
+            int soTimeout = remainingTimeoutMs(attemptDeadline, probeDeadline);
+            raw.setSoTimeout(soTimeout);
+            socket.setSoTimeout(soTimeout);
             int count = input.read(buffer, 0, Math.min(buffer.length, expectedBytes - total));
             if (count < 0) break;
             total += count;
@@ -305,11 +307,11 @@ public final class MainActivity extends Activity {
         return total;
     }
 
-    private static int readChunkedBody(SSLSocket socket, InputStream input, int expectedBytes, long startedAt, long attemptDeadline, long probeDeadline) throws IOException {
+    private static int readChunkedBody(Socket raw, SSLSocket socket, InputStream input, int expectedBytes, long startedAt, long attemptDeadline, long probeDeadline) throws IOException {
         int total = 0;
-        byte[] buffer = new byte[8192];
+        byte[] buffer = new byte[16384];
         while (total < expectedBytes) {
-            String sizeLine = readHttpLine(socket, input, attemptDeadline, probeDeadline);
+            String sizeLine = readHttpLine(raw, socket, input, attemptDeadline, probeDeadline);
             int semicolon = sizeLine.indexOf(';');
             String sizeText = (semicolon >= 0 ? sizeLine.substring(0, semicolon) : sizeLine).trim();
             final int chunkSize;
@@ -322,7 +324,7 @@ public final class MainActivity extends Activity {
                 int trailerCount = 0;
                 int trailerBytes = 0;
                 String trailer;
-                while (!(trailer = readHttpLine(socket, input, attemptDeadline, probeDeadline)).isEmpty()) {
+                while (!(trailer = readHttpLine(raw, socket, input, attemptDeadline, probeDeadline)).isEmpty()) {
                     trailerCount++;
                     trailerBytes += trailer.length();
                     if (trailerCount > MAX_HTTP_HEADER_COUNT || trailerBytes > MAX_HTTP_HEADER_BYTES) {
@@ -334,7 +336,9 @@ public final class MainActivity extends Activity {
             int remaining = Math.min(chunkSize, expectedBytes - total);
             int chunkRead = 0;
             while (chunkRead < remaining) {
-                socket.setSoTimeout(remainingTimeoutMs(attemptDeadline, probeDeadline));
+                int soTimeout = remainingTimeoutMs(attemptDeadline, probeDeadline);
+                raw.setSoTimeout(soTimeout);
+                socket.setSoTimeout(soTimeout);
                 int count = input.read(buffer, 0, Math.min(buffer.length, remaining - chunkRead));
                 if (count < 0) return total + chunkRead;
                 chunkRead += count;
@@ -342,7 +346,7 @@ public final class MainActivity extends Activity {
             total += chunkRead;
             logTransferProgress(total, expectedBytes, startedAt);
             if (chunkRead < chunkSize || total == expectedBytes) break;
-            if (!readHttpLine(socket, input, attemptDeadline, probeDeadline).isEmpty()) {
+            if (!readHttpLine(raw, socket, input, attemptDeadline, probeDeadline).isEmpty()) {
                 throw new IOException("Malformed HTTP chunk terminator");
             }
         }
@@ -350,7 +354,7 @@ public final class MainActivity extends Activity {
     }
 
     private static void logTransferProgress(int bytesRead, int expectedBytes, long startedAt) {
-        if (bytesRead < expectedBytes && bytesRead % 250_000 >= 8192) return;
+        if (bytesRead < expectedBytes && bytesRead % 100_000 >= 16384) return;
         long elapsedMs = Math.max(1, SystemClock.elapsedRealtime() - startedAt);
         long bytesPerSecond = (long) bytesRead * 1000 / elapsedMs;
         Log.i(TAG, "BHARATSIM_NETWORK_PROBE transfer_progress bytes_read=" + bytesRead
@@ -365,7 +369,7 @@ public final class MainActivity extends Activity {
         }
         long attemptRemaining = attemptDeadline - now;
         if (attemptRemaining <= 0) {
-            throw new SocketTimeoutException("Probe attempt exceeded its 20-second deadline");
+            throw new SocketTimeoutException("Probe attempt exceeded its deadline");
         }
         return (int) Math.max(1, Math.min(socketReadTimeoutMs, Math.min(attemptRemaining, overallRemaining)));
     }
@@ -374,11 +378,13 @@ public final class MainActivity extends Activity {
         return remainingTimeoutMs(attemptDeadline, probeDeadline, SystemClock.elapsedRealtime(), SOCKET_READ_TIMEOUT_MS);
     }
 
-    private static String readHttpLine(SSLSocket socket, InputStream input, long attemptDeadline, long probeDeadline) throws IOException {
+    private static String readHttpLine(Socket raw, SSLSocket socket, InputStream input, long attemptDeadline, long probeDeadline) throws IOException {
         ByteArrayOutputStream line = new ByteArrayOutputStream();
         int previous = -1;
         while (true) {
-            socket.setSoTimeout(remainingTimeoutMs(attemptDeadline, probeDeadline));
+            int soTimeout = remainingTimeoutMs(attemptDeadline, probeDeadline);
+            raw.setSoTimeout(soTimeout);
+            socket.setSoTimeout(soTimeout);
             int current = input.read();
             if (current < 0) {
                 if (line.size() == 0) return "";
