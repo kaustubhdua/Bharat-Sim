@@ -257,7 +257,12 @@ export const fallbackPersonas: Persona[] = [
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   try {
-    const r = await fetch(API + path, init);
+    const token = sessionStorage.getItem("bharatsim.supabase.session");
+    let accessToken = "";
+    if (token) { try { accessToken = JSON.parse(token).access_token || ""; } catch { sessionStorage.removeItem("bharatsim.supabase.session"); } }
+    const headers = new Headers(init?.headers || {});
+    if (accessToken) headers.set("Authorization", "Bearer " + accessToken);
+    const r = await fetch(API + path, { ...init, headers });
     if (!r.ok) {
       const b = await r.json().catch(() => ({}));
       throw new Error(b.detail || `Request failed (${r.status})`);
