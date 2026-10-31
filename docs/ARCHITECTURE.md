@@ -2,7 +2,7 @@
 
 ## Current implementation
 
-The repository provides a FastAPI service, a React/Vite dashboard, deterministic persona profiles, a risk-ordering heuristic, SQLite persistence, bounded APK upload validation, a log marker analyzer, and an authenticated worker-dispatch protocol.
+The repository provides a FastAPI service, a React/Vite dashboard, deterministic persona profiles and risk-ranked scenario planning, SQLite local persistence plus an opt-in PostgreSQL adapter, bounded APK upload validation, evidence-linked log analysis, and an authenticated worker-dispatch protocol. Optional Supabase Auth JWT verification and owner-scoped run/analysis operations are implemented behind a production configuration gate.
 
 ## Data flow
 
@@ -27,7 +27,7 @@ Current worker protocol controls include:
 - worker heartbeat display in the dashboard;
 - APK deletion after a terminal result, when filesystem deletion succeeds.
 
-Production gaps remain: no multi-user identity or run ownership, durable object storage, PostgreSQL/durable distributed queue, per-job disposable VM snapshot/revert, complete cancellation, quotas, or artifact retention policy.
+Production gaps remain: live Auth/database/Storage runtime configuration is not verified; the API still defaults to SQLite locally; reports/logs/screenshots are inline JSON rather than durable object artifacts; there is no per-job disposable VM snapshot/revert, active-job cancellation with child-process teardown, enforced quotas, background retention scheduler, or complete audit trail.
 
 ## Network shaping
 
@@ -35,4 +35,4 @@ Linux tc/netem can emulate latency, jitter, loss, and rate limits on a controlle
 
 ## Security
 
-APK files and logs are untrusted inputs. The API checks archive shape and size but does not perform malware analysis and is not a secure execution sandbox. Before public deployment, add user authentication, per-run authorization, quotas, retention/cleanup, private object storage, restricted egress, and isolated worker execution. Never send logs to a hosted AI service without explicit consent.
+APK files and logs are untrusted inputs. The API checks archive shape and size but does not perform malware analysis and is not a secure execution sandbox. Before public deployment, verify live Supabase Auth/session settings and per-run authorization against the deployed environment, then add enforced quotas, retention/cleanup scheduling, private report/log/screenshot storage, restricted egress, and VM-grade isolated worker execution. Owner-scoped run deletion and integrity-checked report export exist, but do not replace durable artifact storage or active-job cancellation. Never send logs to a hosted AI service without explicit consent.

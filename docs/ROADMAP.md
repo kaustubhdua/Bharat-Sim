@@ -30,7 +30,7 @@
 ### P0 — Prove real Android execution
 
 - [x] Provision a disposable Android emulator in GitHub Actions with Android SDK platform-tools and build-tools.
-- [x] Execute a source-built, authorized fixture APK through local FastAPI upload → queue/lease → worker → ADB install/launch/logcat → result callback → persisted run report on earlier revisions. The latest main run failed because the worker did not claim the queued run; the integrated candidate adds worker registration checks and diagnostics. Do not claim the full pipeline passed on the release candidate until its current Android workflow succeeds.
+- [x] Execute a source-built, authorized fixture APK through local FastAPI upload → queue/lease → worker → ADB install/launch/logcat → result callback → persisted run report. The integrated pipeline and CI suite pass on the current main line; the separate Android fixture network data-plane candidate remains under revalidation and must pass repeated measurements/reset before network throughput is claimed verified.
 - [x] The basic Appium/UiAutomator2 fixture primary-action assertion is implemented and passed on an earlier revision. The current extended journey also performs real HTTPS network probes; the latest recorded candidate failed while waiting for the network probe to finish. The primary-action fixture pass does not count as current end-to-end release evidence.
 - [x] Exercise a real Android install-signature-conflict failure through API → worker → ADB → callback, and exercise an APK-shaped invalid-manifest failure through the real worker/API path. The workflow checks failed status, failure classification, and cleanup evidence.
 - [ ] Exercise launch failure, worker crash, timeout, stale lease, and retry recovery on a real worker. Duplicate/stale callback and retry-exhaustion protocol behavior have unit-level coverage, but not all are yet proven as full emulator journeys.
@@ -50,15 +50,15 @@
 
 ### P0 — Secure public execution
 
-- [ ] Implement real user identity and per-run ownership/authorization.
+- [x] Implement optional Supabase Auth JWT verification and owner-scoped run/analysis reads and writes, with cross-user regression tests. Live provider settings and deployed Auth/session verification remain pending.
 - [ ] Run untrusted APKs in disposable, resource-limited VMs/containers with no production secrets and restricted egress.
-- [ ] Add quotas, concurrency limits, cancellation, artifact retention/deletion, private object storage, and audit logging.
+- [ ] Add enforced quotas/concurrency limits, active-run cancellation with verified child-process teardown, durable report/log/screenshot object storage and retention, and a complete audit trail. Private APK Storage and owner-scoped run deletion/report export are implemented, but do not complete these remaining controls.
 - [ ] Perform a threat-model review and security testing before public APK uploads.
 
 ### P1 — Production operations and quality
 
 - [ ] Move multi-worker production metadata to PostgreSQL and use durable queue semantics.
-- [ ] Add authenticated artifact downloads, durable log/screenshot storage, migrations/backups, and operational alerts.
+- [ ] Complete durable report/log/screenshot artifact storage and lifecycle, backup/restore drills, and operational alerts. Owner-scoped JSON report export is implemented, but is generated from bounded database JSON rather than a durable object artifact.
 - [ ] Extend browser E2E coverage to real APK upload validation, worker-connected queued → running → report lifecycle, and API/network error states; current browser tests cover actual API-backed profiles, log analysis, and no-worker registration.
 - [ ] Deploy frontend/API/worker and verify a real public URL, health/readiness, TLS, persistence, and deployed commit SHA.
 - [ ] Add Sarvam translation only as an optional, consent-aware feature with server-side secrets, redaction, timeout, and fallback; it is not wired yet.

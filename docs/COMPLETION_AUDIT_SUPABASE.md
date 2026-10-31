@@ -1,3 +1,33 @@
+# BharatSim Supabase completion audit — latest revalidation (2026-11-01)
+
+This addendum supersedes older status statements below where the live repository or connected Supabase state has changed. It records read-only checks against the connected project and the merged GitHub implementation. It does not imply that the application is deployed or production-ready.
+
+## Current verified state
+
+- Connected Supabase project `common 1` (project ref `hkyieaovolkethovyenb`) is `ACTIVE_HEALTHY` in `ap-south-1`. It contains a separate `bharatsim` schema alongside an existing `genomeguard` schema. Do not modify GenomeGuard objects as part of BharatSim work.
+- The `bharatsim` schema has seven tables: `runs`, `analyses`, `workers`, `run_events`, `artifacts`, `quotas`, and `audit_events`. RLS is enabled. Read-only privilege checks show `anon` and `authenticated` have no schema USAGE and no table privileges; `service_role` has the required table privileges. The schema is therefore not directly exposed to browser roles.
+- The private Storage bucket `bharatsim-private` exists, has `public=false`, a 150 MiB file limit, and APK MIME allow-list. It currently contains zero objects. This confirms bucket configuration, not that the running API is configured with its server-only service-role credential.
+- Remote migration history includes `20261027054905_bharatsim_core`, `20261027061609_bharatsim_fk_indexes`, and `20261030181640_bharatsim_private_apk_storage_bucket`.
+- The Supabase Security Advisor reports informational `rls_enabled_no_policy` findings for the private BharatSim tables. Because browser roles have no schema usage/table grants, do not add permissive policies merely to silence the informational lint. If the schema is ever exposed to client roles, add tested least-privilege RLS policies first.
+- GitHub main now includes optional Supabase Auth JWT verification, owner-scoped run/analysis access, cross-user regression coverage, owner-scoped run deletion, and authenticated integrity-checked report export. The frontend has optional Supabase email/password sign-in. These are code and CI facts; they do not prove live Auth provider configuration or a deployed user session.
+- The run deletion flow refuses to interrupt leased/running jobs, cleans up the associated APK and run-linked analyses, and retains a cancelled record if storage cleanup fails so the owner can retry. Report export is generated from bounded database JSON and includes a stable report SHA-256 plus an export ETag. It is not yet a separate durable report object.
+- GitHub CI passed on main after these changes, including backend tests, PostgreSQL integration, frontend build/E2E, worker guards, and container smoke tests.
+
+## Still unverified / release blockers
+
+- No BharatSim production service or public URL is configured in the connected Render/Vercel accounts.
+- The API has not been shown using the live `BHARATSIM_DATABASE_URL` against `common 1`; the local default remains SQLite.
+- The live `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, Auth provider settings, email-confirmation/redirect configuration, and deployed frontend publishable key have not been validated as one end-to-end deployment.
+- The private bucket currently has no objects; APK upload/download/delete has not been demonstrated against the live bucket from the deployed API.
+- Reports, logcat, screenshots, and Appium evidence are not yet stored as durable private objects with lifecycle/retention policies.
+- VM-grade disposable APK execution, default-deny egress, enforced CPU/RAM/disk/process quotas, active worker cancellation with child-process teardown, background retention, abuse controls, and complete audit logging remain unimplemented.
+- The latest Android fixture bandwidth probe candidate is still under CI revalidation; do not claim measured download bandwidth or arbitrary-app traffic shaping until the current candidate produces repeated traffic-path evidence and verified reset.
+- Physical low-cost device fidelity and Sarvam translation are not verified.
+
+**Release decision:** keep BharatSim labelled MVP / controlled beta. Do not expose public arbitrary-APK execution until isolation, live tenant/Auth configuration, quotas, artifact lifecycle, and deployment evidence are complete.
+
+---
+
 # BharatSim completion audit and Supabase migration plan
 
 **Audit date:** 2026-10-27  
