@@ -329,12 +329,19 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).not.toContain("alpha.apk");
     expect(container.textContent).toContain("Showing 1 of 3 runs");
 
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(search, "");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
     const filter = container.querySelector('select[aria-label="Filter runs by status"]') as HTMLSelectElement;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(filter, "failed");
       filter.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    expect(container.textContent).toContain("No matching test runs");
+    expect(container.textContent).toContain("gamma.apk");
+    expect(container.textContent).not.toContain("alpha.apk");
+    expect(container.textContent).not.toContain("beta.apk");
   });
 
 });
