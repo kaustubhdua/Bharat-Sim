@@ -92,7 +92,9 @@ export default function CapabilityPanel({ capabilities, loading }: CapabilityPan
           <div className="capability-row"><span>Latency</span><Status label={network.latency ? "Supported" : "Unsupported"} tone={network.latency ? "good" : "off"} /></div>
           <div className="capability-row"><span>Bandwidth</span><Status label={network.bandwidth ? "Supported" : "Unsupported"} tone={network.bandwidth ? "good" : "off"} /></div>
           <div className="capability-row"><span>Control readback</span><Status label={network.configuration_readback ? "Supported" : "Unsupported"} tone={network.configuration_readback ? "good" : "off"} /></div>
-          <div className="capability-row"><span>Packet loss / outage recovery</span><Status label={network.packet_loss || network.outage_and_recovery ? "Supported" : "Unsupported"} tone={network.packet_loss || network.outage_and_recovery ? "good" : "off"} /></div>
+          <div className="capability-row"><span>Packet loss</span><Status label={network.packet_loss ? "Supported" : "Unsupported"} tone={network.packet_loss ? "good" : "off"} /></div>
+          <div className="capability-row"><span>Outage and recovery</span><Status label={network.outage_and_recovery ? "Supported" : "Unsupported"} tone={network.outage_and_recovery ? "good" : "off"} /></div>
+          <div className="capability-row"><span>Host network shaping</span><Status label={capabilities.network_shaping ? "Supported" : "Unsupported"} tone={capabilities.network_shaping ? "good" : "off"} /></div>
           <div className="capability-row"><span>Arbitrary app traffic verification</span><Status label={network.arbitrary_app_traffic_verified ? "Verified" : "Not verified"} tone={network.arbitrary_app_traffic_verified ? "good" : "caution"} /></div>
           <p className="capability-note">{network.scope}</p>
         </section>
