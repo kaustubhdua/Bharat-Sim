@@ -1,5 +1,19 @@
 export const API = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
+export type Capabilities = {
+  apk_upload: boolean; log_analysis: boolean; risk_planner: boolean;
+  failure_fingerprinting: boolean; bharat_score: boolean; android_execution: boolean;
+  worker_dispatch: boolean; network_shaping: boolean; sarvam_translation: boolean;
+  emulator_network_controls: {
+    latency: boolean; bandwidth: boolean; configuration_readback: boolean;
+    packet_loss: boolean; outage_and_recovery: boolean; arbitrary_app_traffic_verified: boolean; scope: string;
+  };
+  persona_condition_simulation: {
+    supported: string[]; control_plane_verifiable: string[]; report_only: string[]; unsupported: string[]; scope: string;
+  };
+  notes: string[];
+};
+
 export type Persona = {
   id: string;
   name: string;

@@ -6,6 +6,7 @@ import ScoreRing from "../components/ScoreRing";
 import FindingCard from "../components/FindingCard";
 import PersonaPanel from "../components/PersonaPanel";
 import RunsTable from "../components/RunsTable";
+import CapabilityPanel from "../components/CapabilityPanel";
 import { BrowserRouter } from "react-router-dom";
 import { cls, displayRunStatus, fallbackPersonas, isRunActive } from "../api";
 
@@ -342,6 +343,45 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("gamma.apk");
     expect(container.textContent).not.toContain("alpha.apk");
     expect(container.textContent).not.toContain("beta.apk");
+  });
+
+  it("CapabilityPanel renders only the backend-declared capability contract", async () => {
+    const capabilities = {
+      apk_upload: true, log_analysis: true, risk_planner: true,
+      failure_fingerprinting: true, bharat_score: true, android_execution: false,
+      worker_dispatch: true, network_shaping: false, sarvam_translation: false,
+      emulator_network_controls: {
+        latency: true, bandwidth: true, configuration_readback: true,
+        packet_loss: false, outage_and_recovery: false,
+        arbitrary_app_traffic_verified: false, scope: "Emulator console controls; fixture traffic-path evidence is CI-only."
+      },
+      persona_condition_simulation: {
+        supported: ["network_latency", "download_bandwidth", "battery_saver", "storage_pressure"],
+        control_plane_verifiable: ["upload_bandwidth"],
+        report_only: ["ram_constraint"],
+        unsupported: ["packet_loss", "cpu_constraint"],
+        scope: "Disposable Android Emulator targets only."
+      },
+      notes: []
+    };
+
+    await act(async () => {
+      root.render(<CapabilityPanel capabilities={capabilities} loading={false} />);
+    });
+
+    expect(container.textContent).toContain("What BharatSim can verify");
+    expect(container.textContent).toContain("Worker dispatch");
+    expect(container.textContent).toContain("Evidence required");
+    expect(container.textContent).toContain("Packet Loss · unsupported");
+    expect(container.textContent).toContain("Ram Constraint · report-only");
+    expect(container.textContent).toContain("Sarvam translation");
+  });
+
+  it("CapabilityPanel does not infer availability when API capability data is missing", async () => {
+    await act(async () => {
+      root.render(<CapabilityPanel capabilities={null} loading={false} />);
+    });
+    expect(container.textContent).toContain("No feature availability is inferred");
   });
 
 });
