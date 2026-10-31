@@ -154,7 +154,7 @@ def test_supabase_auth_required_and_run_data_is_owner_scoped(monkeypatch, tmp_pa
 
     analysis_a = client.post(
         "/api/v1/analyze/logs", headers=user_a,
-        json={"text": "FATAL EXCEPTION: main", "persona_id": "baseline"},
+        json={"text": "FATAL EXCEPTION: main", "persona_id": "baseline", "run_id": run_id},
     )
     assert analysis_a.status_code == 200
     assert len(client.get("/api/v1/analyses", headers=user_a).json()["items"]) == 1
