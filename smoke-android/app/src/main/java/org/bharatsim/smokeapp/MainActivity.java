@@ -162,7 +162,7 @@ public final class MainActivity extends Activity {
             raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
-                // A 256 KB sample remains measurable at 2 Mbps while keeping the socket deadline bounded.
+                // A 256 KB fixture transfer is measured under the selected emulator profile with a bounded overall deadline.
                 tls.setSoTimeout(remainingTimeoutMs(deadlineAt));
                 tls.startHandshake();
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE tls_handshake_completed endpoint_host=" + host);
@@ -295,7 +295,7 @@ public final class MainActivity extends Activity {
     }
 
     private static void logTransferProgress(int bytesRead, int expectedBytes, long startedAt) {
-        if (bytesRead < expectedBytes && bytesRead % 250_000 >= 8192) return;
+        if (bytesRead < expectedBytes && bytesRead % 16_384 != 0) return;
         long elapsedMs = Math.max(1, SystemClock.elapsedRealtime() - startedAt);
         long bytesPerSecond = (long) bytesRead * 1000 / elapsedMs;
         Log.i(TAG, "BHARATSIM_NETWORK_PROBE transfer_progress bytes_read=" + bytesRead
@@ -306,7 +306,7 @@ public final class MainActivity extends Activity {
     private static int remainingTimeoutMs(long deadlineAt) throws IOException {
         long remaining = deadlineAt - SystemClock.elapsedRealtime();
         if (remaining <= 0) {
-            throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 45-second overall deadline");
+            throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 30-second overall deadline");
         }
         return (int) Math.max(1, Math.min(Integer.MAX_VALUE, remaining));
     }

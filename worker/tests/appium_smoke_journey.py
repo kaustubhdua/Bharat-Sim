@@ -268,7 +268,7 @@ def network_probe_log_tail() -> str:
         return adb(
             "logcat", "-d", "-t", "1000", "-s",
             "BharatSimNetworkProbe:I", "BharatSimNetworkProbe:W",
-            "BharatSimNetworkProbe:E", "*:S", timeout=10,
+            "BharatSimNetworkProbe:V", "*:S", timeout=10,
         )[-6000:]
     except Exception as exc:
         return f"Could not collect device probe logcat: {exc}"
