@@ -34,8 +34,8 @@ import javax.net.ssl.SSLPeerUnverifiedException;
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
-    private static final int PROBE_BYTES = 500_000;
-    private static final int PROBE_TIMEOUT_MS = 45_000;
+    private static final int PROBE_BYTES = 256_000;
+    private static final int PROBE_TIMEOUT_MS = 30_000;
     private static final int MAX_HTTP_LINE_BYTES = 8_192;
     private static final int MAX_HTTP_HEADER_COUNT = 100;
     private static final int MAX_HTTP_HEADER_BYTES = 32_768;
@@ -162,8 +162,7 @@ public final class MainActivity extends Activity {
             raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
-                // A 500 KB sample can take several seconds on a 1 Mbps shaped route; allow
-                // headroom for TLS/header delays while keeping the read bounded.
+                // A 256 KB fixture transfer is measured under the selected emulator profile with a bounded overall deadline.
                 tls.setSoTimeout(remainingTimeoutMs(deadlineAt));
                 tls.startHandshake();
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE tls_handshake_completed endpoint_host=" + host);
@@ -296,7 +295,7 @@ public final class MainActivity extends Activity {
     }
 
     private static void logTransferProgress(int bytesRead, int expectedBytes, long startedAt) {
-        if (bytesRead < expectedBytes && bytesRead % 250_000 >= 8192) return;
+        if (bytesRead < expectedBytes && bytesRead % 16_384 != 0) return;
         long elapsedMs = Math.max(1, SystemClock.elapsedRealtime() - startedAt);
         long bytesPerSecond = (long) bytesRead * 1000 / elapsedMs;
         Log.i(TAG, "BHARATSIM_NETWORK_PROBE transfer_progress bytes_read=" + bytesRead
@@ -307,7 +306,7 @@ public final class MainActivity extends Activity {
     private static int remainingTimeoutMs(long deadlineAt) throws IOException {
         long remaining = deadlineAt - SystemClock.elapsedRealtime();
         if (remaining <= 0) {
-            throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 45-second overall deadline");
+            throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 30-second overall deadline");
         }
         return (int) Math.max(1, Math.min(Integer.MAX_VALUE, remaining));
     }
