@@ -18,7 +18,9 @@ FastAPI's interactive schema is available at /docs when the backend is running.
 - POST /api/v1/analyze/logs — deterministic analysis of supplied log text.
 - GET /api/v1/analyses — recent saved log analyses.
 
-When BHARATSIM_REQUIRE_API_KEY=true, /api/v1 routes require X-BharatSim-API-Key. This is a single shared-key gate for private deployments, not multi-user authentication.
+When `BHARATSIM_AUTH_REQUIRED=true`, customer-data endpoints require a verified Supabase Auth access token in the `Authorization: Bearer` header. The backend validates the JWT against the configured project's JWKS and scopes run/analysis reads, writes, report exports, and run deletion by the verified user UUID. The frontend can use email/password Supabase Auth when its public URL and publishable/legacy anon key are configured.
+
+When `BHARATSIM_REQUIRE_API_KEY=true`, `/api/v1` routes additionally require `X-BharatSim-API-Key`. This is an optional shared-key gate for private deployments, not a substitute for multi-user authentication. The shared API key and the Supabase user JWT are separate credentials.
 
 ## Worker protocol
 
