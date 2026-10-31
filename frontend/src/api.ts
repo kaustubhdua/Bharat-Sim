@@ -81,7 +81,7 @@ export type Worker = {
   id: string;
   status: string;
   online: boolean;
-  current_run_id?: string | null;
+  busy?: boolean;
   last_seen: string;
 };
 

@@ -218,7 +218,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-BharatSim-API-Key"],
 )
 
@@ -926,9 +926,88 @@ def worker_status():
             online = (now - seen).total_seconds() <= 90
         except (TypeError, ValueError):
             online = False
+        # Do not expose a worker's current run ID: it may belong to another tenant.
         items.append({"id": row["id"], "last_seen": row["last_seen"], "status": row["status"] if online else "offline",
-                      "online": online, "current_run_id": row["current_run_id"] if online else None})
+                      "online": online, "busy": bool(online and row["current_run_id"])})
     return {"items": items, "online_count": sum(1 for item in items if item["online"])}
+
+
+@app.delete("/api/v1/runs/{run_id}")
+def delete_run(run_id: str, request: Request):
+    """Delete a user's run and its associated evidence; never interrupt an active worker."""
+    with db() as conn:
+        if AUTH_REQUIRED:
+            row = conn.execute(
+                "SELECT id,status,apk_path,apk_storage_path FROM runs WHERE id=? AND owner_id=?",
+                (run_id, request.state.owner_id),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT id,status,apk_path,apk_storage_path FROM runs WHERE id=?",
+                (run_id,),
+            ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Run not found")
+        if row["status"] in ("leased", "running"):
+            raise HTTPException(
+                status_code=409,
+                detail="This run is being executed by a worker. Wait for it to finish before deleting its evidence.",
+            )
+        # Transition first so a concurrent worker claim cannot acquire this queued run
+        # while the external object is being deleted. Keep the row if cleanup fails so
+        # the user can retry deletion safely.
+        if AUTH_REQUIRED:
+            updated = conn.execute(
+                "UPDATE runs SET status='cancelled',error='Deleted by owner',lease_token=NULL,lease_until=NULL,updated_at=? "
+                "WHERE id=? AND owner_id=? AND status NOT IN ('leased','running')",
+                (utcnow(), run_id, request.state.owner_id),
+            )
+        else:
+            updated = conn.execute(
+                "UPDATE runs SET status='cancelled',error='Deleted by owner',lease_token=NULL,lease_until=NULL,updated_at=? "
+                "WHERE id=? AND status NOT IN ('leased','running')",
+                (utcnow(), run_id),
+            )
+        if updated.rowcount != 1:
+            raise HTTPException(status_code=409, detail="Run state changed; refresh before deleting")
+        conn.execute(
+            "UPDATE workers SET status='idle',current_run_id=NULL WHERE current_run_id=?",
+            (run_id,),
+        )
+
+    apk_path = Path(row["apk_path"]).resolve() if row["apk_path"] else None
+    if apk_path:
+        if apk_path.parent != UPLOAD_DIR.resolve():
+            raise HTTPException(status_code=503, detail="Run was cancelled, but its local APK path failed the storage safety check")
+        try:
+            apk_path.unlink(missing_ok=True)
+        except OSError as exc:
+            raise HTTPException(status_code=503, detail="Run was cancelled, but its local APK could not be deleted; retry deletion") from exc
+    if row["apk_storage_path"]:
+        try:
+            delete_private_object(row["apk_storage_path"])
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="Run was cancelled, but its private APK could not be deleted; retry deletion") from exc
+
+    with db() as conn:
+        if AUTH_REQUIRED:
+            conn.execute(
+                "DELETE FROM analyses WHERE run_id=? AND owner_id=?",
+                (run_id, request.state.owner_id),
+            )
+            deleted = conn.execute(
+                "DELETE FROM runs WHERE id=? AND owner_id=? AND status='cancelled'",
+                (run_id, request.state.owner_id),
+            )
+        else:
+            conn.execute("DELETE FROM analyses WHERE run_id=?", (run_id,))
+            deleted = conn.execute(
+                "DELETE FROM runs WHERE id=? AND status='cancelled'",
+                (run_id,),
+            )
+        if deleted.rowcount != 1:
+            raise HTTPException(status_code=409, detail="Run cleanup completed, but the record changed; refresh and retry")
+    return {"id": run_id, "deleted": True}
 
 
 @app.get("/api/v1/runs/{run_id}")
