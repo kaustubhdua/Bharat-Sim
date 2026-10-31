@@ -30,6 +30,7 @@ import {
   fallbackPersonas,
   isRunActive,
   type Analysis,
+  type Capabilities,
   type Persona,
   type Run,
   type Worker
@@ -41,6 +42,7 @@ import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
 import RunDetailView from "./components/RunDetailView";
+import CapabilityPanel from "./components/CapabilityPanel";
 
 const API_DOCS_URL = API || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
 
@@ -59,6 +61,7 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [apiStatus, setApiStatus] = useState("checking");
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [loading, setLoading] = useState(true);
 
   const persona = personas.find((p) => p.id === selected) || fallbackPersonas[0];
@@ -72,19 +75,22 @@ export default function App() {
   async function refresh(silent = false) {
     if (!silent) setLoading(true);
     try {
-      const [p, r, w] = await Promise.all([
+      const [p, r, w, capabilityContract] = await Promise.all([
         api<{ items: Persona[] }>("/api/v1/personas"),
         api<{ items: Run[] }>("/api/v1/runs"),
-        api<{ items: Worker[] }>("/api/v1/workers")
+        api<{ items: Worker[] }>("/api/v1/workers"),
+        api<Capabilities>("/api/v1/capabilities")
       ]);
       setPersonas(p.items);
       setRuns(r.items);
       setWorkers(w.items);
+      setCapabilities(capabilityContract);
       setApiStatus("online");
       setError("");
     } catch (err) {
       setApiStatus("offline");
       setWorkers([]);
+      setCapabilities(null);
       setError(
         err instanceof Error && err.message
           ? err.message
@@ -631,6 +637,8 @@ export default function App() {
                       </div>
                     )}
                   </section>
+
+                  <CapabilityPanel capabilities={capabilities} loading={loading} />
                 </div>
               }
             />
