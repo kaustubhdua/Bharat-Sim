@@ -66,40 +66,50 @@ def prepare_supported_transport() -> None:
     Android may install routes in per-network policy tables. Inspect all IPv4
     tables before failing the preflight; the actual HTTPS probe remains the
     final data-plane check. Wi-Fi is excluded because emulator-console shaping
-    does not cover modern Wi-Fi traffic.
+    does not cover modern Wi-Fi traffic. A single radio re-registration is
+    attempted when a cold-booted emulator reports no active cellular route.
     """
-    adb("shell", "settings", "put", "global", "airplane_mode_on", "0")
-    # The global setting alone does not guarantee the framework has processed the radio state.
-    adb("shell", "cmd", "connectivity", "airplane-mode", "disable")
-    adb("shell", "settings", "put", "global", "mobile_data", "1")
-    # svc data drives the Android telephony service; the settings value alone is not sufficient.
-    adb("shell", "svc", "data", "enable")
-    adb("shell", "cmd", "phone", "data", "enable")
-    adb("emu", "gsm", "voice", "home")
-    adb("emu", "gsm", "data", "home")
-    adb("shell", "svc", "wifi", "disable")
-
-    deadline = time.monotonic() + 30
     last_route = ""
     last_route6 = ""
     last_rules = ""
     last_connectivity = ""
     last_gsm = ""
-    while time.monotonic() < deadline:
-        try:
-            last_route = adb("shell", "ip", "route", "show", "table", "all", timeout=5)
-            last_route6 = adb("shell", "ip", "-6", "route", "show", "table", "all", timeout=5)
-            last_rules = adb("shell", "ip", "rule", "show", timeout=5)
-            last_connectivity = adb("shell", "dumpsys", "connectivity", timeout=8)
-            last_gsm = adb("emu", "gsm", "status", timeout=5)
-            # Android's per-network policy routes are not always visible in the
-            # main route table. Require an active supported network here; the
-            # Network-bound HTTPS transfer below is the final route/data-plane proof.
-            if has_supported_active_transport(last_connectivity):
-                return
-        except Exception as exc:
-            last_gsm = f"preflight command failed: {exc}"
-        time.sleep(1)
+    for attempt in range(2):
+        adb("shell", "settings", "put", "global", "airplane_mode_on", "0")
+        adb("shell", "cmd", "connectivity", "airplane-mode", "disable")
+        adb("shell", "settings", "put", "global", "mobile_data", "1")
+        adb("shell", "svc", "data", "enable")
+        adb("shell", "cmd", "phone", "data", "enable")
+        adb("emu", "gsm", "voice", "home")
+        adb("emu", "gsm", "data", "home")
+        adb("shell", "svc", "wifi", "disable")
+
+        deadline = time.monotonic() + 45
+        while time.monotonic() < deadline:
+            try:
+                last_route = adb("shell", "ip", "route", "show", "table", "all", timeout=5)
+                last_route6 = adb("shell", "ip", "-6", "route", "show", "table", "all", timeout=5)
+                last_rules = adb("shell", "ip", "rule", "show", timeout=5)
+                last_connectivity = adb("shell", "dumpsys", "connectivity", timeout=8)
+                last_gsm = adb("emu", "gsm", "status", timeout=5)
+                # Android's per-network policy routes are not always visible in the
+                # main route table. Require an active supported network here; the
+                # Network-bound HTTPS transfer below is the final route/data-plane proof.
+                if has_supported_active_transport(last_connectivity):
+                    return
+            except Exception as exc:
+                last_gsm = f"preflight command failed: {exc}"
+            time.sleep(1)
+
+        if attempt == 0:
+            # A cold-booted emulator can report GSM data=home before ConnectivityService
+            # has registered a default cellular Network. Re-register the radio once.
+            adb("shell", "svc", "data", "disable")
+            time.sleep(2)
+            adb("shell", "svc", "data", "enable")
+            adb("shell", "cmd", "phone", "data", "enable")
+            adb("emu", "gsm", "data", "home")
+            time.sleep(5)
 
     raise RuntimeError(
         "Android emulator has no active supported cellular/Ethernet network; "
@@ -108,7 +118,6 @@ def prepare_supported_transport() -> None:
         f"IPv6 routes={last_route6[-2500:]!r}; rules={last_rules[-2500:]!r}; "
         f"connectivity={last_connectivity[-4000:]!r}"
     )
-
 
 def speed_limits_bps(speed: str) -> tuple[int, int]:
     """Return expected (upload, download) bits/s for supported emulator speed profiles."""
