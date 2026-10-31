@@ -265,7 +265,7 @@ def network_probe_log_tail() -> str:
         return f"Could not collect device probe logcat: {exc}"
 
 
-def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 120) -> dict:
+def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 45) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
@@ -305,7 +305,7 @@ def main() -> int:
                     "appium:appPackage": "org.bharatsim.smokeapp",
                     "appium:appActivity": ".MainActivity",
                     "appium:noReset": True,
-                    "appium:newCommandTimeout": 120,
+                    "appium:newCommandTimeout": 60,
                 },
                 "firstMatch": [{}],
             }

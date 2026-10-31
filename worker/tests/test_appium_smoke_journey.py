@@ -13,6 +13,8 @@ class ProbeContractTests(unittest.TestCase):
         gradle = (root / "smoke-android/app/build.gradle").read_text()
         self.assertEqual(journey.PROBE_BYTES, 256_000)
         self.assertEqual(journey.BANDWIDTH_PROFILE, "umts")
+        self.assertIn("timeout: int = 45", (root / "worker/tests/appium_smoke_journey.py").read_text())
+        self.assertIn('"appium:newCommandTimeout": 60', (root / "worker/tests/appium_smoke_journey.py").read_text())
         self.assertEqual(journey.speed_limits_bps("umts"), (384_000, 384_000))
         self.assertIn("PROBE_BYTES = 256_000", java)
         self.assertIn("PROBE_TIMEOUT_MS = 30_000", java)
