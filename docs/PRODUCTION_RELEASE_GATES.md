@@ -9,17 +9,19 @@ This document is the release checklist for turning BharatSim from a credible loc
 ## P0 — Safety and tenant boundaries
 
 - [ ] Add real user identity (or an explicitly scoped single-tenant access model) and enforce authorization on every run, report, log analysis, download, and artifact endpoint.
-- [ ] Add cross-user denial tests: user A must not list, read, download, cancel, or infer user B's run or artifact. Test unauthenticated and expired sessions too.
+- [ ] Complete cross-user denial coverage for every customer-data route, including list/read/report export/delete, analyses, and any future artifact endpoints. Current regression tests cover run listing/detail, report export, deletion, analysis listing, and worker run-ID non-disclosure; live Supabase Auth and expired-session behavior still require deployment-level verification.
 - [ ] Run each untrusted APK only in a disposable VM or equivalently strong isolation boundary. No host secrets, privileged container, Docker socket, host filesystem mounts, or access to cloud metadata; default-deny egress except explicitly approved test targets.
 - [ ] Enforce per-job CPU, memory, disk, process, wall-clock and network quotas. Ensure timeout/cancellation actually stops ADB, emulator, Appium and child processes.
 - [ ] Add per-user upload/run/concurrency quotas, abuse controls, audit events, and documented artifact retention/deletion.
-- [ ] Store reports, screenshots and logs in private object storage with generated object names, authorization checks, bounded retention, and integrity hashes. Do not rely on a local container filesystem for multi-instance production.
+- [ ] Store reports, screenshots and logs in private object storage with generated object names, authorization checks, bounded retention, and integrity hashes. The current run-report download is generated from bounded database JSON and is not durable object storage. Do not rely on a local container filesystem for multi-instance production.
 - [ ] Add security tests for malformed APK archives, decompression bombs, oversized multipart bodies/results, path traversal, package-name injection, malicious redirect targets, replayed callbacks, stale leases, worker crashes and cleanup failures.
 - [ ] Obtain a documented threat-model/security review before enabling public execution.
 
 **Acceptance evidence:** tests and review results attached to the exact release commit; isolation/egress policy verified from inside the worker environment; cross-tenant tests fail closed; cancellation and cleanup tests prove no active child process or artifact remains.
 
 ## P0 — Prove what a test actually did
+
+**Recent implementation:** the run detail page now exports an owner-scoped JSON report with SHA-256 integrity metadata. This is a download/export capability, not yet private object-storage retention or a CI artifact manifest for every customer run.
 
 - [ ] Maintain a real disposable-emulator CI journey: upload APK → validate/hash → queue → lease → install/launch → collect logcat → Appium assertions → authenticated callback → persisted report.
 - [ ] Add negative real-worker journeys for invalid APK/manifest, install failure, launch failure, app crash, ANR/timeout, worker termination, expired lease, duplicate/stale callback and retry exhaustion.

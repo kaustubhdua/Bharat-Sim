@@ -9,6 +9,9 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - Jobs are leased to a worker; the lease token is required to download an APK, renew a lease, and submit a result.
 - Expired leases are retried up to three claims. Stale/duplicate results are rejected.
 - Inline worker result JSON is capped at 250 KB.
+- Authenticated users can delete their own non-active runs. The API first atomically transitions queued/awaiting runs to `cancelled`, blocks deletion of leased/running jobs, removes the associated APK and run-linked analyses, and retains a cancelled row if storage cleanup fails so deletion can be retried.
+- Run detail pages can export the stored report as a private, non-cacheable JSON download. The export contains the run metadata, the original report, a stable SHA-256 over canonical report JSON, and a separate SHA-256/ETag for the downloaded file.
+- The authenticated worker status endpoint no longer returns `current_run_id`; it exposes only an online/busy summary so another tenant's run identifier is not disclosed.
 - Before submitting worker evidence, common bearer credentials, key/token/password/secret key-value fields, secret query parameters, and JWT-shaped strings are redacted recursively from report text.
 - When server-side Supabase Storage credentials are configured, APKs are streamed into the private `bharatsim-private` bucket using generated `runs/<uuid>/input.apk` object paths; worker downloads are proxied through the authenticated lease endpoint, and terminal results trigger object deletion. Local development without Storage credentials retains the local-filesystem path. Abandoned local/private uploads expire after 24 hours when cleanup is invoked during startup, run creation, or worker claim requests.
 - The runner has an explicit opt-in environment guard, explicit Android serial, bounded duration, APK size limit, bounded archive metadata checks, and command timeouts.
@@ -24,8 +27,8 @@ BharatSim accepts APK files, which are untrusted executable code. The current re
 - APK archive checks are not malware scanning and do not make an APK safe.
 - The worker agent and runner do not create a sandbox by themselves. A compromised APK may act with the privileges of the Android guest and potentially attack reachable infrastructure.
 - There is no per-run disposable VM snapshot/revert, hardened container/VM policy, verified network egress isolation, or complete cancellation of active device operations.
-- Inline logcat evidence and worker reports remain bounded JSON in the database; they are not yet separate object artifacts. APK upload expiry is 24 hours but cleanup is request/startup-driven, not a background scheduler. Storage lifecycle rules and a user-facing artifact deletion workflow are not yet configured.
-- There are no quotas, billing controls, per-user limits, or full audit trail for a multi-user service.
+- Inline logcat evidence and worker reports remain bounded JSON in the database; they are not yet separate object artifacts. Report export is generated on demand from the stored JSON rather than persisted as a separate object. APK upload expiry is 24 hours but cleanup is request/startup-driven, not a background scheduler. Storage lifecycle rules and a background retention scheduler are not yet configured. Run-level deletion is available, but independent artifact-level deletion is not.
+- There are no enforced per-user quotas, billing controls, concurrency limits, or complete audit trail for a multi-user service.
 - A configured worker token means dispatch is configured; it does not prove a live worker or emulator exists.
 
 ## Before public APK execution
