@@ -66,17 +66,13 @@ class SupportedRoutePreflightTests(unittest.TestCase):
 
     def test_preflight_retries_radio_registration_after_transient_no_route(self):
         with (
-            patch.object(journey, "adb", side_effect=self._fake_adb("")),
+            patch.object(journey, "adb", side_effect=self._fake_adb("")) as adb_call,
             patch.object(journey, "has_supported_active_transport", side_effect=[False, True]),
             patch.object(journey.time, "sleep"),
             patch.object(journey.time, "monotonic", side_effect=[0, 0, 46, 46, 46]),
-        ) as _:
+        ):
             journey.prepare_supported_transport()
 
-        # The second attempt explicitly bounces mobile data before accepting the route.
-        with patch.object(journey, "adb", side_effect=self._fake_adb("Cellular active networks: {100}")) as adb_call:
-            with patch.object(journey.time, "sleep"):
-                journey.prepare_supported_transport()
         commands = [call.args for call in adb_call.call_args_list]
         self.assertTrue(any(args[:4] == ("shell", "svc", "data", "disable") for args in commands))
         self.assertGreaterEqual(sum(args[:4] == ("shell", "svc", "data", "enable") for args in commands), 2)
