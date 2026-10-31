@@ -109,3 +109,12 @@
 .condition-chip.unsupported{border-color:#543a35;background:#2b1d1b;color:#e7a59a}
 @media(max-width:1000px){.capability-groups{grid-template-columns:1fr 1fr}.capability-group:last-child{grid-column:1/-1}}
 @media(max-width:650px){.capability-groups{grid-template-columns:1fr}.capability-group:last-child{grid-column:auto}.capability-row{font-size:9px}.capability-status{font-size:7px}}
+
+
+/* Explicit destructive action for privacy-preserving run deletion */
+.detail-actions{display:flex;align-items:center;gap:8px}
+.danger-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 11px;border:1px solid #70413b;border-radius:7px;background:#2a1b19;color:#f0b0a5;font:10px var(--mono);cursor:pointer;transition:background .15s,border-color .15s}
+.danger-button:hover:not(:disabled){background:#3a211e;border-color:#a35b4e}
+.danger-button:focus-visible{outline:2px solid #f0b0a5;outline-offset:2px}
+.danger-button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:520px){.detail-actions{gap:6px}.danger-button{padding:7px 8px;font-size:9px}}

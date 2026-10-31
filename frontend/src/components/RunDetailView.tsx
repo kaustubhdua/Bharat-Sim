@@ -3,18 +3,21 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle2,
+  Download,
   CircleAlert,
   Clock3,
   FileSearch,
   Layers3,
   LoaderCircle,
   RefreshCw,
+  Trash2,
   ShieldAlert,
   ShieldCheck,
   Wifi
 } from "lucide-react";
 import {
   api,
+  downloadApi,
   displayRunStatus,
   date,
   isRunActive,
@@ -56,6 +59,7 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchRun = useCallback(
     async (showLoadingSpinner = true) => {
@@ -73,6 +77,44 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
     },
     [id]
   );
+
+  const handleDownloadReport = async () => {
+    if (!id || !run?.result) return;
+    setError("");
+    try {
+      const blob = await downloadApi("/api/v1/runs/" + encodeURIComponent(id) + "/report");
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = "bharatsim-" + id + "-report.json";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not export run report");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id || !run || isRunActive(run.status) || deleting) return;
+    const confirmed = window.confirm(
+      "Permanently delete this test run and its associated analysis evidence? This cannot be undone."
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await api<{ id: string; deleted: boolean }>(
+        "/api/v1/runs/" + encodeURIComponent(id),
+        { method: "DELETE" }
+      );
+      navigate("/runs");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete test run");
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     void fetchRun(true);
@@ -195,14 +237,32 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
         <button className="text-button" onClick={() => navigate("/runs")}>
           <ArrowLeft size={15} /> Back to all test runs
         </button>
-        <button
-          className="icon-button"
-          onClick={() => void fetchRun(true)}
-          aria-label="Refresh run evidence"
-          disabled={loading}
-        >
-          <RefreshCw size={15} className={loading ? "spin" : ""} />
-        </button>
+        <div className="detail-actions">
+          <button
+            className="secondary-button report-export-button"
+            onClick={() => void handleDownloadReport()}
+            disabled={!run.result || deleting}
+          >
+            <Download size={14} /> Export report
+          </button>
+          <button
+            className="danger-button"
+            onClick={() => void handleDelete()}
+            disabled={isRunActive(run.status) || deleting}
+            title={isRunActive(run.status) ? "Wait until worker execution finishes before deleting" : "Permanently delete this run and its evidence"}
+          >
+            {deleting ? <LoaderCircle size={14} className="spin" /> : <Trash2 size={14} />}
+            {deleting ? "Deleting…" : "Delete run"}
+          </button>
+          <button
+            className="icon-button"
+            onClick={() => void fetchRun(true)}
+            aria-label="Refresh run evidence"
+            disabled={loading}
+          >
+            <RefreshCw size={15} className={loading ? "spin" : ""} />
+          </button>
+        </div>
       </div>
 
       {/* Header with APK name, persona and status */}

@@ -154,11 +154,30 @@ def test_supabase_auth_required_and_run_data_is_owner_scoped(monkeypatch, tmp_pa
 
     analysis_a = client.post(
         "/api/v1/analyze/logs", headers=user_a,
-        json={"text": "FATAL EXCEPTION: main", "persona_id": "baseline"},
+        json={"text": "FATAL EXCEPTION: main", "persona_id": "baseline", "run_id": run_id},
     )
     assert analysis_a.status_code == 200
     assert len(client.get("/api/v1/analyses", headers=user_a).json()["items"]) == 1
     assert client.get("/api/v1/analyses", headers=user_b).json()["items"] == []
+
+    # Worker health is visible to authenticated users, but cross-tenant run IDs are not.
+    with main.db() as conn:
+        conn.execute(
+            "INSERT INTO workers(id,last_seen,status,current_run_id) VALUES(?,?,?,?)",
+            ("privacy-worker", main.utcnow(), "running", run_id),
+        )
+    worker_items = client.get("/api/v1/workers", headers=user_a).json()["items"]
+    assert worker_items
+    assert "current_run_id" not in worker_items[0]
+    assert worker_items[0]["busy"] is True
+
+    apk_path = main.UPLOAD_DIR / f"{run_id}.apk"
+    assert apk_path.is_file()
+    assert client.delete(f"/api/v1/runs/{run_id}", headers=user_b).status_code == 404
+    assert client.delete(f"/api/v1/runs/{run_id}", headers=user_a).json() == {"id": run_id, "deleted": True}
+    assert not apk_path.exists()
+    assert client.get(f"/api/v1/runs/{run_id}", headers=user_a).status_code == 404
+    assert client.get("/api/v1/analyses", headers=user_a).json()["items"] == []
 
 
 def test_supabase_auth_rejects_invalid_access_tokens(monkeypatch):
@@ -205,3 +224,79 @@ def test_supabase_jwt_verifier_checks_signature_and_required_claims(monkeypatch)
     bad_token = main.jwt.encode(wrong_audience, private_key, algorithm="ES256", headers={"kid": "unit-test"})
     with pytest.raises(main.InvalidTokenError):
         main.verify_supabase_access_token(bad_token)
+
+
+def test_run_deletion_refuses_to_interrupt_an_active_worker(monkeypatch, tmp_path):
+    from app import main
+
+    data_dir = tmp_path / "active-run-data"
+    data_dir.mkdir()
+    monkeypatch.setattr(main, "DB_PATH", data_dir / "active.sqlite3")
+    monkeypatch.setattr(main, "DATA_DIR", data_dir)
+    monkeypatch.setattr(main, "UPLOAD_DIR", data_dir / "uploads")
+    main.UPLOAD_DIR.mkdir()
+    main.init_db()
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setenv("BHARATSIM_REQUIRE_API_KEY", "false")
+    owner_id = "11111111-1111-4111-8111-111111111111"
+    monkeypatch.setattr(main, "verify_supabase_access_token", lambda token: owner_id)
+    now = main.utcnow()
+    with main.db() as conn:
+        conn.execute(
+            "INSERT INTO runs(id,created_at,updated_at,status,persona_id,owner_id) VALUES(?,?,?,?,?,?)",
+            ("active-run", now, now, "leased", "baseline", owner_id),
+        )
+    response = client.delete(
+        "/api/v1/runs/active-run",
+        headers={"Authorization": "Bearer user-a-token"},
+    )
+    assert response.status_code == 409
+    assert client.get(
+        "/api/v1/runs/active-run",
+        headers={"Authorization": "Bearer user-a-token"},
+    ).status_code == 200
+
+
+def test_run_report_export_is_owner_scoped_and_integrity_tagged(monkeypatch, tmp_path):
+    import hashlib
+    import json
+    from app import main
+
+    data_dir = tmp_path / "report-export-data"
+    data_dir.mkdir()
+    monkeypatch.setattr(main, "DB_PATH", data_dir / "report.sqlite3")
+    monkeypatch.setattr(main, "DATA_DIR", data_dir)
+    monkeypatch.setattr(main, "UPLOAD_DIR", data_dir / "uploads")
+    main.UPLOAD_DIR.mkdir()
+    main.init_db()
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setenv("BHARATSIM_REQUIRE_API_KEY", "false")
+    owners = {
+        "user-a-token": "11111111-1111-4111-8111-111111111111",
+        "user-b-token": "22222222-2222-4222-8222-222222222222",
+    }
+    monkeypatch.setattr(main, "verify_supabase_access_token", lambda token: owners[token])
+    report = {"status": "completed", "apk_sha256": "a" * 64, "steps": [{"name": "install", "return_code": 0}]}
+    encoded = json.dumps(report, ensure_ascii=False)
+    now = main.utcnow()
+    with main.db() as conn:
+        conn.execute(
+            "INSERT INTO runs(id,created_at,updated_at,status,apk_name,apk_sha256,persona_id,result_json,owner_id) "
+            "VALUES(?,?,?,?,?,?,?,?,?)",
+            ("report-run", now, now, "completed", "sample.apk", "a" * 64, "baseline", encoded, owners["user-a-token"]),
+        )
+
+    user_a = {"Authorization": "Bearer user-a-token"}
+    user_b = {"Authorization": "Bearer user-b-token"}
+    response = client.get("/api/v1/runs/report-run/report", headers=user_a)
+    assert response.status_code == 200
+    exported = response.json()
+    assert exported["schema_version"] == "1.0"
+    assert exported["run"]["id"] == "report-run"
+    assert exported["report"] == report
+    canonical = json.dumps(report, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    assert exported["integrity"]["report_sha256"] == hashlib.sha256(canonical).hexdigest()
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.headers["x-content-sha256"] == hashlib.sha256(response.content).hexdigest()
+    assert response.headers["etag"].strip('"') == hashlib.sha256(response.content).hexdigest()
+    assert client.get("/api/v1/runs/report-run/report", headers=user_b).status_code == 404
