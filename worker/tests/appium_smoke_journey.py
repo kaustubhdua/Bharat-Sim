@@ -252,8 +252,8 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
 
 
 # Each fixture probe transfers 500 KB. The 1 Mbps bandwidth profile needs about 4 seconds
-# for payload bytes alone; the device socket has a 30-second bounded read timeout to tolerate
-# real endpoint/TLS variation without treating an incomplete transfer as a measurement.
+# for payload bytes alone; the Android fixture enforces a 90-second overall deadline across
+# connect, TLS, headers, body reads, and one bounded retry. Incomplete transfers are not measurements.
 def network_probe_log_tail() -> str:
     """Return real device-side probe diagnostics when a UI wait fails."""
     try:

@@ -35,7 +35,7 @@ public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
     private static final int PROBE_BYTES = 500_000;
-    private static final int PROBE_TIMEOUT_MS = 45_000;
+    private static final int PROBE_TIMEOUT_MS = 90_000;
     private static final int MAX_HTTP_LINE_BYTES = 8_192;
     private static final int MAX_HTTP_HEADER_COUNT = 100;
     private static final int MAX_HTTP_HEADER_BYTES = 32_768;
@@ -307,7 +307,7 @@ public final class MainActivity extends Activity {
     private static int remainingTimeoutMs(long deadlineAt) throws IOException {
         long remaining = deadlineAt - SystemClock.elapsedRealtime();
         if (remaining <= 0) {
-            throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 45-second overall deadline");
+            throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 90-second overall deadline");
         }
         return (int) Math.max(1, Math.min(Integer.MAX_VALUE, remaining));
     }

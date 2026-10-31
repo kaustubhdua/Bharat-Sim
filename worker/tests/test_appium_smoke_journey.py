@@ -1,7 +1,15 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from worker.tests import appium_smoke_journey as journey
+
+
+class AndroidProbeTimeoutContractTests(unittest.TestCase):
+    def test_fixture_has_a_bounded_90_second_overall_deadline(self):
+        source = (Path(__file__).resolve().parents[2] / "smoke-android/app/src/main/java/org/bharatsim/smokeapp/MainActivity.java").read_text(encoding="utf-8")
+        self.assertIn("PROBE_TIMEOUT_MS = 90_000", source)
+        self.assertIn("exceeded its 90-second overall deadline", source)
 
 
 class SupportedRoutePreflightTests(unittest.TestCase):
