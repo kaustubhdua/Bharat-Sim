@@ -65,3 +65,10 @@ test("dashboard remains usable at narrow mobile widths without horizontal overfl
     ).toBeLessThanOrEqual(dimensions.viewport);
   }
 });
+
+
+test("API documentation link stays same-origin in production builds", async ({ page }) => {
+  await page.goto("/");
+  const docsLink = page.getByRole("link", { name: /API documentation/ });
+  await expect(docsLink).toHaveAttribute("href", /^(https?:\\/\\/127\\.0\\.0\\.1:8000)?\\/docs$/);
+});
