@@ -1,35 +1,66 @@
 # Reproducible Android emulator smoke test
 
-BharatSim includes a small, known-good Android fixture app and a GitHub Actions workflow that builds it, boots a disposable Android emulator, starts a local FastAPI instance and authenticated worker with an ephemeral token, uploads the fixture through the API, verifies the queue/lease/ADB/result-callback path and saved report, then runs an Appium UI journey.
+BharatSim's Android emulator workflow validates two separate things:
 
-## What this proves
+1. The real local product path: FastAPI upload → queued run → authenticated worker lease → ADB install/launch/logcat → worker callback → persisted run report.
+2. A controlled Appium network experiment from the fixture Android app, using the active Android `Network` socket factory and a real HTTPS transfer.
 
-When the Android emulator smoke evidence workflow passes, it demonstrates that the checked-in runner can, in that CI environment:
-1. Observe an online emulator.
-2. Read package metadata from a built APK.
-3. Install the APK.
-4. Launch its launcher activity.
-5. Collect logcat evidence.
-6. Emit a report with the APK SHA-256 and expected package name.
-7. Attempt uninstall cleanup.
+The workflow uses a source-built fixture APK. It does not execute an arbitrary customer APK.
 
-The workflow uploads its report as a short-lived GitHub Actions artifact. It does not submit to the production API and does not prove arbitrary third-party apps work.
+## What the workflow verifies
 
-## Run it
+### Product execution path
 
-Open GitHub Actions, select Android emulator smoke evidence, and choose Run workflow. It also runs on pull requests changing the runner, runner tests, smoke app, or this workflow. Inspect the run and download the bharatsim-android-emulator-smoke artifact.
+- Starts a disposable Android emulator with Wi-Fi disabled and checks the observed supported transport.
+- Starts a local FastAPI instance and a worker with an ephemeral CI-only token.
+- Waits for the worker to register before uploading any APK.
+- Uploads the fixture APK through the same API used by the dashboard.
+- Verifies queue claim, lease, ADB install, launch, logcat collection, APK SHA-256, and the saved worker report.
+- Exercises a real Android install-signature conflict and an intentionally invalid APK. Both must fail closed, preserve failure evidence, and attempt cleanup.
+- Stores JSON reports, worker/API logs, Appium logs, screenshots, and a SHA-256 evidence manifest in the GitHub Actions artifact.
 
-## Explicit limitations
+### Network data-plane experiment
 
-- This is an isolated CI fixture, not physical-device validation.
-- The fixture has no external network requests; it does not prove netem shaping reaches emulator traffic.
-- The workflow also runs an Appium/UiAutomator2 journey that asserts the fixture title, taps the primary-action button, checks the resulting UI state, and saves a screenshot. This is a fixture-app journey, not a user journey for arbitrary uploaded apps.
-- It does not test RAM, storage, or CPU pressure.
-- It does not establish production multi-user auth, worker VM isolation, artifact storage, or public deployment readiness.
-- The emulator workflow is separate from fast CI to keep normal PR checks quick.
+- The fixture downloads exactly 256,000 bytes from the repository-controlled `smoke-android/probe-256k.bin` object over `raw.githubusercontent.com` HTTPS.
+- The workflow resolves the host to IPv4 on the CI runner, pins the fixture socket to that address, and still validates TLS using the HTTPS hostname for SNI and certificate verification.
+- The Appium journey runs one warm-up and three samples for baseline, bandwidth-only, and latency-only conditions.
+- It records HTTP status, exact bytes read, elapsed time, active Android transport, requested and observed emulator profile, and median deltas.
+- It requires the configured bandwidth and latency effects to exceed the test thresholds, then resets emulator network controls and verifies the reset.
+- The CI workflow also runs an independent Linux `netem` traffic-shaper check. That proves the Linux shaping path; it does not substitute for the Android fixture's own traffic-path evidence.
 
-## Upstream projects
+The harness uses the built-in UMTS emulator profile and checks the profile values against the actual API 35 emulator image's console readback. The control-plane status is recorded separately from the measured fixture transfer. A control-plane readback alone is never treated as a successful bandwidth measurement.
 
-- Android Emulator / ADB: https://developer.android.com/studio/run/emulator-commandline
+## What a passing result means
+
+A passing run proves that the source-built fixture app completed the tested HTTP transfers through the observed Android emulator transport under the configured conditions, produced repeatable median deltas, and reset the emulator controls.
+
+It does **not** prove:
+
+- arbitrary third-party APK traffic behaves the same way;
+- production or public-Internet bandwidth/latency for a real user;
+- physical low-cost Android device fidelity;
+- packet-loss, CPU-throttling, or unsupported condition simulation;
+- production worker isolation or public arbitrary-APK execution.
+
+The earlier Cloudflare speed-test endpoint repeatedly stalled on the first bandwidth-only request after successful baseline requests. The current test uses a controlled static fixture object hosted on GitHub's HTTPS CDN to avoid depending on a public speed-test endpoint's per-client throttling. The data transfer itself still occurs over a real external HTTPS path from Android.
+
+## Run it in CI
+
+Open GitHub Actions → **Android emulator smoke evidence** → **Run workflow**. It also runs on pull requests that change the worker, worker tests, Android fixture, CI scripts, or this workflow.
+
+Download the `bharatsim-android-emulator-smoke` artifact. Inspect:
+
+- `api-run.report.json` — successful product execution report;
+- `install-failure.report.json` and `negative-run.report.json` — fail-closed negative fixtures;
+- `appium-journey.report.json` — baseline/latency/bandwidth samples and reset evidence;
+- `appium-failure-logcat.txt` — device-side diagnostics if the network journey fails;
+- `evidence-manifest.json` — SHA-256 and size for each retained evidence file.
+
+Artifacts are retained by GitHub Actions for 14 days. They are CI evidence, not durable customer-run storage.
+
+## Upstream references
+
+- Android Emulator command-line networking: https://developer.android.com/studio/run/emulator-commandline
+- Android Emulator console network controls: https://developer.android.com/studio/run/emulator-console
 - Appium UiAutomator2: https://appium.github.io/appium-uiautomator2-driver/latest/
-- Linux netem: https://www.man7.org/linux/man-pages/man8/netem.8.html
+- Linux `netem`: https://www.man7.org/linux/man-pages/man8/netem.8.html

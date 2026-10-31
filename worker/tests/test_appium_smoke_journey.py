@@ -1,7 +1,26 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from worker.tests import appium_smoke_journey as journey
+
+
+class ProbeContractTests(unittest.TestCase):
+    def test_android_fixture_ci_url_and_harness_share_the_same_bounded_payload(self):
+        root = Path(__file__).resolve().parents[2]
+        java = (root / "smoke-android/app/src/main/java/org/bharatsim/smokeapp/MainActivity.java").read_text()
+        workflow = (root / ".github/workflows/android-emulator-smoke.yml").read_text()
+        gradle = (root / "smoke-android/app/build.gradle").read_text()
+        self.assertEqual(journey.PROBE_BYTES, 256_000)
+        self.assertEqual(journey.BANDWIDTH_PROFILE, "umts")
+        self.assertEqual(journey.speed_limits_bps("umts"), (384_000, 384_000))
+        self.assertIn("PROBE_BYTES = 256_000", java)
+        self.assertIn("PROBE_TIMEOUT_MS = 30_000", java)
+        self.assertEqual(workflow.count("https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/"), 3)
+        self.assertIn("/smoke-android/probe-256k.bin", workflow)
+        self.assertNotIn("speed.cloudflare.com", workflow)
+        self.assertIn("raw.githubusercontent.com", gradle)
+        self.assertIn("probe-256k.bin", gradle)
 
 
 class SupportedRoutePreflightTests(unittest.TestCase):

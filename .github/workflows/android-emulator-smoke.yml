@@ -97,19 +97,19 @@ jobs:
         id: probe-address
         shell: bash
         run: |
-          ip="$(timeout 10s getent ahostsv4 speed.cloudflare.com | awk 'NR == 1 { print $1 }')"
+          ip="$(timeout 10s getent ahostsv4 raw.githubusercontent.com | awk 'NR == 1 { print $1 }')"
           if [[ ! "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-            echo "Could not resolve speed.cloudflare.com to an IPv4 address on the CI host" >&2
+            echo "Could not resolve raw.githubusercontent.com to an IPv4 address on the CI host" >&2
             exit 1
           fi
-          echo "Resolved speed.cloudflare.com to $ip"
+          echo "Resolved raw.githubusercontent.com to $ip"
           # Fail early if the public test endpoint is unavailable from the CI host.
-          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 --range 0-0 --output /dev/null https://speed.cloudflare.com/__down?bytes=500000
+          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 --range 0-0 --output /dev/null https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
           echo "ip=$ip" >> "$GITHUB_OUTPUT"
       - name: Build known-good test APK
         working-directory: smoke-android
         env:
-          BHARATSIM_PROBE_URL: https://speed.cloudflare.com/__down?bytes=500000
+          BHARATSIM_PROBE_URL: https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
           BHARATSIM_PROBE_IP: ${{ steps.probe-address.outputs.ip }}
         run: gradle --no-daemon assembleDebug
       - name: Add Android build-tools to PATH
@@ -128,7 +128,7 @@ jobs:
       - name: Boot disposable Android emulator and execute runner
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          BHARATSIM_PROBE_URL: https://speed.cloudflare.com/__down?bytes=500000
+          BHARATSIM_PROBE_URL: https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
           BHARATSIM_PROBE_IP: ${{ steps.probe-address.outputs.ip }}
         with:
           api-level: 35
