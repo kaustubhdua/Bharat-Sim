@@ -42,6 +42,8 @@ import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
 import RunDetailView from "./components/RunDetailView";
 
+const API_DOCS_URL = API || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -249,7 +251,7 @@ export default function App() {
               : "APK execution waits until an authenticated, isolated Android worker connects."}
           </p>
           <a
-            href={(API || "http://localhost:8000") + "/docs"}
+            href={API_DOCS_URL + "/docs"}
             target="_blank"
             rel="noreferrer"
           >

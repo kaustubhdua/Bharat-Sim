@@ -308,4 +308,40 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("queued for worker");
     expect(container.textContent).toContain("Budget Android");
   });
+  it("RunsTable filters runs by search term and status", async () => {
+    const mockRuns = [
+      { id: "run-alpha", created_at: new Date().toISOString(), status: "queued", apk_name: "alpha.apk", apk_sha256: "aaa", persona_id: "budget-android" },
+      { id: "run-beta", created_at: new Date().toISOString(), status: "completed", apk_name: "beta.apk", apk_sha256: "bbb", persona_id: "baseline" },
+      { id: "run-gamma", created_at: new Date().toISOString(), status: "failed", apk_name: "gamma.apk", apk_sha256: "ccc", persona_id: "edge-village" }
+    ];
+
+    await act(async () => {
+      root.render(<BrowserRouter><RunsTable runs={mockRuns} personas={fallbackPersonas} /></BrowserRouter>);
+    });
+    expect(container.textContent).toContain("Showing 3 of 3 runs");
+
+    const search = container.querySelector('input[type="search"]') as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(search, "beta");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("beta.apk");
+    expect(container.textContent).not.toContain("alpha.apk");
+    expect(container.textContent).toContain("Showing 1 of 3 runs");
+
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(search, "");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const filter = container.querySelector('select[aria-label="Filter runs by status"]') as HTMLSelectElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(filter, "failed");
+      filter.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("gamma.apk");
+    expect(container.textContent).not.toContain("alpha.apk");
+    expect(container.textContent).not.toContain("beta.apk");
+  });
+
 });
