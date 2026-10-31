@@ -22,7 +22,7 @@ from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -1008,6 +1008,60 @@ def delete_run(run_id: str, request: Request):
         if deleted.rowcount != 1:
             raise HTTPException(status_code=409, detail="Run cleanup completed, but the record changed; refresh and retry")
     return {"id": run_id, "deleted": True}
+
+
+@app.get("/api/v1/runs/{run_id}/report")
+def export_run_report(run_id: str, request: Request):
+    """Export a completed worker report with stable report and file integrity hashes."""
+    with db() as conn:
+        if AUTH_REQUIRED:
+            row = conn.execute(
+                "SELECT id,created_at,status,apk_name,apk_sha256,persona_id,result_json,error "
+                "FROM runs WHERE id=? AND owner_id=?",
+                (run_id, request.state.owner_id),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT id,created_at,status,apk_name,apk_sha256,persona_id,result_json,error "
+                "FROM runs WHERE id=?",
+                (run_id,),
+            ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if not row["result_json"]:
+        raise HTTPException(status_code=409, detail="No worker report is available for this run yet")
+    report = json.loads(row["result_json"])
+    canonical_report = json.dumps(report, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    export = {
+        "schema_version": "1.0",
+        "generated_at": utcnow(),
+        "run": {
+            "id": row["id"],
+            "created_at": row["created_at"],
+            "status": row["status"],
+            "apk_name": row["apk_name"],
+            "apk_sha256": row["apk_sha256"],
+            "persona_id": row["persona_id"],
+            "error": row["error"],
+        },
+        "report": report,
+        "integrity": {
+            "report_sha256": hashlib.sha256(canonical_report).hexdigest(),
+            "report_hash_method": "SHA-256 of UTF-8 JSON serialized with sorted keys and compact separators",
+        },
+    }
+    content = json.dumps(export, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
+    file_digest = hashlib.sha256(content).hexdigest()
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": 'attachment; filename="bharatsim-run-report.json"',
+            "Cache-Control": "private, no-store",
+            "ETag": f'"{file_digest}"',
+            "X-Content-SHA256": file_digest,
+        },
+    )
 
 
 @app.get("/api/v1/runs/{run_id}")

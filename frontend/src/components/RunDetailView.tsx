@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle2,
+  Download,
   CircleAlert,
   Clock3,
   FileSearch,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   api,
+  downloadApi,
   displayRunStatus,
   date,
   isRunActive,
@@ -75,6 +77,24 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
     },
     [id]
   );
+
+  const handleDownloadReport = async () => {
+    if (!id || !run?.result) return;
+    setError("");
+    try {
+      const blob = await downloadApi("/api/v1/runs/" + encodeURIComponent(id) + "/report");
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = "bharatsim-" + id + "-report.json";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not export run report");
+    }
+  };
 
   const handleDelete = async () => {
     if (!id || !run || isRunActive(run.status) || deleting) return;
@@ -218,6 +238,13 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
           <ArrowLeft size={15} /> Back to all test runs
         </button>
         <div className="detail-actions">
+          <button
+            className="secondary-button report-export-button"
+            onClick={() => void handleDownloadReport()}
+            disabled={!run.result || deleting}
+          >
+            <Download size={14} /> Export report
+          </button>
           <button
             className="danger-button"
             onClick={() => void handleDelete()}

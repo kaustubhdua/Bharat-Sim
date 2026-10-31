@@ -269,6 +269,28 @@ export const fallbackPersonas: Persona[] = [
   }
 ];
 
+export async function downloadApi(path: string): Promise<Blob> {
+  const token = sessionStorage.getItem("bharatsim.supabase.session");
+  let accessToken = "";
+  if (token) {
+    try { accessToken = JSON.parse(token).access_token || ""; }
+    catch { sessionStorage.removeItem("bharatsim.supabase.session"); }
+  }
+  const headers = new Headers();
+  if (accessToken) headers.set("Authorization", "Bearer " + accessToken);
+  let response: Response;
+  try {
+    response = await fetch(API + path, { headers });
+  } catch {
+    throw new Error("API is down or unreachable. Could not connect to backend server.");
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.detail || `Request failed (${response.status})`);
+  }
+  return response.blob();
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     const token = sessionStorage.getItem("bharatsim.supabase.session");
