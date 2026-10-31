@@ -9,10 +9,12 @@ FastAPI's interactive schema is available at /docs when the backend is running.
 - GET /api/v1/capabilities — current implementation flags and limitations.
 - GET /api/v1/personas — supported test personas.
 - POST /api/v1/plan — deterministic risk-ranked scenario plan.
-- POST /api/v1/runs — multipart form with persona_id and optional APK file.
+- POST /api/v1/runs — multipart form with persona_id and a required APK file.
 - GET /api/v1/runs — recent run metadata.
-- GET /api/v1/runs/{run_id} — run state and worker-submitted report, if present.
-- GET /api/v1/workers — workers whose heartbeat was observed in the last 90 seconds.
+- GET /api/v1/runs/{run_id} — owner-scoped run state and worker-submitted report, if present.
+- GET /api/v1/runs/{run_id}/report — owner-scoped JSON report export. Includes a SHA-256 digest of the canonical report and an ETag / X-Content-SHA256 digest of the downloaded export; responses are private and non-cacheable.
+- DELETE /api/v1/runs/{run_id} — owner-scoped deletion of a run and associated analysis evidence. Queued/awaiting runs are first marked cancelled so a worker cannot claim them during cleanup. Active leased/running jobs return 409 and must finish before deletion. If APK cleanup fails, the cancelled row is retained so deletion can be retried.
+- GET /api/v1/workers — authenticated worker heartbeat summary for the last 90 seconds. It exposes a busy indicator but never another user's current run ID.
 - POST /api/v1/analyze/logs — deterministic analysis of supplied log text.
 - GET /api/v1/analyses — recent saved log analyses.
 
@@ -36,6 +38,7 @@ Lease tokens are per-run capabilities and must be kept secret. Stale/expired lea
 - leased — a worker claimed the job.
 - completed — the runner reports that its configured smoke workflow finished and the report was accepted. This does not mean every app journey passed.
 - failed — the runner reported an execution failure or the lease expired after the retry cap.
+- cancelled — a queued/awaiting run was cancelled during owner deletion; the run row is removed after associated APK cleanup succeeds.
 
 ## Security and limits
 
