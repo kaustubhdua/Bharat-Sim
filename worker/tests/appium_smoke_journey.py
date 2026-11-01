@@ -10,6 +10,7 @@ import re
 import statistics
 import subprocess
 import time
+from datetime import datetime, timezone
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -244,6 +245,7 @@ def main() -> int:
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts"))
     args = parser.parse_args()
     args.artifacts.mkdir(parents=True, exist_ok=True)
+    journey_started_at = datetime.now(timezone.utc)
     session_id = None
     phase = "prepare_proxy_path"
     evidence: dict[str, object] = {}
@@ -396,8 +398,13 @@ def main() -> int:
         probe_logcat_path = args.artifacts / "appium-network-probe.logcat.txt"
         probe_logcat_path.write_text("\n".join(probe_lines) + "\n", encoding="utf-8")
 
+        journey_finished_at = datetime.now(timezone.utc)
         report = {
+            "schema_version": "1.0",
             "status": "passed",
+            "started_at_utc": journey_started_at.isoformat(),
+            "finished_at_utc": journey_finished_at.isoformat(),
+            "duration_seconds": round((journey_finished_at - journey_started_at).total_seconds(), 3),
             "package_name": "org.bharatsim.smokeapp",
             "probe_endpoint": EXPECTED_URL,
             "probe_endpoint_scope": f"Fixture-only HTTPS range request to {EXPECTED_HOST}, tunneled through an allowlisted HTTP CONNECT proxy that pins upstream IP {EXPECTED_IP}. The proxy records byte counts and applies delay/rate shaping without terminating TLS. This proves the fixture path only, not arbitrary uploaded-app traffic.",
