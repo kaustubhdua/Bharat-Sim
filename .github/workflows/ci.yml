@@ -122,8 +122,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m unittest worker.tests.test_network_shaper worker.tests.test_runner worker.tests.test_agent worker.tests.test_appium_smoke_journey
-      - run: python -m py_compile worker/agent.py worker/runner.py worker/network_shaper.py worker/tests/appium_smoke_journey.py worker/tests/test_appium_smoke_journey.py
+      - run: python -m unittest worker.tests.test_network_shaper worker.tests.test_runner worker.tests.test_agent worker.tests.test_appium_smoke_journey worker.tests.test_https_shaping_proxy
+      - run: python -m py_compile worker/agent.py worker/runner.py worker/network_shaper.py worker/tests/appium_smoke_journey.py worker/tests/test_appium_smoke_journey.py scripts/ci/https_shaping_proxy.py
 
   container-build:
     runs-on: ubuntu-latest
