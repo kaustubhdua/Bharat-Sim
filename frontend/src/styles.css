@@ -266,3 +266,11 @@
 @media(max-width:1050px){.evidence-fusion-sources{grid-template-columns:repeat(3,minmax(0,1fr))}.evidence-observation-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:680px){.evidence-fusion-panel{padding:14px}.evidence-fusion-sources,.evidence-observation-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.evidence-fusion-heading h3{font-size:16px}.evidence-observation>p{min-height:0}}
 @media(max-width:420px){.evidence-fusion-sources,.evidence-observation-grid{grid-template-columns:1fr}.evidence-fusion-status{width:100%;justify-content:center}}
+
+
+.evidence-condition-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 17px}
+.evidence-condition-strip>div{padding:9px 10px;border:1px solid #2a392e;border-radius:7px;background:#111a15;min-width:0}
+.evidence-condition-strip b,.evidence-condition-strip span{display:block}
+.evidence-condition-strip b{font:9px var(--mono);letter-spacing:.5px;color:#9daf9e;text-transform:uppercase}
+.evidence-condition-strip span{margin-top:5px;font-size:10px;line-height:1.5;color:#d5e1d5;overflow-wrap:anywhere}
+@media(max-width:680px){.evidence-condition-strip{grid-template-columns:1fr}}
