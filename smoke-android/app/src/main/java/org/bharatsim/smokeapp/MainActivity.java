@@ -197,9 +197,6 @@ public final class MainActivity extends Activity {
                     throw new IOException("Unexpected HTTP status " + statusCode);
                 }
 
-                Log.i(TAG, "BHARATSIM_NETWORK_PROBE response_headers_received status=HTTP_" + statusCode
-                        + " content_length=" + headers.getOrDefault("content-length", "unknown")
-                        + " transfer_encoding=" + headers.getOrDefault("transfer-encoding", "none"));
                 Map<String, String> headers = new HashMap<>();
                 String headerLine;
                 int headerCount = 0;
@@ -218,6 +215,9 @@ public final class MainActivity extends Activity {
                                 headerLine.substring(colon + 1).trim());
                     }
                 }
+                Log.i(TAG, "BHARATSIM_NETWORK_PROBE response_headers_received status=HTTP_" + statusCode
+                        + " content_length=" + headers.getOrDefault("content-length", "unknown")
+                        + " transfer_encoding=" + headers.getOrDefault("transfer-encoding", "none"));
                 String transferEncoding = headers.getOrDefault("transfer-encoding", "").toLowerCase(Locale.ROOT);
                 String contentLength = headers.get("content-length");
                 if (!transferEncoding.contains("chunked") && contentLength != null) {
