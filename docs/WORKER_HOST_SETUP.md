@@ -45,7 +45,11 @@ Create /etc/bharatsim/worker.env with root-only permissions (mode 0600):
     BHARATSIM_POLL_SECONDS=5
     BHARATSIM_SMOKE_DURATION_SECONDS=20
 
-The API's production alias currently has Vercel SSO protection and production database/Storage credentials are not yet configured. Do not start this service against that alias until those blockers are resolved and the API is reachable from the worker. For local development only, use the local API URL and set BHARATSIM_ALLOW_INSECURE_HTTP=true; never enable that exception on a public network.
+The API's production alias currently has Vercel SSO protection and production database/Storage credentials are not yet configured. Do not start this service against that alias until those blockers are resolved and the API is reachable from the worker.
+
+Production worker claims are also fail-closed until all three API flags are explicitly enabled: `BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED=true`, `BHARATSIM_WORKER_ISOLATION_ATTESTED=true`, and `BHARATSIM_WORKER_EGRESS_RESTRICTED=true`. Set them only after independently verifying a disposable VM/microVM boundary and default-deny egress from inside the worker environment. These are operator attestations, not cryptographic remote attestation; a worker token alone is never a sandbox. Keep all three false until that review is complete.
+
+For local development only, use the local API URL and set BHARATSIM_ALLOW_INSECURE_HTTP=true; never enable that exception on a public network.
 
 ## 4. systemd service example
 
