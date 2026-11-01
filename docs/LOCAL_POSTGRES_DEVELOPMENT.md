@@ -6,9 +6,10 @@ This repository can run the BharatSim API and dashboard with a local PostgreSQL 
 
 Requirements: Docker Engine and the Docker Compose plugin.
 
+Set a unique local-only password before starting. The Compose file intentionally refuses to start if it is missing; it has no known/default database password.
+
 ```bash
-# Optional: choose a local-only password before first startup.
-export BHARATSIM_LOCAL_POSTGRES_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export BHARATSIM_LOCAL_POSTGRES_PASSWORD="$(openssl rand -hex 32)"
 
 docker compose up --build -d
 docker compose ps
@@ -27,7 +28,7 @@ docker compose exec postgres psql -U service_role -d bharatsim -c \
 curl --fail http://localhost:8080/health/ready
 ```
 
-For an API-level persistence check, submit a valid fixture APK through the dashboard or the documented local API flow, restart only the API, and verify that the run remains visible. The CI PostgreSQL integration workflow remains the authoritative automated restart-persistence test.
+For an API-level persistence check, submit a valid fixture APK through the dashboard or the documented local API flow, restart only the API, and verify that the run remains visible. The CI PostgreSQL integration workflow exercises real PostgreSQL-backed API restart persistence.
 
 ## Reset local data
 
@@ -43,7 +44,7 @@ Do not run this if you need to preserve local test data.
 
 - The local database bootstrap is intentionally minimal. It supplies only the `auth.users` foreign-key target and local roles needed by the BharatSim migrations; it does not run Supabase Auth, PostgREST, Realtime, or Storage.
 - The local Compose API defaults to development mode. Do not expose it to an untrusted network or use real customer APKs/data.
-- The local `service_role` is the container's database bootstrap superuser so it can run the app against RLS-enabled tables without production role emulation. Its password is local-only. Never reuse it remotely.
+- `BHARATSIM_LOCAL_POSTGRES_PASSWORD` is mandatory. The local `service_role` is the container's database bootstrap superuser so it can run the app against RLS-enabled tables without production role emulation. Use a unique local secret; never reuse it remotely or commit it.
 - Supabase Auth/JWT verification, private object storage, signed TUS uploads and production ownership boundaries still require the managed or properly self-hosted Supabase services and server-only credentials.
 - This mode does not execute APKs. The ADB worker remains an explicitly controlled test runner; public execution and Firecracker isolation flags must remain disabled until the isolated-host acceptance gates pass.
-- For a production Supabase alternative, follow the official [Supabase self-hosting guide](https://supabase.com/docs/guides/self-hosting/docker), configure TLS, SMTP, backups, monitoring and a secrets manager, and complete the production release gates before accepting users.
+- For production Supabase, follow the official [Supabase self-hosting guide](https://supabase.com/docs/guides/self-hosting/docker). Self-hosting transfers responsibility for host security, patching, backups, disaster recovery, monitoring and availability to the operator.
