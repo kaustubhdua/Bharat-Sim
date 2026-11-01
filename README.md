@@ -61,7 +61,7 @@ The frontend uses same-origin API requests by default. Set VITE_API_BASE_URL=htt
 
 ### Docker Compose
 
-See docs/DEPLOYMENT.md and docs/WORKER_HOST_SETUP.md for local deployment and isolated Android worker host setup. The local stack runs with `docker compose up --build -d` and serves the dashboard at `http://127.0.0.1:8080`. It does not provision an Android emulator and is not safe for public multi-user APK execution.
+See docs/DEPLOYMENT.md, docs/WORKER_HOST_SETUP.md, and docs/WORKER_DEPLOYMENT.md for local deployment and the secure production Android worker setup. The local stack runs with `docker compose up --build -d` and serves the dashboard at `http://127.0.0.1:8080`. It does not provision an Android emulator and is not safe for public multi-user APK execution.
 
 ### Worker
 
