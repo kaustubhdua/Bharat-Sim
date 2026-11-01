@@ -178,3 +178,44 @@ def test_report_export_hashes_original_report_and_derived_diagnostics_separately
     assert payload["integrity"]["report_sha256"]
     assert payload["integrity"]["diagnostics_sha256"]
     assert "diagnostics" not in payload["report"]
+
+def test_malformed_signal_category_is_ignored_without_crashing():
+    report = base_report()
+    report["log_signals"] = [
+        {"category": {"unexpected": "object"}, "line_number": 1, "marker": "bad", "evidence": []},
+        signal("crash", "FATAL EXCEPTION"),
+    ]
+
+    result = fuse_worker_report(report)
+
+    assert result["status"] == "OBSERVED_ONLY"
+    assert result["observations"][0]["count"] == 1
+
+
+def test_string_marker_flag_does_not_count_as_observed_boolean():
+    report = base_report()
+    report["fatal_exception_marker"] = "false"
+
+    result = fuse_worker_report(report)
+
+    assert result["status"] == "NO_MARKER_OBSERVED"
+
+
+def test_preexisting_storage_state_is_not_misreported_as_applied_pressure():
+    report = base_report()
+    report["storage_failure_marker"] = True
+    report["log_signals"] = [signal("storage", "ENOSPC")]
+    report["condition_evidence"] = {
+        "conditions": [{
+            "condition": "storage_pressure",
+            "apply_status": "already_satisfied",
+            "verification_status": "verified",
+        }]
+    }
+
+    result = fuse_worker_report(report)
+
+    assert result["status"] == "OBSERVED_ONLY"
+    assert result["hypotheses"][0]["confidence"] == "low"
+    assert result["preexisting_conditions"] == ["storage_pressure"]
+    assert result["verified_conditions"] == []
