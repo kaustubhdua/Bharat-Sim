@@ -124,7 +124,8 @@ async function getUploadOffset(uploadUrl: string): Promise<number> {
   if (!response.ok) {
     throw new Error("Could not resume the private upload (" + response.status + ").");
   }
-  const offset = Number(response.headers.get("Upload-Offset"));
+  const rawOffset = response.headers.get("Upload-Offset");
+  const offset = rawOffset === null ? Number.NaN : Number(rawOffset);
   if (!Number.isSafeInteger(offset) || offset < 0) {
     throw new Error("Storage returned an invalid resumable upload offset.");
   }
@@ -178,7 +179,8 @@ export async function uploadApkResumable(
           body: chunk,
         });
         if (response.status === 204) {
-          const nextOffset = Number(response.headers.get("Upload-Offset"));
+          const rawNextOffset = response.headers.get("Upload-Offset");
+          const nextOffset = rawNextOffset === null ? Number.NaN : Number(rawNextOffset);
           if (!Number.isSafeInteger(nextOffset) || nextOffset !== offset + chunk.size) {
             throw new Error("Storage returned an unexpected upload offset.");
           }
@@ -188,7 +190,7 @@ export async function uploadApkResumable(
           break;
         }
         if (response.status === 409 || response.status >= 500 || response.status === 429) {
-          offset = await getUploadOffset(uploadUrl, ticket.upload_token);
+          offset = await getUploadOffset(uploadUrl);
           if (offset >= file.size) {
             completed = true;
             onProgress(100);
@@ -201,7 +203,7 @@ export async function uploadApkResumable(
       } catch (error) {
         lastError = error;
         try {
-          offset = await getUploadOffset(uploadUrl, ticket.upload_token);
+          offset = await getUploadOffset(uploadUrl);
           if (offset >= file.size) {
             completed = true;
             onProgress(100);
