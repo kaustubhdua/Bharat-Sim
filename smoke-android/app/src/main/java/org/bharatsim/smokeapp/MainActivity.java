@@ -168,13 +168,51 @@ public final class MainActivity extends Activity {
         Log.i(TAG, "BHARATSIM_NETWORK_PROBE request_started endpoint_host=" + host
                 + " expected_upstream_ip=" + expectedUpstreamIp
                 + " proxy_host=" + BuildConfig.PROBE_PROXY_HOST + " proxy_port=" + BuildConfig.PROBE_PROXY_PORT);
-        Proxy httpProxy = new Proxy(
-                Proxy.Type.HTTP,
-                new InetSocketAddress(BuildConfig.PROBE_PROXY_HOST, BuildConfig.PROBE_PROXY_PORT)
-        );
-        try (Socket raw = new Socket(httpProxy)) {
+        try (Socket raw = new Socket()) {
+            // Java's Socket(Proxy) constructor supports SOCKS proxies, not HTTP CONNECT.
+            // Connect to the allowlisted proxy as a plain socket and establish the
+            // CONNECT tunnel explicitly before layering TLS over the same socket.
             activeNetwork.bindSocket(raw);
-            raw.connect(new InetSocketAddress(host, port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
+            raw.connect(
+                    new InetSocketAddress(BuildConfig.PROBE_PROXY_HOST, BuildConfig.PROBE_PROXY_PORT),
+                    Math.min(8000, remainingTimeoutMs(deadlineAt))
+            );
+            raw.setSoTimeout(remainingTimeoutMs(deadlineAt));
+            OutputStream proxyOutput = raw.getOutputStream();
+            String connectRequest = "CONNECT " + host + ":" + port + " HTTP/1.1\\r\\n"
+                    + "Host: " + host + ":" + port + "\\r\\n"
+                    + "Proxy-Connection: Keep-Alive\\r\\n\\r\\n";
+            proxyOutput.write(connectRequest.getBytes(StandardCharsets.US_ASCII));
+            proxyOutput.flush();
+
+            InputStream proxyInput = raw.getInputStream();
+            String connectStatusLine = readHttpLine(raw, proxyInput, deadlineAt);
+            String[] connectStatusParts = connectStatusLine.split(" ", 3);
+            if (connectStatusParts.length < 2 || !connectStatusParts[0].startsWith("HTTP/")) {
+                throw new IOException("Malformed HTTPS proxy CONNECT response: " + connectStatusLine);
+            }
+            final int connectStatusCode;
+            try {
+                connectStatusCode = Integer.parseInt(connectStatusParts[1]);
+            } catch (NumberFormatException badStatus) {
+                throw new IOException("Malformed HTTPS proxy CONNECT status: " + connectStatusLine, badStatus);
+            }
+            if (connectStatusCode != 200) {
+                throw new IOException("HTTPS proxy CONNECT failed (" + connectStatusCode + "): " + connectStatusLine);
+            }
+
+            int connectHeaderCount = 0;
+            int connectHeaderBytes = 0;
+            while (true) {
+                String headerLine = readHttpLine(raw, proxyInput, deadlineAt);
+                if (headerLine.isEmpty()) break;
+                connectHeaderCount++;
+                connectHeaderBytes += headerLine.length();
+                if (connectHeaderCount > MAX_HTTP_HEADER_COUNT || connectHeaderBytes > MAX_HTTP_HEADER_BYTES) {
+                    throw new IOException("HTTPS proxy CONNECT headers exceed configured limits");
+                }
+            }
+
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
                 // A 64 KB fixture transfer is measured under the selected proxy profile with a bounded overall deadline.
@@ -326,7 +364,7 @@ public final class MainActivity extends Activity {
         return (int) Math.max(1, Math.min(Integer.MAX_VALUE, remaining));
     }
 
-    private static String readHttpLine(SSLSocket socket, InputStream input, long deadlineAt) throws IOException {
+    private static String readHttpLine(Socket socket, InputStream input, long deadlineAt) throws IOException {
         ByteArrayOutputStream line = new ByteArrayOutputStream();
         int previous = -1;
         while (true) {
