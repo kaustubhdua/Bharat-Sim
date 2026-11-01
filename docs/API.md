@@ -17,7 +17,7 @@ FastAPI's interactive schema is available at /docs when the backend is running.
 - GET /api/v1/workers — authenticated worker heartbeat summary for the last 90 seconds. It exposes a busy indicator but never another user's current run ID.
 - POST /api/v1/analyze/logs — deterministic analysis of supplied log text.
 - POST /api/v1/translate/report — opt-in Sarvam translation of a user-selected condensed report summary (Hindi, Tamil, or Marathi); requires server-side `SARVAM_API_KEY`.
-- POST /api/v1/uploads/sign — creates a short-lived signed URL for a server-generated path in the private APK bucket; requires Storage credentials and an authenticated user when Auth is enabled.
+- POST /api/v1/uploads/sign — creates a short-lived signed TUS capability (upload token plus direct Storage resumable endpoint) for a server-generated path in the private APK bucket; requires Storage credentials and an authenticated user when Auth is enabled. Upload with the TUS 1.0.0 protocol in 6 MiB chunks using `POST`, `HEAD`, and `PATCH`, then call upload-complete. The token is a bearer capability and must not be logged.
 - PUT the APK bytes directly to the returned Supabase Storage `signed_url`, then POST /api/v1/runs/{run_id}/upload-complete. The completion endpoint checks the stored object size before queueing; the worker independently verifies the APK SHA-256 before execution.
 - GET /api/v1/analyses — recent saved log analyses.
 
