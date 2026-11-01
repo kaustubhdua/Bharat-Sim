@@ -189,10 +189,9 @@ export async function uploadApkResumable(
       // Only create a new TUS session when the old one has expired. A transient
       // network failure must not silently abandon a resumable upload.
       if (error instanceof Error && /resumable upload \((404|410)\)/.test(error.message)) {
-        uploadUrl = undefined;
-      } else {
-        throw new Error("Could not reach Storage to resume the existing upload. Check your connection and retry.");
+        throw new Error("The previous resumable upload session expired. A fresh upload ticket is required.");
       }
+      throw new Error("Could not reach Storage to resume the existing upload. Check your connection and retry.");
     }
   }
 
