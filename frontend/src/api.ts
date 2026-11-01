@@ -346,3 +346,13 @@ export function date(v: string): string {
     minute: "2-digit"
   });
 }
+
+
+export type RunEvent = {
+  id: number;
+  event_type: string;
+  created_at: string;
+  actor_type: "user" | "worker" | "system" | "admin";
+  actor_id?: string | null;
+  payload: Record<string, unknown>;
+};
