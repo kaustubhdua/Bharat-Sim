@@ -7,6 +7,7 @@ import FindingCard from "../components/FindingCard";
 import PersonaPanel from "../components/PersonaPanel";
 import RunsTable from "../components/RunsTable";
 import CapabilityPanel from "../components/CapabilityPanel";
+import PlannerPanel from "../components/PlannerPanel";
 import { BrowserRouter } from "react-router-dom";
 import { cls, displayRunStatus, fallbackPersonas, isRunActive } from "../api";
 
@@ -53,6 +54,7 @@ describe("Components tests with jsdom", () => {
       root.unmount();
     });
     container.remove();
+    vi.unstubAllGlobals();
   });
 
   it("ScoreRing renders score value and /100", async () => {
@@ -61,6 +63,53 @@ describe("Components tests with jsdom", () => {
     });
     expect(container.textContent).toContain("88");
     expect(container.textContent).toContain("/100");
+  });
+
+  it("PlannerPanel renders API-ranked scenarios and interaction hypotheses", async () => {
+    const plan = {
+      generated_at: "2026-11-01T00:00:00Z",
+      strategy: "deterministic-risk-and-pairwise-interaction-v2",
+      total_candidates: 1,
+      interaction_hunter: {
+        candidate_pairwise_interactions: 3,
+        selected_scenario_interactions: 3,
+        method: "pairwise",
+        warning: "These are test-selection hypotheses only."
+      },
+      scenarios: [{
+        id: "budget-android:payment-retry",
+        persona_id: "budget-android",
+        persona_name: "Budget Android",
+        flow: "payment retry",
+        risk_score: 92,
+        reason: "heuristic",
+        requested_conditions: [{ id: "high_latency", label: "High network latency", target: "180 ms" }],
+        interaction_hypotheses: [{
+          conditions: ["high_latency", "limited_bandwidth"],
+          labels: ["High network latency", "Limited download bandwidth"],
+          risk_bonus: 18,
+          hypothesis: "High latency × limited bandwidth may amplify request timeouts.",
+          validation: "Run paired condition against baseline."
+        }],
+        interaction_count: 1,
+        interaction_risk_bonus: 18
+      }]
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => plan
+    }));
+
+    await act(async () => {
+      root.render(<PlannerPanel selected="budget-android" />);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain("Risk-first test plan");
+    expect(container.textContent).toContain("payment retry");
+    expect(container.textContent).toContain("92 / 100");
+    expect(container.textContent).toContain("High latency × limited bandwidth");
+    expect(container.textContent).toContain("test-selection hypotheses only");
   });
 
   it("FindingCard renders finding details and evidence", async () => {
