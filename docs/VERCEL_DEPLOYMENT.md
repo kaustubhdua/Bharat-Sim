@@ -25,11 +25,12 @@ Configure these on the `bharat-sim-81g2` Vercel project for Production and Previ
 
 | Variable | Value |
 |---|---|
-| `VITE_API_BASE_URL` | `https://bharat-sim-bay.vercel.app` |
+| `VITE_API_BASE_URL` (Production) | `https://bharat-sim-bay.vercel.app` |
+| `VITE_API_BASE_URL` (Preview) | The matching backend branch alias, currently `https://bharat-sim-git-feat-tus-resumable-apk-upload-jyc-website.vercel.app` |
 | `VITE_SUPABASE_URL` | The HTTPS project URL for common1 |
 | `VITE_SUPABASE_ANON_KEY` | The common1 publishable key (the code's variable name is legacy-compatible; the value may be the current publishable key) |
 
-The current frontend defaults `VITE_API_BASE_URL` to an empty string. Because the dashboard and API are separate Vercel projects, leaving it empty sends requests to the dashboard origin rather than the FastAPI project.
+The current frontend defaults `VITE_API_BASE_URL` to an empty string. Because the dashboard and API are separate Vercel projects, leaving it empty sends requests to the dashboard origin rather than the FastAPI project. Production and Preview use separate values so a preview dashboard does not accidentally call the production API.
 
 ## API project variables
 
@@ -43,7 +44,7 @@ Configure these on the `bharat-sim` Vercel project. Keep every value server-side
 | `SUPABASE_SERVICE_ROLE_KEY` | common1 server-only secret key; never expose it to the browser |
 | `BHARATSIM_AUTH_REQUIRED` | `true` |
 | `BHARATSIM_STORAGE_BUCKET` | `bharatsim-private` |
-| `BHARATSIM_CORS_ORIGINS` | Exact dashboard origin(s), comma-separated; start with `https://bharat-sim-81g2.vercel.app` and add only verified custom domains |
+| `BHARATSIM_CORS_ORIGINS` | Exact dashboard origin(s), comma-separated; include the production dashboard aliases and the active preview dashboard branch alias; remove stale branch aliases when preview deployments are retired |
 | `BHARATSIM_WORKER_TOKEN` | Strong random value of at least 32 characters, only after the isolated worker is provisioned |
 | `SARVAM_API_KEY` | Optional server-only key; required to enable the Sarvam capability |
 
