@@ -9,6 +9,8 @@ class FakeConnection:
             def fetchall(self):
                 return []
             def fetchone(self):
+                if "to_regclass" in query:
+                    return {"runs": "bharatsim.runs", "run_events": "bharatsim.run_events", "audit_events": "bharatsim.audit_events"}
                 return {"ok": 1}
         return Result()
 
@@ -18,6 +20,7 @@ def install_database(monkeypatch):
     def fake_db():
         yield FakeConnection()
     monkeypatch.setattr(main, "db", fake_db)
+    monkeypatch.setattr(main, "DATABASE_URL", "postgresql://user:pass@db.example.com:5432/postgres?sslmode=require")
     monkeypatch.setattr(main, "production_worker_execution_enabled", lambda: False)
     monkeypatch.setenv("BHARATSIM_WORKER_TOKEN", "")
 
