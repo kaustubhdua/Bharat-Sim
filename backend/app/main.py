@@ -12,7 +12,7 @@ import time
 import uuid
 import zipfile
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import parse_qs, quote, urlsplit
@@ -776,6 +776,9 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
     safe_name = payload.filename.replace("\\", "/").rsplit("/", 1)[-1].strip()[:180]
     if not safe_name.lower().endswith(".apk"):
         raise HTTPException(status_code=415, detail="Upload must have an .apk filename")
+    owner_id = getattr(request.state, "owner_id", None)
+    with db() as conn:
+        enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
     run_id = str(uuid.uuid4())
     object_path = f"runs/{run_id}/input.apk"
     try:
@@ -786,7 +789,6 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
     created = utcnow()
     try:
         with db() as conn:
-            owner_id = getattr(request.state, "owner_id", None)
             enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
             conn.execute(
                 "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path,apk_size_bytes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -881,6 +883,9 @@ async def create_run(
     cleanup_expired_uploads()
     if persona_id not in PERSONAS:
         raise HTTPException(status_code=422, detail="Unknown persona_id")
+    owner_id = getattr(request.state, "owner_id", None)
+    with db() as conn:
+        enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
     run_id = str(uuid.uuid4())
     apk_name = None
     apk_hash = None
@@ -931,7 +936,6 @@ async def create_run(
     created = utcnow()
     try:
         with db() as conn:
-            owner_id = getattr(request.state, "owner_id", None)
             enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
             conn.execute(
                 "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
