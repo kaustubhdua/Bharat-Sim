@@ -144,7 +144,7 @@ public final class MainActivity extends Activity {
                 }
                 Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport
                         + " probe=" + sequence + " attempts=" + attempt, exception);
-                final String detail = exception.getMessage() == null ? "" : exception.getMessage().replaceAll("[\\r\\n]+", " ").substring(0, Math.min(180, exception.getMessage().replaceAll("[\\r\\n]+", " ").length()));
+                final String detail = exception.getMessage() == null ? "" : exception.getMessage().replaceAll("[\r\n]+", " ").substring(0, Math.min(180, exception.getMessage().replaceAll("[\r\n]+", " ").length()));
                 final String message = "Network probe failed: " + exception.getClass().getSimpleName() + (detail.isEmpty() ? "" : " · " + detail);
                 runOnUiThread(() -> target.setText(message));
                 return;
@@ -168,12 +168,12 @@ public final class MainActivity extends Activity {
             socket.connect(new InetSocketAddress(host, port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
             socket.setSoTimeout(remainingTimeoutMs(deadlineAt));
             OutputStream output = socket.getOutputStream();
-            String request = "GET " + requestPath + " HTTP/1.1\\r\\n"
-                    + "Host: " + host + ":" + port + "\\r\\n"
-                    + "Connection: close\\r\\n"
-                    + "Accept-Encoding: identity\\r\\n"
-                    + "Cache-Control: no-cache\\r\\n"
-                    + "Range: bytes=0-" + (expectedBytes - 1) + "\\r\\n\\r\\n";
+            String request = "GET " + requestPath + " HTTP/1.1\r\n"
+                    + "Host: " + host + ":" + port + "\r\n"
+                    + "Connection: close\r\n"
+                    + "Accept-Encoding: identity\r\n"
+                    + "Cache-Control: no-cache\r\n"
+                    + "Range: bytes=0-" + (expectedBytes - 1) + "\r\n\r\n";
             output.write(request.getBytes(StandardCharsets.US_ASCII));
             output.flush();
 
