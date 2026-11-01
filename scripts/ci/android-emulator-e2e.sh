@@ -29,11 +29,12 @@ API_PID=
 WORKER_PID=
 APPIUM_PID=
 cleanup() {
-  # Always restore network controls, even when Appium assertions fail.
+  # Always restore emulator controls and the fixture proxy, even when assertions fail.
   adb -s emulator-5554 emu network delay none >/dev/null 2>&1 || true
   adb -s emulator-5554 emu network speed full >/dev/null 2>&1 || true
   adb -s emulator-5554 shell svc wifi enable >/dev/null 2>&1 || true
   adb -s emulator-5554 shell svc data enable >/dev/null 2>&1 || true
+  curl --silent --show-error --max-time 3 -X POST http://127.0.0.1:8889/reset >/dev/null 2>&1 || true
   [ -z "$APPIUM_PID" ] || kill "$APPIUM_PID" 2>/dev/null || true
   [ -z "$WORKER_PID" ] || kill "$WORKER_PID" 2>/dev/null || true
   [ -z "$API_PID" ] || kill "$API_PID" 2>/dev/null || true
@@ -41,8 +42,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# The fixture uses a CI-host-resolved IPv4 address and validates TLS against the
-# HTTPS hostname, so the real transfer does not depend on emulator DNS resolution.
+# The worker smoke run below exercises its own emulator-console condition
+# controls. The separate Appium fixture later uses the host-side CONNECT proxy,
+# which pins the upstream IP and preserves TLS hostname validation.
 
 (cd backend && exec uvicorn app.main:app --host 0.0.0.0 --port 8000) > artifacts/api.log 2>&1 &
 API_PID=$!
@@ -312,10 +314,10 @@ print(json.dumps({"status": final["status"], "fixture_kind": "intentionally_inva
                   "runner_return_code": result.get("runner_return_code"), "error": result.get("error")}, indent=2))
 PYNEG
 
-# The Appium journey runs a warm-up plus three baseline, three latency-only,
-# and three bandwidth-only HTTP transfers of a controlled payload through the
-# emulator network stack, then verifies the emulator controls reset to defaults.
-# This deterministically validates emulator shaping; it does not claim public-Internet performance.
+# The Appium journey runs a warm-up plus repeated baseline, latency-only and
+# bandwidth-only HTTPS transfers through the allowlisted host CONNECT proxy.
+# It verifies the proxy event, upstream IP, response bytes, measured deltas and
+# reset readback. This proves the fixture path only, not arbitrary customer APKs.
 adb install smoke-android/app/build/outputs/apk/debug/app-debug.apk
 
 # A hosted Pixel emulator can occasionally leave a system "launcher isn't
