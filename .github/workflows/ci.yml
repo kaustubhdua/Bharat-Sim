@@ -65,12 +65,13 @@ jobs:
         run: |
           psql "$BHARATSIM_DATABASE_URL" -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20261027054905_bharatsim_core.sql \
-            -f supabase/migrations/20261027061609_bharatsim_fk_indexes.sql
+            -f supabase/migrations/20261027061609_bharatsim_fk_indexes.sql \
+            -f supabase/migrations/20261101042942_bharatsim_signed_upload_sizes.sql
         env:
           PGPASSWORD: postgres
           BHARATSIM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
       - name: Verify API persistence across real PostgreSQL-backed API restarts
-        run: pytest -q tests/test_restart_persistence.py tests/test_postgres_quotas.py
+        run: pytest -q tests/test_restart_persistence.py tests/test_postgres_quotas.py tests/test_postgres_signed_uploads.py
         working-directory: backend
         env:
           PGPASSWORD: postgres
