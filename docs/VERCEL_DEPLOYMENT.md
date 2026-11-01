@@ -9,13 +9,13 @@ This runbook describes the two existing Vercel projects and the environment cont
 | Dashboard | `bharat-sim-81g2` | Vite | `https://bharat-sim-81g2.vercel.app` |
 | API | `bharat-sim` | FastAPI | `https://bharat-sim-bay.vercel.app` |
 
-Both projects currently report Vercel SSO protection enabled for all non-custom domains. Their latest production deployments report READY, but the projects report `live: false`. A READY build is not proof of an authenticated, persistent, publicly accessible application. Keep SSO protection enabled until the app-level authentication and persistence checks below pass.
+Both projects report Vercel SSO protection enabled for non-custom domains. The latest production deployments are READY and have the stable aliases assigned, but they serve commit `2b125971f8ab6c7c0e943d57790b4ae631021dbd`; GitHub `main` is one commit ahead at `5aa4d68e0ae32d09ec72d68414983e0a4fe016e0`. GitHub's latest Vercel deployment checks report `build-rate-limit`, so the current main revision and new PR previews have not been deployed. A READY build is not proof of an authenticated, persistent, working application. Keep SSO protection enabled until the app-level authentication and persistence checks below pass.
 
 ## Environment-variable audit
 
 The latest environment inspection (2026-11-01) confirms that the public frontend variable names are now aligned:
 
-- Dashboard: `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured for Production and Preview. The Preview API URL is branch-specific.
+- Dashboard: `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured for Production and Preview. The Production API base URL is correct. The current Preview API base URL still points to an older `feat/tus-resumable-apk-upload` branch alias; refresh it only after a matching backend preview deployment is available, and do not treat it as a validated preview.
 - API: `SUPABASE_URL`, `BHARATSIM_ENV`, `BHARATSIM_AUTH_REQUIRED`, `BHARATSIM_STORAGE_BUCKET`, and `BHARATSIM_CORS_ORIGINS` are configured. Preview uses development mode with ephemeral SQLite; Production is set to production mode.
 - API credentials `BHARATSIM_DATABASE_URL` and `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`) are not present in the inspected environment. `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured.
 - Never rename a server secret to a `NEXT_PUBLIC_*` or `VITE_*` variable. Only the Supabase publishable key belongs in the browser.
@@ -74,12 +74,12 @@ The following non-secret configuration has been applied directly to the two Verc
 The following required values are not present in the inspected Vercel environment and must be added before production can start: `BHARATSIM_DATABASE_URL`, `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`). `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured. The production API deliberately fails closed without the database and server-only Storage credential. No production deployment or real APK upload/execution is claimed.
 ## Deployment audit observed on 2026-11-01
 
-- The latest Production deployment for both Vercel projects still references commit `e20f933523bbda56c4a4688d1260a93d8265c3fc`. The current GitHub `main` commit is newer: `a8f4b3310c5d5b0dfca161a6500d31087de887fa`.
+- The latest Production deployment for both Vercel projects is READY at commit `2b125971f8ab6c7c0e943d57790b4ae631021dbd`. GitHub `main` is currently `5aa4d68e0ae32d09ec72d68414983e0a4fe016e0` (one commit ahead). The production aliases therefore do not yet include the latest main commit.
 - The frontend's most recent preview build for an intermediate TUS-fix commit failed because its tests still expected the old `/storage/v1/upload/resumable/sign` path. The tests and implementation were corrected, the corresponding GitHub CI build passed, and the fix was merged into `main`. That earlier failed Vercel preview is not the current main build.
-- Subsequent Vercel deployment-creation requests were rejected with HTTP 402, resource `api-deployments-free-per-day`, because the team exceeded 100 deployments in the daily window. Vercel returned a 24-hour retry period. Do not repeatedly retry or bypass this limit; wait for the quota window to reset or have the account owner resolve the plan limit.
-- Both projects still have SSO protection enabled for non-custom domains. The latest production deployment records are READY, but they are old builds and do not prove that the newly merged code is live.
+- GitHub's Vercel status checks currently report `build-rate-limit` for both projects. Do not repeatedly retry or bypass the account's build limit; wait for Vercel to permit builds again or have the account owner resolve the plan limit.
+- Both projects still have SSO protection enabled for non-custom domains. The latest production deployment records are READY and aliases are assigned, but they serve the previous main commit. The backend is also missing required production database and Storage credentials, so READY must not be interpreted as an operational API.
 
-This means GitHub `main` is updated, but the current Vercel Production aliases have **not** been verified against the latest commit. Once the deployment quota resets, deploy a Preview from the current main commit first, inspect the build logs and protected preview, then deploy Production only after the missing database and Storage credentials have been added.
+This means GitHub `main` is updated, but the current Vercel Production aliases are one commit behind. Once the build-rate limit permits deployments, deploy a Preview from current `main`, inspect build logs and the protected preview, and deploy Production only after the missing database and Storage credentials have been added.
 
 ## Safe rollout order
 
@@ -94,4 +94,4 @@ This means GitHub `main` is updated, but the current Vercel Production aliases h
 
 ## Current blockers
 
-The Vercel variable audit confirms that the public frontend variable names and non-secret backend settings are now aligned. It still does not show the required API database URL or server-side Supabase secret key. No database password or Supabase secret/service-role credential is available through the current project inspection. These values must be added by the project owner directly in Vercel; do not paste them into GitHub or chat. The latest production deployments still point to an older commit, and the projects remain SSO-protected. Until the credentials are added and the new commit is deployed and verified, the production API must not be considered connected to common1, and the dashboard must not be considered end-to-end live.
+The Vercel variable audit confirms that the public frontend variable names and non-secret backend settings are now aligned. It still does not show the required API database URL or server-side Supabase secret key. No database password or Supabase secret/service-role credential is available through the current project inspection. These values must be added by the project owner directly in Vercel; do not paste them into GitHub or chat. The latest production deployments point to commit `2b125971f8ab6c7c0e943d57790b4ae631021dbd`, one commit behind `main` at `5aa4d68e0ae32d09ec72d68414983e0a4fe016e0`; the projects remain SSO-protected and current deployment checks report `build-rate-limit`. Until the credentials are added and the new commit is deployed and verified, the production API must not be considered connected to common1, and the dashboard must not be considered end-to-end live.
