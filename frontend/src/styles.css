@@ -118,3 +118,57 @@
 .danger-button:focus-visible{outline:2px solid #f0b0a5;outline-offset:2px}
 .danger-button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:520px){.detail-actions{gap:6px}.danger-button{padding:7px 8px;font-size:9px}}
+
+
+/* Opt-in regional-language report translation */
+.sarvam-panel {
+  grid-column: 1 / -1;
+  margin-top: 18px;
+}
+.sarvam-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.sarvam-controls label {
+  color: var(--muted, #64748b);
+  font-size: 12px;
+  font-weight: 700;
+}
+.sarvam-controls select {
+  min-width: 150px;
+  border: 1px solid var(--border, #dbe3df);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--ink, #17231e);
+  padding: 10px 12px;
+  font: inherit;
+}
+.translation-unavailable {
+  margin: 12px 0 0;
+  color: #9a5a17;
+  font-size: 13px;
+}
+.translation-result {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #d8e8df;
+  border-radius: 12px;
+  background: #f5faf7;
+  color: #183b2b;
+  font-size: 16px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+@media (max-width: 640px) {
+  .sarvam-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .sarvam-controls select,
+  .sarvam-controls button {
+    width: 100%;
+  }
+}
