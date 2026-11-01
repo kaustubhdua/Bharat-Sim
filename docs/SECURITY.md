@@ -75,3 +75,8 @@ When private Storage is configured, the API creates a short-lived signed upload 
 ## Private Supabase schema and RLS advisor findings
 
 The `bharatsim` schema is server-only: `anon` and `authenticated` have no `USAGE` privilege on the schema, while the backend service role has the required access. RLS is enabled on the BharatSim tables and there are intentionally no browser-facing table policies. Supabase's `rls_enabled_no_policy` advisor therefore reports these tables as informational findings; do not add broad `anon`/`authenticated` policies merely to silence the advisor. Any future browser-facing data access must use narrowly scoped ownership policies and be reviewed separately. This note applies only to `bharatsim`; do not change the shared `genomeguard` schema as part of BharatSim work.
+
+
+## Supabase server credentials
+
+Prefer the modern Supabase `sb_secret_...` API key for server-side Storage calls. It is an opaque API key, not a JWT, and must be sent in the `apikey` header only. The backend retains compatibility with the legacy `service_role` JWT by sending it in both `apikey` and `Authorization: Bearer` headers. Keep either credential server-side and rotate it through Supabase/Vercel controls; never place it in Vite or `NEXT_PUBLIC_*` variables.
