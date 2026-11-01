@@ -104,7 +104,7 @@ public final class MainActivity extends Activity {
                 ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
                 Network activeNetwork = manager == null ? null : manager.getActiveNetwork();
                 if (activeNetwork == null) {
-                    throw new IOException("No active Android network for the HTTPS probe");
+                    throw new IOException("No active Android network for the fixture probe");
                 }
                 transport = transportForNetwork(activeNetwork);
                 if (!"CELLULAR".equals(transport) && !"ETHERNET".equals(transport)) {
