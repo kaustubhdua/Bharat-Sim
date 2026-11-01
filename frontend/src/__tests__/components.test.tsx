@@ -96,6 +96,7 @@ describe("Components tests with jsdom", () => {
           workers={[]}
           busy={false}
           apiStatus="online"
+          directUploadAvailable={false}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -118,6 +119,7 @@ describe("Components tests with jsdom", () => {
           workers={[]}
           busy={false}
           apiStatus="online"
+          directUploadAvailable={false}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -140,6 +142,7 @@ describe("Components tests with jsdom", () => {
           workers={[]}
           busy={false}
           apiStatus="online"
+          directUploadAvailable={false}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -170,6 +173,7 @@ describe("Components tests with jsdom", () => {
           workers={[]}
           busy={false}
           apiStatus="online"
+          directUploadAvailable={false}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -200,6 +204,7 @@ describe("Components tests with jsdom", () => {
           workers={[]}
           busy={false}
           apiStatus="online"
+          directUploadAvailable={false}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -277,6 +282,7 @@ describe("Components tests with jsdom", () => {
           workers={[]}
           busy={false}
           apiStatus="offline"
+          directUploadAvailable={false}
           onSubmit={vi.fn()}
         />
       );
@@ -347,7 +353,7 @@ describe("Components tests with jsdom", () => {
 
   it("CapabilityPanel renders only the backend-declared capability contract", async () => {
     const capabilities = {
-      apk_upload: true, log_analysis: true, risk_planner: true,
+      apk_upload: true, direct_apk_upload: false, log_analysis: true, risk_planner: true,
       failure_fingerprinting: true, bharat_score: true, android_execution: false,
       worker_dispatch: true, network_shaping: false, sarvam_translation: false,
       emulator_network_controls: {
