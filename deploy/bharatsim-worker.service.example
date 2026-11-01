@@ -35,7 +35,7 @@ ReadWritePaths=/var/lib/bharatsim /var/log/bharatsim /tmp
 RestrictSUIDSGID=true
 LockPersonality=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
-MemoryMax=8G
+MemoryMax=6G
 CPUQuota=400%
 TasksMax=256
 
