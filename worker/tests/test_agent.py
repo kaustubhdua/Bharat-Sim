@@ -47,7 +47,8 @@ class AgentEntrypointTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         env = os.environ.copy()
         for key in ("BHARATSIM_API_URL", "BHARATSIM_WORKER_TOKEN", "ANDROID_SERIAL",
-                    "BHARATSIM_ENABLE_LOCAL_APK_EXECUTION", "BHARATSIM_ALLOW_INSECURE_HTTP"):
+                    "BHARATSIM_ENABLE_LOCAL_APK_EXECUTION", "BHARATSIM_ALLOW_INSECURE_HTTP",
+                    "BHARATSIM_ENV", "BHARATSIM_RECYCLE_EMULATOR", "ANDROID_AVD_NAME", "BHARATSIM_EMULATOR_ACCEL"):
             env.pop(key, None)
         completed = subprocess.run(
             [sys.executable, "worker/agent.py"],
