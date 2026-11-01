@@ -1462,12 +1462,12 @@ def delete_run(run_id: str, request: Request):
     with db() as conn:
         if AUTH_REQUIRED:
             row = conn.execute(
-                "SELECT id,status,apk_path,apk_storage_path FROM runs WHERE id=? AND owner_id=?",
+                "SELECT id,status,apk_path,apk_storage_path,owner_id FROM runs WHERE id=? AND owner_id=?",
                 (run_id, request.state.owner_id),
             ).fetchone()
         else:
             row = conn.execute(
-                "SELECT id,status,apk_path,apk_storage_path FROM runs WHERE id=?",
+                "SELECT id,status,apk_path,apk_storage_path,owner_id FROM runs WHERE id=?",
                 (run_id,),
             ).fetchone()
         if not row:
@@ -1494,6 +1494,9 @@ def delete_run(run_id: str, request: Request):
             )
         if updated.rowcount != 1:
             raise HTTPException(status_code=409, detail="Run state changed; refresh before deleting")
+        record_audit_event(conn, row["owner_id"], "user" if row["owner_id"] else "system",
+                           getattr(request.state, "owner_id", None), "run.deletion_requested", "run", run_id,
+                           {"previous_status": row["status"]})
         conn.execute(
             "UPDATE workers SET status='idle',current_run_id=NULL WHERE current_run_id=?",
             (run_id,),
@@ -1531,6 +1534,8 @@ def delete_run(run_id: str, request: Request):
             )
         if deleted.rowcount != 1:
             raise HTTPException(status_code=409, detail="Run cleanup completed, but the record changed; refresh and retry")
+        record_audit_event(conn, row["owner_id"], "user" if row["owner_id"] else "system",
+                           getattr(request.state, "owner_id", None), "run.deleted", "run", run_id, {})
     return {"id": run_id, "deleted": True}
 
 
