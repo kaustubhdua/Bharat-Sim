@@ -43,6 +43,7 @@ import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
 import RunDetailView from "./components/RunDetailView";
 import CapabilityPanel from "./components/CapabilityPanel";
+import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
 
@@ -570,6 +571,8 @@ export default function App() {
                     directUploadAvailable={Boolean(capabilities?.direct_apk_upload)}
                     onSubmit={submitApk}
                   />
+
+                  <PlannerPanel selected={selected} />
 
                   <section className="panel log-panel">
                     <div className="panel-heading">
