@@ -33,7 +33,7 @@ def test_signed_upload_is_only_queued_after_storage_verification(monkeypatch, tm
     assert ticket.status_code == 200
     payload = ticket.json()
     assert payload["run_id"]
-    assert payload["tus_endpoint"].startswith("https://example.storage.supabase.co/storage/v1/upload/resumable/sign/")
+    assert payload["tus_endpoint"].startswith("https://example.storage.supabase.co/storage/v1/upload/resumable/sign")
     assert len(payload["upload_token"]) == 48
     assert "SUPABASE_SERVICE_ROLE_KEY" not in payload
     assert payload["expires_in_seconds"] == 7200
@@ -99,7 +99,6 @@ def test_signed_upload_config_uses_direct_storage_host_and_encodes_path(monkeypa
     monkeypatch.setattr(main, "STORAGE_BUCKET", "bharatsim-private")
     result = main.build_tus_signed_upload_config(
         "https://project.supabase.co/storage/v1/object/upload/sign/bharatsim-private/runs/run-1/input.apk?token=" + "s" * 48,
-        "runs/run-1/input.apk",
     )
     assert result["upload_token"] == "s" * 48
     assert result["tus_endpoint"] == "https://project.storage.supabase.co/storage/v1/upload/resumable/sign/bharatsim-private/runs/run-1/input.apk"
@@ -108,4 +107,4 @@ def test_signed_upload_config_uses_direct_storage_host_and_encodes_path(monkeypa
 def test_signed_upload_config_rejects_invalid_provider_response():
     import pytest
     with pytest.raises(RuntimeError, match="invalid signed upload capability"):
-        main.build_tus_signed_upload_config("https://project.supabase.co/not-a-signed-url", "runs/run-1/input.apk")
+        main.build_tus_signed_upload_config("https://project.supabase.co/not-a-signed-url")
