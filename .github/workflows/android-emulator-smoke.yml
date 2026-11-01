@@ -99,7 +99,9 @@ jobs:
         id: probe-address
         shell: bash
         run: |
-          python3 -m http.server 8765 --bind 0.0.0.0 --directory smoke-android > "$RUNNER_TEMP/bharatsim-fixture-http.log" 2>&1 &
+          mkdir -p "$RUNNER_TEMP/bharatsim-fixture"
+          cp smoke-android/probe-256k.bin "$RUNNER_TEMP/bharatsim-fixture/probe-256k.bin"
+          nohup python3 -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/bharatsim-fixture" > "$RUNNER_TEMP/bharatsim-fixture-http.log" 2>&1 </dev/null &
           echo "$!" > "$RUNNER_TEMP/bharatsim-fixture-http.pid"
           for attempt in $(seq 1 20); do
             if curl --fail --silent --show-error --range 0-0 http://127.0.0.1:8765/probe-256k.bin --output /dev/null; then
