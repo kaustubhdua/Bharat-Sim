@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: bharatsim
       POSTGRES_USER: service_role
-      POSTGRES_PASSWORD: ${BHARATSIM_LOCAL_POSTGRES_PASSWORD:-local-only-change-me}
+      POSTGRES_PASSWORD: ${BHARATSIM_LOCAL_POSTGRES_PASSWORD:?Set BHARATSIM_LOCAL_POSTGRES_PASSWORD to a unique local-only secret}
     volumes:
       - bharatsim-postgres:/var/lib/postgresql/data
       - ./dev-postgres-init:/docker-entrypoint-initdb.d:ro
@@ -22,7 +22,7 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       BHARATSIM_ENV: ${BHARATSIM_ENV:-development}
-      BHARATSIM_DATABASE_URL: ${BHARATSIM_DATABASE_URL:-postgresql://service_role:${BHARATSIM_LOCAL_POSTGRES_PASSWORD:-local-only-change-me}@postgres:5432/bharatsim?sslmode=disable}
+      BHARATSIM_DATABASE_URL: ${BHARATSIM_DATABASE_URL:-postgresql://service_role:${BHARATSIM_LOCAL_POSTGRES_PASSWORD:?Set BHARATSIM_LOCAL_POSTGRES_PASSWORD to a unique local-only secret}@postgres:5432/bharatsim?sslmode=disable}
       BHARATSIM_DATA_DIR: /app/backend/data
       BHARATSIM_MAX_UPLOAD_MB: ${BHARATSIM_MAX_UPLOAD_MB:-150}
       BHARATSIM_REQUIRE_API_KEY: ${BHARATSIM_REQUIRE_API_KEY:-false}
