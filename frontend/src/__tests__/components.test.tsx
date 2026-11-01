@@ -69,7 +69,9 @@ describe("Components tests with jsdom", () => {
   it("PlannerPanel renders API-ranked scenarios and interaction hypotheses", async () => {
     const plan = {
       generated_at: "2026-11-01T00:00:00Z",
-      strategy: "deterministic-risk-and-pairwise-interaction-v2",
+      strategy: "deterministic-category-aware-risk-and-pairwise-interaction-v3",
+      app_category: "general",
+      critical_flows: ["cold start", "login", "payment retry", "primary action"],
       total_candidates: 1,
       interaction_hunter: {
         candidate_pairwise_interactions: 3,
@@ -82,6 +84,8 @@ describe("Components tests with jsdom", () => {
         persona_id: "budget-android",
         persona_name: "Budget Android",
         flow: "payment retry",
+        app_category: "general",
+        category_flow_sensitive: true,
         risk_score: 92,
         reason: "heuristic",
         requested_conditions: [{ id: "high_latency", label: "High network latency", target: "180 ms" }],
