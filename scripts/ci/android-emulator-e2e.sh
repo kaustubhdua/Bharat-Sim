@@ -47,11 +47,7 @@ metadata = {
     "runner_os": platform.platform(),
     "python_version": platform.python_version(),
     "emulator": {
-        "system_image": ";".join([
-            os.environ.get("ANDROID_SYSTEM_IMAGE_TARGET", "google_apis"),
-            "android-" + os.environ.get("ANDROID_API_LEVEL", "35"),
-            os.environ.get("ANDROID_ARCH", "x86_64"),
-        ]),
+        "system_image": "system-images;android-" + os.environ.get("ANDROID_API_LEVEL", "35") + ";" + os.environ.get("ANDROID_SYSTEM_IMAGE_TARGET", "google_apis") + ";" + os.environ.get("ANDROID_ARCH", "x86_64"),
         "api_level": adb_property("ro.build.version.sdk"),
         "release": adb_property("ro.build.version.release"),
         "build_fingerprint": adb_property("ro.build.fingerprint"),
