@@ -555,6 +555,7 @@ export default function App() {
                     workers={workers}
                     busy={busy}
                     apiStatus={apiStatus}
+                    directUploadAvailable={Boolean(capabilities?.direct_apk_upload)}
                     onSubmit={submitApk}
                   />
 
