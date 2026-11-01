@@ -41,8 +41,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# The fixture uses a CI-host-resolved IPv4 address and validates TLS against the
-# HTTPS hostname, so the real transfer does not depend on emulator DNS resolution.
+# The fixture is served by the CI host and reached through the Android Emulator's
+# 10.0.2.2 gateway. The app binds its socket to Android's active Network and
+# downloads the full payload; no external CDN or emulator DNS is involved.
 
 (cd backend && exec uvicorn app.main:app --host 0.0.0.0 --port 8000) > artifacts/api.log 2>&1 &
 API_PID=$!
