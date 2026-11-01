@@ -8,7 +8,6 @@ import {
   ChevronRight,
   CircleAlert,
   Clock3,
-  Cpu,
   FileSearch,
   FlaskConical,
   Gauge,
@@ -17,7 +16,6 @@ import {
   RefreshCw,
   ShieldCheck,
   Smartphone,
-  Wifi,
   X
 } from "lucide-react";
 
@@ -66,7 +64,6 @@ export default function App() {
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const persona = personas.find((p) => p.id === selected) || fallbackPersonas[0];
 
   const currentTab = location.pathname.startsWith("/runs")
     ? "runs"
