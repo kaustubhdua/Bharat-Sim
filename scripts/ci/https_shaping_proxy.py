@@ -116,6 +116,7 @@ class ShapingProxy:
         *,
         delay_ms: int,
         rate_kbps: int,
+        event: dict[str, Any] | None = None,
     ) -> int:
         loop = asyncio.get_running_loop()
         started = loop.time()
@@ -127,8 +128,14 @@ class ShapingProxy:
             if not chunk:
                 break
             if first_chunk and delay_ms:
-                # Half the configured RTT in each direction.
-                await asyncio.sleep(delay_ms / 2000)
+                # Split the configured RTT evenly across the two relay directions.
+                half_delay_ms = delay_ms / 2
+                await asyncio.sleep(half_delay_ms / 1000)
+                if event is not None:
+                    event["delay_injected_ms"] = round(
+                        float(event.get("delay_injected_ms", 0.0)) + half_delay_ms, 2
+                    )
+                    event["delayed_directions"] = int(event.get("delayed_directions", 0)) + 1
                 first_chunk = False
             elif first_chunk:
                 first_chunk = False
@@ -149,6 +156,8 @@ class ShapingProxy:
             "started_at": time.time(),
             "bytes_client_to_upstream": 0,
             "bytes_upstream_to_client": 0,
+            "delay_injected_ms": 0.0,
+            "delayed_directions": 0,
         }
         self.next_event_id += 1
         upstream_writer: asyncio.StreamWriter | None = None
@@ -196,10 +205,10 @@ class ShapingProxy:
             )
             await writer.drain()
             up_task = asyncio.create_task(
-                self._relay(reader, upstream_writer, delay_ms=config["delay_ms"], rate_kbps=config["rate_kbps"])
+                self._relay(reader, upstream_writer, delay_ms=config["delay_ms"], rate_kbps=config["rate_kbps"], event=event)
             )
             down_task = asyncio.create_task(
-                self._relay(upstream_reader, writer, delay_ms=config["delay_ms"], rate_kbps=config["rate_kbps"])
+                self._relay(upstream_reader, writer, delay_ms=config["delay_ms"], rate_kbps=config["rate_kbps"], event=event)
             )
             try:
                 up_bytes, down_bytes = await asyncio.wait_for(asyncio.gather(up_task, down_task), timeout=90)
