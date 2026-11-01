@@ -43,6 +43,11 @@ export type Finding = {
   evidence: FindingEvidence[];
   explanation: string;
   recommendation: string;
+  occurrence_count?: number;
+  line_numbers?: number[];
+  evidence_context?: Array<{ line: number; text: string; relation: string }>;
+  impact_priority?: { score: number; label: string; persona_risk: string; warning: string };
+  root_cause_hypothesis?: { statement: string; confidence: string; validation_steps: string[]; status: string };
 };
 
 export type Analysis = {
@@ -65,6 +70,10 @@ export type Analysis = {
   };
   limitations: string[];
   persona: Persona;
+  analysis_mode?: string;
+  failure_dna?: { groups: Array<{ fingerprint: string; kind: string; severity: string; occurrence_count: number; line_numbers: number[]; first_line: number; last_line: number }>; group_count: number; total_occurrences: number; method: string };
+  user_impact?: { priority_score: number; label: string; persona_risk: string; drivers: string[]; assumptions: string[] };
+  root_cause_hypotheses?: Array<{ finding_id: string; kind: string; statement: string; confidence: string; validation_steps: string[]; status: string }>;
 };
 
 export type Run = {
@@ -346,3 +355,30 @@ export function date(v: string): string {
     minute: "2-digit"
   });
 }
+
+
+export type PlanScenario = {
+  id: string;
+  persona_id: string;
+  persona_name: string;
+  flow: string;
+  risk_score: number;
+  reason: string;
+  requested_conditions: Array<{ id: string; label: string; target: string }>;
+  interaction_hypotheses: Array<{ conditions: string[]; labels: string[]; risk_bonus: number; hypothesis: string; validation: string }>;
+  interaction_count: number;
+  interaction_risk_bonus: number;
+};
+
+export type PlanResponse = {
+  generated_at: string;
+  strategy: string;
+  scenarios: PlanScenario[];
+  total_candidates: number;
+  interaction_hunter: {
+    candidate_pairwise_interactions: number;
+    selected_scenario_interactions: number;
+    method: string;
+    warning: string;
+  };
+};
