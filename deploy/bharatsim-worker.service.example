@@ -1,33 +1,42 @@
 [Unit]
-Description=BharatSim Android execution worker
+Description=BharatSim Android execution worker (wipes AVD user data after every APK)
 Wants=network-online.target
-Requires=bharatsim-emulator.service
-After=network-online.target bharatsim-emulator.service
+After=network-online.target
 
 [Service]
 Type=simple
 User=bharatsim
 Group=bharatsim
+SupplementaryGroups=kvm
 WorkingDirectory=/opt/bharatsim
 EnvironmentFile=/etc/bharatsim/worker.env
 Environment=HOME=/var/lib/bharatsim
 Environment=ANDROID_HOME=/opt/android-sdk
 Environment=ANDROID_SDK_ROOT=/opt/android-sdk
+Environment=ANDROID_USER_HOME=/var/lib/bharatsim/android
 Environment=ANDROID_AVD_HOME=/var/lib/bharatsim/avd
+Environment=PATH=/opt/android-sdk/platform-tools:/opt/android-sdk/emulator:/opt/android-sdk/cmdline-tools/latest/bin:/usr/local/bin:/usr/bin:/bin
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /opt/bharatsim/worker/agent.py
+ExecStart=/usr/bin/python3 -m worker.agent
 Restart=on-failure
 RestartSec=5
+TimeoutStopSec=30
+KillMode=control-group
 
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/bharatsim /tmp
+ProtectClock=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/bharatsim /var/log/bharatsim /tmp
 RestrictSUIDSGID=true
 LockPersonality=true
-MemoryMax=4G
-CPUQuota=300%
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryMax=8G
+CPUQuota=400%
 TasksMax=256
 
 [Install]
