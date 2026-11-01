@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from app import main
@@ -20,7 +19,7 @@ def configure_upload_test(monkeypatch, tmp_path, actual_size=123):
     return TestClient(main.app)
 
 
-def test_signed_upload_is_owner_bound_and_only_queued_after_storage_verification(monkeypatch, tmp_path):
+def test_signed_upload_is_only_queued_after_storage_verification(monkeypatch, tmp_path):
     client = configure_upload_test(monkeypatch, tmp_path)
     ticket = client.post(
         "/api/v1/uploads/sign",
