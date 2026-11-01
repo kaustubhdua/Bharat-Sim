@@ -8,7 +8,7 @@
 - Audited pre-follow-up main SHA: `80634cc4356b12bd4fcfb2a48ae3ef41318a4da9`. Follow-up product UI PR #105 merged as `fbe294b7fdfcd241d07b7f86e30ea9371c666043`.
 - Dashboard design PR #104 is merged. PR #105 is also merged and replaces the decorative hero with live readiness data and removes built-in synthetic log examples. It combines field-first visual clarity inspired by [Nihdhoom](https://github.com/kaustubhdua/nihdhoom) with a structured engineering-console hierarchy inspired by [Jai-hack](https://github.com/kaustubhdua/jai-hack).
 - Post-merge CI [41343948538](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/41343948538) passed: backend, worker safety, PostgreSQL integration, frontend build, frontend Playwright E2E, and container/Compose smoke.
-- Dependency audit [41343948568](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/41343948568) passed. A passing dependency audit is not a security certification.
+- Dependency audit [41343948568](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/41343948568) passed on the preceding main SHA. After PR #105, post-merge CI [41344820578](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/41344820578) and dependency audit [41344820576](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/41344820576) also passed on `fbe294b7fdfcd241d07b7f86e30ea9371c666043`. A passing dependency audit is not a security certification.
 - CI uses a source-built fixture APK and a disposable emulator. This proves the controlled fixture journey, not arbitrary customer APK safety or production worker isolation.
 
 ## Live deployment inventory
