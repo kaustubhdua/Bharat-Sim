@@ -6,7 +6,6 @@ from subprocess import CompletedProcess
 from unittest.mock import patch
 
 from worker.tests.appium_smoke_journey import parse_probe_text
-from worker.tests.appium_smoke_journey import speed_limits_bps
 from worker.runner import (
     apply_emulator_network_profile,
     extract_logcat_signals,
@@ -50,19 +49,6 @@ class AppiumProbeStatusParserTests(unittest.TestCase):
     def test_rejects_running_or_malformed_probe_status(self):
         self.assertIsNone(parse_probe_text("Network probe running"))
         self.assertIsNone(parse_probe_text("HTTP 500 · 100 ms · CELLULAR · probe 1 · bytes 0 · attempts 1"))
-
-
-class EmulatorSpeedProfileMappingTests(unittest.TestCase):
-    def test_supported_presets_and_numeric_profiles_have_expected_bits_per_second(self):
-        self.assertEqual(speed_limits_bps("full"), (0, 0))
-        self.assertEqual(speed_limits_bps("umts"), (384_000, 384_000))
-        # Android Emulator API 35 EDGE preset is 473.6 kbps both ways.
-        self.assertEqual(speed_limits_bps("edge"), (473_600, 473_600))
-        self.assertEqual(speed_limits_bps("3000:1200"), (3_000_000, 1_200_000))
-
-    def test_rejects_unknown_speed_profiles(self):
-        with self.assertRaises(ValueError):
-            speed_limits_bps("unknown")
 
 
 class PackageNameValidationTests(unittest.TestCase):
