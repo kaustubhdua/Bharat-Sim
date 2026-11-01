@@ -32,6 +32,7 @@ For the production Linux VM setup, KVM requirements, per-job emulator wipe, work
 
 From the repository root, configure these environment variables:
 
+    export BHARATSIM_ENV=production
     export BHARATSIM_API_URL=https://your-api-host.example
     export BHARATSIM_WORKER_TOKEN='your-long-random-secret'
     export BHARATSIM_WORKER_ID='android-worker-01'
