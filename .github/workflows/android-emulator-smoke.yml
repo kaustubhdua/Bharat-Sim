@@ -95,29 +95,23 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
-      - name: Start deterministic local fixture server
+      - name: Resolve public HTTPS probe address on CI host
         id: probe-address
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/bharatsim-fixture"
-          cp smoke-android/probe-256k.bin "$RUNNER_TEMP/bharatsim-fixture/probe-256k.bin"
-          nohup python3 -m http.server 8765 --bind 0.0.0.0 --directory "$RUNNER_TEMP/bharatsim-fixture" > "$RUNNER_TEMP/bharatsim-fixture-http.log" 2>&1 </dev/null &
-          echo "$!" > "$RUNNER_TEMP/bharatsim-fixture-http.pid"
-          for attempt in $(seq 1 20); do
-            if curl --fail --silent --show-error --range 0-0 http://127.0.0.1:8765/probe-256k.bin --output /dev/null; then
-              break
-            fi
-            if [ "$attempt" -eq 20 ]; then
-              cat "$RUNNER_TEMP/bharatsim-fixture-http.log"
-              exit 1
-            fi
-            sleep 1
-          done
-          echo "ip=10.0.2.2" >> "$GITHUB_OUTPUT"
+          ip="$(timeout 10s getent ahostsv4 raw.githubusercontent.com | awk 'NR == 1 { print $1 }')"
+          if [[ ! "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            echo "Could not resolve raw.githubusercontent.com to an IPv4 address on the CI host" >&2
+            exit 1
+          fi
+          echo "Resolved raw.githubusercontent.com to $ip"
+          # Fail early if the public test endpoint is unavailable from the CI host.
+          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 --range 0-0 --output /dev/null https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
+          echo "ip=$ip" >> "$GITHUB_OUTPUT"
       - name: Build known-good test APK
         working-directory: smoke-android
         env:
-          BHARATSIM_PROBE_URL: http://10.0.2.2:8765/probe-256k.bin
+          BHARATSIM_PROBE_URL: https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
           BHARATSIM_PROBE_IP: ${{ steps.probe-address.outputs.ip }}
         run: gradle --no-daemon assembleDebug
       - name: Add Android build-tools to PATH
@@ -136,7 +130,7 @@ jobs:
       - name: Boot disposable Android emulator and execute runner
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          BHARATSIM_PROBE_URL: http://10.0.2.2:8765/probe-256k.bin
+          BHARATSIM_PROBE_URL: https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
           BHARATSIM_PROBE_IP: ${{ steps.probe-address.outputs.ip }}
         with:
           api-level: 35
