@@ -53,7 +53,7 @@ The API's production startup requires PostgreSQL, verified Supabase Auth, and th
 
 ### Why transaction pooler mode
 
-Vercel functions are short-lived/serverless. Supabase recommends the shared Transaction pooler for serverless application traffic. The backend's psycopg connection now sets `prepare_threshold=None`, because transaction pooler mode does not support prepared statements. Use the exact URI shown by common1's Connect panel rather than guessing a pooler hostname or region. Keep SSL enabled.
+Vercel functions are short-lived/serverless. Supabase recommends the shared Transaction pooler for serverless application traffic. The backend's psycopg connection sets `prepare_threshold=None`, because transaction pooler mode does not support prepared statements. It applies `SET LOCAL search_path TO bharatsim, public` inside every transaction rather than relying on session-level state, which transaction poolers do not preserve. Use the exact URI shown by common1's Connect panel rather than guessing a pooler hostname or region. Keep SSL enabled.
 
 ## Supabase prerequisites
 
