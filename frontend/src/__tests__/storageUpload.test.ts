@@ -79,16 +79,17 @@ describe("resumable private APK uploads", () => {
     });
     const sha256 = "b".repeat(64);
     savePendingApkUpload(sha256, file, ticket);
+    const pendingKey = "bharatsim.pending-apk-upload.v1." + sha256;
     sessionStorage.setItem(
-      Object.keys(sessionStorage).find(key => key.includes(sha256))!,
+      pendingKey,
       JSON.stringify({
-        ...JSON.parse(sessionStorage.getItem(Object.keys(sessionStorage).find(key => key.includes(sha256))!)!),
+        ...JSON.parse(sessionStorage.getItem(pendingKey)!),
         upload_url: "https://project.storage.supabase.co/storage/v1/upload/resumable/session-123",
       }),
     );
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === "HEAD") {
-        return new Response(null, { status: 200, headers: { "Upload-Offset": "17" } });
+        return new Response(null, { status: 200, headers: { "Upload-Offset": String(file.size) } });
       }
       throw new Error("A completed upload should not need another request.");
     });
