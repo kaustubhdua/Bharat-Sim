@@ -25,6 +25,7 @@ class ProbeContractTests(unittest.TestCase):
         self.assertIn("content_length=", java)
         self.assertIn("transfer_encoding=", java)
         self.assertIn("User-Agent: BharatSimNetworkProbe/1.0", java)
+        self.assertLess(java.index("Map<String, String> headers"), java.index("response_headers_received"))
         self.assertNotIn("speed.cloudflare.com", workflow)
         self.assertNotIn("cdn.jsdelivr.net", workflow)
         self.assertIn("api.github.com/repos/kaustubhdua/Bharat-Sim/contents/", gradle)
