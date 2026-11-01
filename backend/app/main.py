@@ -877,6 +877,14 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
                 "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path,apk_size_bytes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (run_id, created, "awaiting_worker", safe_name, payload.sha256, None, payload.persona_id, None, None, created, owner_id, object_path, payload.size_bytes),
             )
+            actor_type = "user" if owner_id else "system"
+            record_run_event(conn, run_id, "run_created", actor_type, owner_id, {
+                "persona_id": payload.persona_id, "apk_name": safe_name,
+                "apk_size_bytes": payload.size_bytes, "upload_method": "tus",
+            })
+            record_audit_event(conn, owner_id, actor_type, owner_id, "run.created", "run", run_id, {
+                "persona_id": payload.persona_id, "apk_size_bytes": payload.size_bytes, "upload_method": "tus",
+            })
     except Exception:
         # The signed URL is short-lived and the object has not been uploaded yet.
         raise
@@ -896,12 +904,12 @@ def complete_apk_upload(run_id: str, request: Request):
     with db() as conn:
         if AUTH_REQUIRED:
             row = conn.execute(
-                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id FROM runs WHERE id=? AND owner_id=?",
+                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id,owner_id FROM runs WHERE id=? AND owner_id=?",
                 (run_id, request.state.owner_id),
             ).fetchone()
         else:
             row = conn.execute(
-                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id FROM runs WHERE id=?",
+                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id,owner_id FROM runs WHERE id=?",
                 (run_id,),
             ).fetchone()
     if not row:
@@ -924,6 +932,15 @@ def complete_apk_upload(run_id: str, request: Request):
                 "UPDATE runs SET status='failed',error=?,updated_at=? WHERE id=? AND status='awaiting_worker'",
                 ("Uploaded APK size did not match the signed upload request.", utcnow(), run_id),
             )
+            actor_type = "user" if row["owner_id"] else "system"
+            record_run_event(conn, run_id, "apk_upload_rejected", actor_type, row["owner_id"], {
+                "expected_size_bytes": row["apk_size_bytes"], "actual_size_bytes": actual_size,
+                "reason": "size_mismatch",
+            })
+            record_audit_event(conn, row["owner_id"], actor_type, row["owner_id"], "run.upload_rejected", "run", run_id, {
+                "expected_size_bytes": row["apk_size_bytes"], "actual_size_bytes": actual_size,
+                "reason": "size_mismatch",
+            })
         raise HTTPException(status_code=422, detail="Uploaded APK size did not match the signed upload request.")
     worker_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
     status = "queued" if worker_configured else "awaiting_worker"
@@ -938,8 +955,15 @@ def complete_apk_upload(run_id: str, request: Request):
                 "UPDATE runs SET status=?,updated_at=? WHERE id=? AND status='awaiting_worker'",
                 (status, utcnow(), run_id),
             ).rowcount
-    if not changed:
-        raise HTTPException(status_code=409, detail="Run changed while the upload was being confirmed.")
+        if not changed:
+            raise HTTPException(status_code=409, detail="Run changed while the upload was being confirmed.")
+        actor_type = "user" if row["owner_id"] else "system"
+        record_run_event(conn, run_id, "apk_upload_verified", actor_type, row["owner_id"], {
+            "apk_size_bytes": actual_size, "upload_method": "tus", "status": status,
+        })
+        record_audit_event(conn, row["owner_id"], actor_type, row["owner_id"], "run.apk_upload_verified", "run", run_id, {
+            "apk_size_bytes": actual_size, "upload_method": "tus", "status": status,
+        })
     message = (
         "APK upload verified in private storage and queued for an authenticated worker."
         if status == "queued" else
