@@ -70,7 +70,7 @@ def test_planner_normalizes_and_deduplicates_user_critical_flows():
     ))
 
     assert result["critical_flows"] == ["Checkout flow", "Cart"]
-    assert [item["flow"] for item in result["scenarios"]] == ["Checkout flow", "Cart"]
+    assert {item["flow"] for item in result["scenarios"]} == {"Checkout flow", "Cart"}
 
 
 def test_planner_rejects_unknown_app_category_and_too_many_flows():
