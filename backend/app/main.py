@@ -766,7 +766,7 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
             "drivers": [item["kind"] for item in findings if item["impact_priority"]["score"] == impact_score] if impact_score else [],
             "assumptions": [
                 "Priority combines signal severity with the selected persona's authored risk tier.",
-                "No install base, geography, telemetry denominator, or affected-user count is available.",
+                "This is not an affected-user estimate; no install base, geography, or telemetry denominator is available.",
                 "This score orders investigation work; it is not a population estimate.",
             ],
         },
