@@ -13,11 +13,12 @@ Both projects currently report Vercel SSO protection enabled for all non-custom 
 
 ## Environment-variable audit
 
-The current variable names do not match the application code:
+The latest environment inspection (2026-11-01) confirms that the public frontend variable names are now aligned:
 
-- Dashboard currently has `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. The Vite code reads `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_API_BASE_URL`.
-- API currently has `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. The FastAPI code reads server-only `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `BHARATSIM_DATABASE_URL`, plus the runtime flags below.
-- Do not rename a secret to a `NEXT_PUBLIC_*` or `VITE_*` variable. Only the Supabase publishable/anon key belongs in the browser.
+- Dashboard: `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured for Production and Preview. The Preview API URL is branch-specific.
+- API: `SUPABASE_URL`, `BHARATSIM_ENV`, `BHARATSIM_AUTH_REQUIRED`, `BHARATSIM_STORAGE_BUCKET`, and `BHARATSIM_CORS_ORIGINS` are configured. Preview uses development mode with ephemeral SQLite; Production is set to production mode.
+- API credentials `BHARATSIM_DATABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are not present in the inspected environment. `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured.
+- Never rename a server secret to a `NEXT_PUBLIC_*` or `VITE_*` variable. Only the Supabase publishable key belongs in the browser.
 
 ## Dashboard project variables
 
@@ -28,7 +29,7 @@ Configure these on the `bharat-sim-81g2` Vercel project for Production and Previ
 | `VITE_API_BASE_URL` (Production) | `https://bharat-sim-bay.vercel.app` |
 | `VITE_API_BASE_URL` (Preview) | The matching backend branch alias, currently `https://bharat-sim-git-feat-tus-resumable-apk-upload-jyc-website.vercel.app` |
 | `VITE_SUPABASE_URL` | The HTTPS project URL for common1 |
-| `VITE_SUPABASE_ANON_KEY` | The common1 publishable key (the code's variable name is legacy-compatible; the value may be the current publishable key) |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The common1 publishable key (the code also accepts the legacy `VITE_SUPABASE_ANON_KEY`) |
 
 The current frontend defaults `VITE_API_BASE_URL` to an empty string. Because the dashboard and API are separate Vercel projects, leaving it empty sends requests to the dashboard origin rather than the FastAPI project. Production and Preview use separate values so a preview dashboard does not accidentally call the production API.
 
@@ -84,4 +85,4 @@ The following required values are not present in the inspected Vercel environmen
 
 ## Current blockers
 
-The Vercel variable audit shows naming mismatches and does not show the required API database URL or server-side service-role key. No database password or service-role credential is stored in this repository or available through the current project inspection. These values must be added by the project owner directly in Vercel; do not paste them into GitHub or chat. Until that is done, the production API must not be considered connected to common1, and the dashboard must not be considered end-to-end live.
+The Vercel variable audit confirms that the public frontend variable names and non-secret backend settings are now aligned. It still does not show the required API database URL or server-side service-role key. No database password or service-role credential is available through the current project inspection. These values must be added by the project owner directly in Vercel; do not paste them into GitHub or chat. The latest production deployments still point to an older commit, and the projects remain SSO-protected. Until the credentials are added and the new commit is deployed and verified, the production API must not be considered connected to common1, and the dashboard must not be considered end-to-end live.
