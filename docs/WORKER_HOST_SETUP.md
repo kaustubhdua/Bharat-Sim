@@ -57,6 +57,7 @@ The worker token must match the server-side BHARATSIM_WORKER_TOKEN in Vercel and
 Use only the worker service. It must run as a dedicated unprivileged account with supplementary group kvm and read/write access only to the AVD home, Android user home, worker temp/artifact paths, and emulator log path. The service should use KillMode=control-group so stopping the agent also stops its child emulator process.
 
 ~~~~bash
+sudo install -o root -g root -m 0644 deploy/bharatsim-worker.service.example /etc/systemd/system/bharatsim-worker.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now bharatsim-worker
 sudo systemctl status bharatsim-worker
