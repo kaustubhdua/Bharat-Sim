@@ -213,7 +213,7 @@ def build_tus_signed_upload_config(signed_url: str) -> dict[str, str]:
         storage_host = storage_host.removesuffix(".supabase.co") + ".storage.supabase.co"
     return {
         "upload_token": token,
-        "tus_endpoint": f"https://{storage_host}/storage/v1/upload/resumable/sign",
+        "tus_endpoint": f"https://{storage_host}/storage/v1/upload/resumable",
     }
 
 def private_object_size(object_path: str) -> int | None:
