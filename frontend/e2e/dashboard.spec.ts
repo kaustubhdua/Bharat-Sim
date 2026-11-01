@@ -74,3 +74,13 @@ test("API documentation link stays same-origin in production builds", async ({ p
   expect(href).toMatch(/\/docs$/);
   expect(href).not.toContain("localhost:8000");
 });
+
+
+test("overview uses live readiness instead of a synthetic device demo", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Run readiness" })).toBeVisible();
+  await expect(page.getByText("Current service and worker state, reported by the connected API.")).toBeVisible();
+  await expect(page.getByText("Try illustrative sample")).toHaveCount(0);
+  await expect(page.getByText("Load illustrative sample")).toHaveCount(0);
+  await expect(page.getByText("No sample execution metrics are shown.")).toHaveCount(0);
+});
