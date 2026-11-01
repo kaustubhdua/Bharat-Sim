@@ -359,7 +359,7 @@ public final class MainActivity extends Activity {
     private static int remainingTimeoutMs(long deadlineAt) throws IOException {
         long remaining = deadlineAt - SystemClock.elapsedRealtime();
         if (remaining <= 0) {
-            throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 30-second overall deadline");
+            throw new java.net.SocketTimeoutException("Android HTTPS probe exceeded its 45-second overall deadline");
         }
         return (int) Math.max(1, Math.min(Integer.MAX_VALUE, remaining));
     }
