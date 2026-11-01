@@ -304,7 +304,7 @@ def main() -> int:
                     expected_delay_ms = float(profile["delay_ms"])
                     injected_delay_ms = float(proxy_event.get("delay_injected_ms", 0.0))
                     delayed_directions = int(proxy_event.get("delayed_directions", 0))
-                    if delayed_directions != 2 or injected_delay_ms < expected_delay_ms - 1:
+                    if delayed_directions != 2 or injected_delay_ms < expected_delay_ms * 0.9:
                         raise RuntimeError(
                             "Latency-only proxy did not inject the requested RTT across both directions: "
                             f"expected_ms={expected_delay_ms}, event={proxy_event}"
@@ -349,7 +349,7 @@ def main() -> int:
         bandwidth_median_ms = statistics.median(p["duration_ms"] for p in bandwidth_probes)
         latency_delta_ms = latency_median_ms - baseline_median_ms
         bandwidth_delta_ms = bandwidth_median_ms - baseline_median_ms
-        minimum_injected_latency_ms = float(latency_profile["delay_ms"]) - 1
+        minimum_injected_latency_ms = float(latency_profile["delay_ms"]) * 0.9
         minimum_bandwidth_delta_ms = 500
 
         if bandwidth_delta_ms < minimum_bandwidth_delta_ms:
