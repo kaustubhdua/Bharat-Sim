@@ -32,6 +32,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from worker.condition_applicator import reset_target_safely
+from worker.emulator_lifecycle import recycle_emulator
 
 RUNNER = ROOT / "worker" / "runner.py"
 MAX_RESPONSE_BYTES = 300_000
@@ -328,6 +329,23 @@ def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duratio
         heartbeat_thread.join(timeout=2)
 
 
+def validate_emulator_recycling_config(env: dict[str, str] | None = None) -> tuple[bool, str]:
+    """Require a fresh, wiped emulator for every production APK execution."""
+    values = os.environ if env is None else env
+    production = values.get("BHARATSIM_ENV", "development").strip().lower() == "production"
+    enabled = values.get("BHARATSIM_RECYCLE_EMULATOR", "false").strip().lower() == "true"
+    avd_name = values.get("ANDROID_AVD_NAME", "").strip()
+    accel = values.get("BHARATSIM_EMULATOR_ACCEL", "on").strip().lower()
+
+    if production and not enabled:
+        raise WorkerError("Production worker requires BHARATSIM_RECYCLE_EMULATOR=true")
+    if enabled and not avd_name:
+        raise WorkerError("ANDROID_AVD_NAME is required when emulator recycling is enabled")
+    if production and accel != "on":
+        raise WorkerError("Production worker requires BHARATSIM_EMULATOR_ACCEL=on and /dev/kvm")
+    return enabled, avd_name
+
+
 def main() -> int:
     base_url = os.getenv("BHARATSIM_API_URL", "").strip()
     token = os.getenv("BHARATSIM_WORKER_TOKEN", "").strip()
@@ -353,6 +371,18 @@ def main() -> int:
     if not RUNNER.is_file():
         print(f"Runner not found: {RUNNER}", file=sys.stderr)
         return 2
+    try:
+        recycle_enabled, avd_name = validate_emulator_recycling_config()
+    except WorkerError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    if recycle_enabled:
+        try:
+            print(json.dumps({"event": "emulator_recycle_startup", **recycle_emulator(serial, avd_name)}), flush=True)
+        except Exception as exc:
+            print(f"Initial emulator wipe/restart failed; worker refusing APK execution: {exc}", file=sys.stderr, flush=True)
+            return 3
 
     print(f"BharatSim worker {worker_id} starting; target device is explicitly configured.", flush=True)
     while True:
@@ -363,7 +393,23 @@ def main() -> int:
                 time.sleep(poll_seconds)
                 continue
             print(f"claimed run {job.get('id')} attempt {job.get('attempt')}", flush=True)
-            run_job(base_url, token, serial, job, duration)
+            try:
+                run_job(base_url, token, serial, job, duration)
+            finally:
+                if recycle_enabled:
+                    try:
+                        print(json.dumps({
+                            "event": "emulator_recycled_after_run",
+                            "run_id": job.get("id"),
+                            **recycle_emulator(serial, avd_name),
+                        }), flush=True)
+                    except Exception as exc:
+                        print(
+                            f"Emulator wipe/restart failed after run {job.get('id')}; worker exiting fail-closed: {exc}",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        return 3
         except KeyboardInterrupt:
             return 0
         except urllib.error.HTTPError as exc:
