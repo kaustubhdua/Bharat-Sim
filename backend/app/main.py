@@ -1110,7 +1110,9 @@ def list_analyses(request: Request, limit: int = 20):
 @app.post("/api/v1/translate/report")
 def translate_report(payload: SarvamTranslationRequest):
     """Translate a user-requested, condensed report summary via Sarvam AI."""
-    if not os.getenv("SARVAM_API_KEY", "").strip():
+    if not payload.text.strip():
+        raise HTTPException(status_code=422, detail="Translation text cannot be blank.")
+    if len(os.getenv("SARVAM_API_KEY", "").strip()) < 16:
         raise HTTPException(status_code=503, detail="Sarvam translation is not configured on this server.")
     try:
         return {
@@ -1149,7 +1151,7 @@ def capabilities():
             "unsupported": ["packet_loss", "cpu_constraint"],
             "scope": "Worker executes conditions on disposable Android Emulator targets only; active data-plane app traffic is unverified",
         },
-        "sarvam_translation": bool(os.getenv("SARVAM_API_KEY", "").strip()),
+        "sarvam_translation": len(os.getenv("SARVAM_API_KEY", "").strip()) >= 16,
         "notes": [
             "Worker dispatch is configured only when BHARATSIM_WORKER_TOKEN is set; android_execution remains false here because this API cannot prove a live emulator has executed an APK. Check /api/v1/workers for recent worker heartbeats.",
             "The worker supports Android Emulator console latency and bandwidth controls plus reversible battery-saver and bounded storage-pressure simulation with readback/reset evidence. Full persona shaping remains false because packet loss, CPU throttling, RAM restriction, outage/recovery, and arbitrary-app traffic verification are not supported.",
