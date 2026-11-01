@@ -70,6 +70,8 @@ function updatePendingUploadUrl(sha256: string, uploadUrl: string): void {
   const pending = readPending(sha256);
   if (!pending) return;
   pending.upload_url = uploadUrl;
+  // Supabase TUS session URLs remain valid for up to 24 hours after creation.
+  pending.expires_at = Date.now() + 24 * 60 * 60 * 1000;
   sessionStorage.setItem(storageKey(sha256), JSON.stringify(pending));
 }
 
@@ -117,7 +119,6 @@ async function getUploadOffset(uploadUrl: string, token: string): Promise<number
     method: "HEAD",
     headers: {
       "Tus-Resumable": TUS_VERSION,
-      "x-signature": token,
     },
   });
   if (!response.ok) {
@@ -173,7 +174,6 @@ export async function uploadApkResumable(
             "Tus-Resumable": TUS_VERSION,
             "Upload-Offset": String(offset),
             "Content-Type": "application/offset+octet-stream",
-            "x-signature": ticket.upload_token,
           },
           body: chunk,
         });
