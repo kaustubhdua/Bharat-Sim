@@ -52,7 +52,8 @@
 
 - [x] Implement optional Supabase Auth JWT verification and owner-scoped run/analysis reads and writes, with cross-user regression tests. Live provider settings and deployed Auth/session verification remain pending.
 - [ ] Run untrusted APKs in disposable, resource-limited VMs/containers with no production secrets and restricted egress.
-- [ ] Add enforced quotas/concurrency limits, active-run cancellation with verified child-process teardown, durable report/log/screenshot object storage and retention, and a complete audit trail. Private APK Storage and owner-scoped run deletion/report export are implemented, but do not complete these remaining controls.
+- [x] Enforce per-user run quotas: 10 runs per UTC day and 2 active runs by default, with per-user transaction serialization and configurable limits in `bharatsim.quotas`.
+- [ ] Add per-user upload-frequency/byte quotas, active-run cancellation with verified child-process teardown, durable report/log/screenshot object storage and retention, and a complete audit trail. Private APK Storage and owner-scoped run deletion/report export are implemented, but do not complete these remaining controls.
 - [ ] Perform a threat-model review and security testing before public APK uploads.
 
 ### P1 — Production operations and quality
