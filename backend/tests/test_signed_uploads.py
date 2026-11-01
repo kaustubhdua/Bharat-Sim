@@ -108,3 +108,45 @@ def test_signed_upload_config_rejects_invalid_provider_response():
     import pytest
     with pytest.raises(RuntimeError, match="invalid signed upload capability"):
         main.build_tus_signed_upload_config("https://project.supabase.co/not-a-signed-url")
+
+
+def test_signed_upload_completion_is_tenant_scoped(monkeypatch, tmp_path):
+    client = configure_upload_test(monkeypatch, tmp_path)
+    owners = {
+        "user-a-token": "11111111-1111-4111-8111-111111111111",
+        "user-b-token": "22222222-2222-4222-8222-222222222222",
+    }
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setattr(main, "verify_supabase_access_token", lambda token: owners[token])
+
+    created = client.post(
+        "/api/v1/uploads/sign",
+        headers={"Authorization": "Bearer user-a-token"},
+        json={
+            "persona_id": "budget-android",
+            "filename": "private-build.apk",
+            "size_bytes": 123,
+            "sha256": "d" * 64,
+        },
+    )
+    assert created.status_code == 200
+    run_id = created.json()["run_id"]
+
+    # A different authenticated tenant must not be able to confirm or queue this upload.
+    foreign = client.post(
+        f"/api/v1/runs/{run_id}/upload-complete",
+        headers={"Authorization": "Bearer user-b-token"},
+    )
+    assert foreign.status_code == 404
+
+    with main.db() as conn:
+        row = conn.execute("SELECT status,owner_id FROM runs WHERE id=?", (run_id,)).fetchone()
+    assert row["status"] == "awaiting_worker"
+    assert row["owner_id"] == owners["user-a-token"]
+
+    own = client.post(
+        f"/api/v1/runs/{run_id}/upload-complete",
+        headers={"Authorization": "Bearer user-a-token"},
+    )
+    assert own.status_code == 200
+    assert own.json()["status"] == "queued"
