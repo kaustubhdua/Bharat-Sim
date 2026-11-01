@@ -383,3 +383,13 @@ export type PlanResponse = {
     warning: string;
   };
 };
+
+
+export type RunEvent = {
+  id: number;
+  event_type: string;
+  created_at: string;
+  actor_type: "user" | "worker" | "system" | "admin";
+  actor_id?: string | null;
+  payload: Record<string, unknown>;
+};
