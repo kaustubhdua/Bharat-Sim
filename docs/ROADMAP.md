@@ -3,12 +3,12 @@
 ## Implemented in the current draft
 
 - [x] Repository scaffold and setup instructions.
-- [x] Four named persona definitions and deterministic risk-ranked test planning.
+- [x] Four named persona definitions and deterministic risk-ranked test planning, including pairwise condition-interaction hypotheses surfaced in the dashboard. The planner ranks tests but does not execute them.
 - [x] APK upload size cap, ZIP/APK-like archive metadata checks, and SHA-256 fingerprint.
 - [x] SQLite persistence for run metadata and log analyses, with backward-compatible worker columns.
-- [x] Crash, ANR, memory, network, StrictMode and storage log markers; failure fingerprints and evidence-linked diagnostics.
+- [x] Crash, ANR, memory, network, StrictMode and storage log markers; Failure DNA groups normalized fingerprints, preserves occurrence counts/line context, redacts common credentials, and emits low-confidence evidence-linked hypotheses with validation steps.
 - [x] Worker reports include bounded, line-addressable crash/ANR/OOM/network/storage marker excerpts from collected logcat with nearby context; they are diagnostic markers, not confirmed root causes, and empty logs do not generate findings.
-- [x] Transparent heuristic BharatScore with explicit limitations.
+- [x] Transparent heuristic BharatScore with explicit limitations, plus a relative persona/severity investigation-priority score that is explicitly not an affected-user estimate.
 - [x] Responsive dashboard for persona selection, run registration/history, log analysis, worker heartbeat status, and report inspection.
 - [x] Real Chromium browser E2E against the actual local FastAPI service and isolated SQLite test database: connected API/profile loading, line-addressable log analysis, and disabled run registration until an APK is selected. The backend independently rejects run creation without an APK. These tests do not fabricate execution results.
 - [x] Authenticated worker claim protocol, short-lived leases, heartbeat extension, authorized APK download, result callbacks, stale-result rejection, and bounded inline results.
