@@ -7,6 +7,7 @@ import FindingCard from "../components/FindingCard";
 import PersonaPanel from "../components/PersonaPanel";
 import RunsTable from "../components/RunsTable";
 import CapabilityPanel from "../components/CapabilityPanel";
+import RunDetailView from "../components/RunDetailView";
 import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 import { cls, displayRunStatus, fallbackPersonas, isRunActive } from "../api";
 
