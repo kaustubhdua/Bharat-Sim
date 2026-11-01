@@ -77,9 +77,14 @@ class ShapingProxyTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(received, b"bharatsm")
         self.assertGreaterEqual(elapsed, 0.08)
-        await asyncio.sleep(0.05)
-        event = self.proxy.metrics()["events"][-1]
-        self.assertEqual(event["label"], "latency-only")
+        event = None
+        for _ in range(20):
+            events = self.proxy.metrics()["events"]
+            if events and events[-1]["label"] == "latency-only":
+                event = events[-1]
+                break
+            await asyncio.sleep(0.05)
+        self.assertIsNotNone(event, "proxy did not record the completed latency tunnel")
         self.assertGreaterEqual(event["delay_injected_ms"], 90.0)
         self.assertEqual(event["delayed_directions"], 2)
 
