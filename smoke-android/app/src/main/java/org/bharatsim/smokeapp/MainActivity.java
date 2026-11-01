@@ -179,9 +179,9 @@ public final class MainActivity extends Activity {
             );
             raw.setSoTimeout(remainingTimeoutMs(deadlineAt));
             OutputStream proxyOutput = raw.getOutputStream();
-            String connectRequest = "CONNECT " + host + ":" + port + " HTTP/1.1\\r\\n"
-                    + "Host: " + host + ":" + port + "\\r\\n"
-                    + "Proxy-Connection: Keep-Alive\\r\\n\\r\\n";
+            String connectRequest = "CONNECT " + host + ":" + port + " HTTP/1.1\r\n"
+                    + "Host: " + host + ":" + port + "\r\n"
+                    + "Proxy-Connection: Keep-Alive\r\n\r\n";
             proxyOutput.write(connectRequest.getBytes(StandardCharsets.US_ASCII));
             proxyOutput.flush();
 
