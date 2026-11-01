@@ -495,6 +495,12 @@ def init_db() -> None:
             id TEXT PRIMARY KEY, last_seen TEXT NOT NULL, status TEXT NOT NULL,
             current_run_id TEXT
         )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS quotas (
+            owner_id TEXT PRIMARY KEY,
+            daily_run_limit INTEGER NOT NULL DEFAULT 10 CHECK (daily_run_limit > 0),
+            active_run_limit INTEGER NOT NULL DEFAULT 2 CHECK (active_run_limit > 0),
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )""")
         # Backward-compatible schema migration for local MVP databases.
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
         migrations = {
@@ -515,6 +521,58 @@ def init_db() -> None:
                 conn.execute(f"ALTER TABLE runs ADD COLUMN {column} {definition}")
 
 init_db()
+
+
+def enforce_run_quota(conn, owner_id: str | None, now: datetime | None = None) -> None:
+    """Serialize per-user run creation and enforce daily/active limits."""
+    if not owner_id:
+        return
+
+    if DATABASE_URL:
+        conn.execute(
+            "INSERT INTO quotas(owner_id) VALUES(?) ON CONFLICT(owner_id) DO NOTHING",
+            (owner_id,),
+        )
+        quota = conn.execute(
+            "SELECT daily_run_limit,active_run_limit FROM quotas WHERE owner_id=? FOR UPDATE",
+            (owner_id,),
+        ).fetchone()
+    else:
+        conn.execute("INSERT OR IGNORE INTO quotas(owner_id) VALUES(?)", (owner_id,))
+        quota = conn.execute(
+            "SELECT daily_run_limit,active_run_limit FROM quotas WHERE owner_id=?",
+            (owner_id,),
+        ).fetchone()
+
+    if not quota:
+        raise HTTPException(status_code=503, detail="Run quota configuration is unavailable.")
+
+    current = now or datetime.now(timezone.utc)
+    current = current.astimezone(timezone.utc)
+    day_start = current.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    daily_count = conn.execute(
+        "SELECT COUNT(*) AS total FROM runs WHERE owner_id=? AND created_at>=?",
+        (owner_id, day_start),
+    ).fetchone()["total"]
+    active_count = conn.execute(
+        "SELECT COUNT(*) AS total FROM runs WHERE owner_id=? AND status IN ('awaiting_worker','queued','leased','running')",
+        (owner_id,),
+    ).fetchone()["total"]
+
+    if active_count >= quota["active_run_limit"]:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Active test-run limit reached ({quota['active_run_limit']}). Wait for a run to finish or delete a queued run.",
+            headers={"Retry-After": "60"},
+        )
+    if daily_count >= quota["daily_run_limit"]:
+        next_day = current.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        retry_after = max(1, int((next_day - current).total_seconds()))
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily test-run limit reached ({quota['daily_run_limit']}). Try again after 00:00 UTC.",
+            headers={"Retry-After": str(retry_after)},
+        )
 
 
 def cleanup_expired_uploads() -> None:
@@ -728,9 +786,11 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
     created = utcnow()
     try:
         with db() as conn:
+            owner_id = getattr(request.state, "owner_id", None)
+            enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
             conn.execute(
                 "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path,apk_size_bytes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (run_id, created, "awaiting_worker", safe_name, payload.sha256, None, payload.persona_id, None, None, created, getattr(request.state, "owner_id", None), object_path, payload.size_bytes),
+                (run_id, created, "awaiting_worker", safe_name, payload.sha256, None, payload.persona_id, None, None, created, owner_id, object_path, payload.size_bytes),
             )
     except Exception:
         # The signed URL is short-lived and the object has not been uploaded yet.
@@ -871,9 +931,11 @@ async def create_run(
     created = utcnow()
     try:
         with db() as conn:
+            owner_id = getattr(request.state, "owner_id", None)
+            enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
             conn.execute(
                 "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, getattr(request.state, "owner_id", None), apk_storage_path),
+                (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, owner_id, apk_storage_path),
             )
     except Exception:
         if apk_storage_path:
