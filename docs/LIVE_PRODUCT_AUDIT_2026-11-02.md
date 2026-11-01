@@ -17,10 +17,10 @@ The inspected Vercel Production deployments are READY, but they are not a coordi
 
 | Component | Deployment | Commit | Assessment |
 |---|---|---|---|
-| Backend | `dpl_7omfvTUmRbzpN31b5vHMC9Q37TsG` | `895a2779dfd409ddc483c20745c418a251b81fdb` | Readiness fix deployed; production persistence credentials not present in exact env inventory |
+| Backend | `dpl_8nJTQo7QPw43iRLrLtu4dA3KGXwK` | `c11ed5b0964738929ea62ca5296172032a57e4d1` | Latest deployment READY; production persistence credentials not present in exact env inventory |
 | Frontend | `dpl_Do49P4uhN4bfiSHZ13p1JmnGioxD` | `23f14d95b8fa986fc36fd5f6306e007e6050ff0b` | Older UI; does not include PR #104 design |
 
-The latest backend deployment's aliases include `https://bharat-sim-bay.vercel.app`; the frontend stable alias is `https://bharat-sim-81g2.vercel.app`. Direct page/health retrieval was not independently verifiable through the available web fetch, so READY deployment metadata is not represented as an HTTP smoke test.
+The latest backend deployment's aliases include `https://bharat-sim-bay.vercel.app`; the frontend stable alias is `https://bharat-sim-81g2.vercel.app`. Backend deployment metadata is READY at the current main SHA; frontend Production is still on the earlier UI SHA. Direct page/health retrieval was not independently verifiable through the available web fetch, so READY deployment metadata is not represented as an HTTP smoke test.
 
 ### Backend Production environment inventory
 
