@@ -470,6 +470,7 @@ def db():
     else:
         conn = sqlite3.connect(DB_PATH, timeout=15)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys=ON")
     try:
         if DATABASE_URL:
             conn.execute("SET LOCAL search_path TO bharatsim, public")
@@ -482,15 +483,48 @@ def db():
         conn.close()
 
 
+def _event_json(payload: dict[str, Any] | None) -> str:
+    """Serialize bounded, caller-curated metadata; never pass credentials or raw logs."""
+    encoded = json.dumps(payload or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if len(encoded.encode("utf-8")) > 8_000:
+        return json.dumps({"truncated": True, "original_bytes": len(encoded.encode("utf-8"))})
+    return encoded
+
+
+def record_run_event(conn, run_id: str, event_type: str, actor_type: str = "system",
+                     actor_id: str | None = None, payload: dict[str, Any] | None = None) -> None:
+    if actor_type not in {"user", "worker", "system"}:
+        raise ValueError("Invalid run-event actor type")
+    conn.execute(
+        "INSERT INTO run_events(run_id,event_type,actor_type,actor_id,payload_json) VALUES(?,?,?,?,?)",
+        (run_id, event_type[:80], actor_type, actor_id, _event_json(payload)),
+    )
+
+
+def record_audit_event(conn, owner_id: str | None, actor_type: str, actor_id: str | None,
+                       action: str, resource_type: str, resource_id: str | None,
+                       metadata: dict[str, Any] | None = None) -> None:
+    if actor_type not in {"user", "worker", "system", "admin"}:
+        raise ValueError("Invalid audit-event actor type")
+    conn.execute(
+        "INSERT INTO audit_events(owner_id,actor_type,actor_id,action,resource_type,resource_id,metadata_json) VALUES(?,?,?,?,?,?,?)",
+        (owner_id, actor_type, actor_id, action[:120], resource_type[:80], resource_id, _event_json(metadata)),
+    )
+
+
 def init_db() -> None:
     if DATABASE_URL:
         # Schema is managed only by versioned Supabase migrations; never create or
         # mutate production tables implicitly during application startup.
         with db() as conn:
-            row = conn.execute("SELECT to_regclass('bharatsim.runs') AS runs").fetchone()
-            if not row or not row["runs"]:
+            row = conn.execute(
+                "SELECT to_regclass('bharatsim.runs') AS runs, "
+                "to_regclass('bharatsim.run_events') AS run_events, "
+                "to_regclass('bharatsim.audit_events') AS audit_events"
+            ).fetchone()
+            if not row or not row["runs"] or not row["run_events"] or not row["audit_events"]:
                 raise RuntimeError(
-                    "Supabase is configured but bharatsim.runs is missing; apply the reviewed Supabase migration first"
+                    "Supabase is configured but BharatSim core/run-event/audit tables are missing; apply the reviewed Supabase migrations first"
                 )
         return
 
@@ -514,6 +548,28 @@ def init_db() -> None:
             active_run_limit INTEGER NOT NULL DEFAULT 2 CHECK (active_run_limit > 0),
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS run_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+            event_type TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            actor_type TEXT NOT NULL CHECK (actor_type IN ('user','worker','system')),
+            actor_id TEXT,
+            payload_json TEXT NOT NULL DEFAULT '{}'
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS run_events_run_created_idx ON run_events(run_id,created_at)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS audit_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id TEXT,
+            actor_type TEXT NOT NULL CHECK (actor_type IN ('user','worker','system','admin')),
+            actor_id TEXT,
+            action TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS audit_events_owner_created_idx ON audit_events(owner_id,created_at DESC)")
         # Backward-compatible schema migration for local MVP databases.
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
         migrations = {
