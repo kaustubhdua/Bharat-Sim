@@ -19,6 +19,9 @@ describe("resumable private APK uploads", () => {
     sessionStorage.clear();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+    // Keep the trusted Storage host deterministic even when Vercel injects
+    // production VITE_SUPABASE_URL into the build-time test process.
+    vi.stubEnv("VITE_SUPABASE_URL", "https://project.supabase.co");
     vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
   });
 
