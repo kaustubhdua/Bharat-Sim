@@ -1494,9 +1494,12 @@ def list_run_events(run_id: str, request: Request, limit: int = 100):
 def analyze_logs(payload: LogAnalysisRequest, request: Request):
     if payload.persona_id not in PERSONAS:
         raise HTTPException(status_code=422, detail="Unknown persona_id")
-    if AUTH_REQUIRED and payload.run_id:
+    if payload.run_id:
         with db() as conn:
-            owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (payload.run_id, request.state.owner_id)).fetchone()
+            if AUTH_REQUIRED:
+                owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (payload.run_id, request.state.owner_id)).fetchone()
+            else:
+                owned = conn.execute("SELECT id FROM runs WHERE id=?", (payload.run_id,)).fetchone()
         if not owned:
             raise HTTPException(status_code=404, detail="Run not found")
     result = analyze_log_text(payload.text, payload.persona_id)
