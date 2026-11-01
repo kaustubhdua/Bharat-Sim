@@ -1,89 +1,66 @@
 # BharatSim Android worker host setup
 
-This guide prepares a dedicated Linux VM to run the existing authenticated Android worker. It is not a substitute for provisioning the VM, verifying KVM, or running a real APK end-to-end.
+This guide is the operational summary for the production worker. The full security and SDK runbook is in [WORKER_DEPLOYMENT.md](WORKER_DEPLOYMENT.md).
 
-## 1. Host requirements
+## Production host
 
-Use a disposable Ubuntu 24.04 x86_64 VM with:
+Use a dedicated Ubuntu 24.04 x86_64 VM with at least 4 vCPU, 12 GB RAM, 40 GB free disk, hardware virtualization, and readable/writable /dev/kvm. The worker executes untrusted APKs. Do not share the host with the API, database, browser profiles, cloud credentials, personal files, or unrelated workloads.
 
-- 4 vCPU and at least 12 GB RAM for one Android Emulator plus the worker/API tooling; more capacity is needed for parallel devices.
-- KVM hardware virtualization exposed to the VM (/dev/kvm readable by the worker account).
-- At least 30 GB of disposable disk for Android SDK, system images, AVD data, APKs and logs.
-- A dedicated unprivileged Linux account named bharatsim.
-- No personal files, browser profiles, SSH agent, cloud credentials, production databases or unrelated services on the VM.
+Do not expose ADB/emulator console ports or host management interfaces. Block cloud metadata and private/control-plane network ranges from the worker. Restrict egress to the BharatSim API, common1 Supabase Storage/Auth endpoints, and public test destinations required by the app under test. A worker token is authentication, not a sandbox.
 
-Do not run untrusted APKs on the Vercel API host, on a developer laptop, or on a host that can reach private corporate networks.
+## Android SDK and AVD
 
-## 2. Install Android tooling
+Install OpenJDK 17, Android command-line tools, platform-tools, emulator, build-tools 35.0.0, and the Android 35 Google APIs x86_64 system image. Configure:
 
-Install OpenJDK 17, Android command-line tools, platform-tools, emulator and build-tools. Set:
+~~~~bash
+export ANDROID_SDK_ROOT=/opt/android-sdk
+export ANDROID_HOME=/opt/android-sdk
+export ANDROID_USER_HOME=/var/lib/bharatsim/android
+export ANDROID_AVD_HOME=/var/lib/bharatsim/avd
+export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/build-tools/35.0.0:$PATH"
 
-    export ANDROID_HOME=/opt/android-sdk
-    export ANDROID_SDK_ROOT=/opt/android-sdk
-    export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/build-tools/35.0.0:$PATH"
+yes | sdkmanager --licenses
+sdkmanager "platform-tools" "emulator" "build-tools;35.0.0" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
+avdmanager create avd --force --name bharatsim-api35 --package "system-images;android-35;google_apis;x86_64" --device pixel_2
+~~~~
 
-Install a compatible system image and create a disposable AVD (example API 35):
+The worker agent now manages the emulator process itself. Do not enable the old standalone bharatsim-emulator.service alongside recycling; it can race the agent for emulator-5554.
 
-    sdkmanager "platform-tools" "emulator" "build-tools;35.0.0" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
-    avdmanager create avd -n bharatsim-api35 -k "system-images;android-35;google_apis;x86_64" -d pixel_2
+## Worker environment
 
-Run the emulator as the dedicated account, with a clean data image:
+Create /etc/bharatsim/worker.env with mode 0600 and root ownership:
 
-    emulator @bharatsim-api35 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -memory 2048 -wipe-data
+~~~~dotenv
+BHARATSIM_ENV=production
+BHARATSIM_API_URL=https://bharat-sim-bay.vercel.app
+BHARATSIM_WORKER_TOKEN=<same strong random token configured on the API>
+BHARATSIM_WORKER_ID=android-worker-01
+BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true
+BHARATSIM_RECYCLE_EMULATOR=true
+BHARATSIM_EMULATOR_ACCEL=on
+BHARATSIM_EMULATOR_BOOT_TIMEOUT_SECONDS=240
+BHARATSIM_EMULATOR_LOG=/var/log/bharatsim/emulator.log
+ANDROID_SERIAL=emulator-5554
+ANDROID_AVD_NAME=bharatsim-api35
+ANDROID_SDK_ROOT=/opt/android-sdk
+ANDROID_HOME=/opt/android-sdk
+ANDROID_USER_HOME=/var/lib/bharatsim/android
+ANDROID_AVD_HOME=/var/lib/bharatsim/avd
+BHARATSIM_POLL_SECONDS=5
+BHARATSIM_SMOKE_DURATION_SECONDS=20
+~~~~
 
-Wait until adb -s emulator-5554 shell getprop sys.boot_completed returns 1. Verify adb devices shows only the disposable emulator. The worker refuses non-emulator serials for destructive condition simulation.
+The worker token must match the server-side BHARATSIM_WORKER_TOKEN in Vercel and contain at least 32 random characters. Do not copy the database URL, service-role key, or Sarvam key to the worker.
 
-## 3. Configure the worker
+## systemd
 
-Create /etc/bharatsim/worker.env with root-only permissions (mode 0600):
+Use only the worker service. It must run as a dedicated unprivileged account with supplementary group kvm and read/write access only to the AVD home, Android user home, worker temp/artifact paths, and emulator log path. The service should use KillMode=control-group so stopping the agent also stops its child emulator process.
 
-    BHARATSIM_API_URL=https://bharat-sim-bay.vercel.app
-    BHARATSIM_WORKER_TOKEN=<same strong random token configured on the API>
-    BHARATSIM_WORKER_ID=android-worker-01
-    ANDROID_SERIAL=emulator-5554
-    BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true
-    BHARATSIM_POLL_SECONDS=5
-    BHARATSIM_SMOKE_DURATION_SECONDS=20
+~~~~bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now bharatsim-worker
+sudo systemctl status bharatsim-worker
+journalctl -u bharatsim-worker -f
+~~~~
 
-The API's production alias currently has Vercel SSO protection and production database/Storage credentials are not yet configured. Do not start this service against that alias until those blockers are resolved and the API is reachable from the worker. For local development only, use the local API URL and set BHARATSIM_ALLOW_INSECURE_HTTP=true; never enable that exception on a public network.
-
-## 4. systemd service example
-
-Copy both deploy/bharatsim-emulator.service.example and deploy/bharatsim-worker.service.example to /etc/systemd/system/ using the filenames bharatsim-emulator.service and bharatsim-worker.service. Adjust paths, AVD name, account permissions and KVM access, then run:
-
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now bharatsim-emulator
-    sudo systemctl enable --now bharatsim-worker
-    sudo systemctl status bharatsim-emulator bharatsim-worker
-    journalctl -u bharatsim-emulator -f
-    journalctl -u bharatsim-worker -f
-
-The emulator unit starts a clean AVD and waits for boot completion; the worker unit requires the emulator unit and starts the polling agent only after it is ready. The emulator service uses -wipe-data on process start, not after each job. For stronger per-job isolation, revert a VM snapshot or destroy/recreate the VM after each APK. Configure the Android SDK read-only and AVD/home directories writable only by the dedicated account.
-
-## 5. Network isolation is a release gate
-
-The runner installs and executes untrusted APKs. A worker token is not a sandbox. Before processing public uploads:
-
-- Run each worker in a dedicated disposable VM or microVM; do not rely on a container alone as the security boundary.
-- Block access to host management interfaces, cloud metadata endpoints, RFC1918/private ranges, loopback services and internal DNS.
-- Permit only the API endpoint and explicitly approved test destinations. If the app must reach arbitrary public internet, route it through an egress proxy that blocks private, link-local and metadata destinations.
-- Do not expose ADB, emulator console ports, SSH, Docker socket or host control ports to the public internet.
-- Apply CPU, memory, disk, process-count and job-duration limits at the VM boundary.
-- Revert a VM snapshot or destroy/recreate the emulator after each job; runner cleanup is best-effort and not equivalent to a clean VM snapshot.
-- Rotate the worker token if the VM is compromised.
-
-## 6. Production acceptance test
-
-Do not mark the worker live until all of these pass with a real APK:
-
-1. API returns a queued run only after private APK upload size verification.
-2. Worker authenticates, leases the run and downloads only the leased APK.
-3. Worker verifies SHA-256 against the run record before ADB install.
-4. Emulator install, launch, logcat capture and report submission complete.
-5. A deliberate crash fixture is detected; a normal fixture does not produce a crash finding.
-6. Battery saver and storage pressure read back correctly and are reset after success, failure, timeout and worker restart.
-7. Network latency/bandwidth are read back; packet loss remains explicitly unsupported until a verified data-plane path is integrated.
-8. Worker cannot reach host/private metadata endpoints from the APK network.
-9. VM/emulator is reset before another customer's APK is processed.
-
-A green Python unit-test suite does not satisfy this acceptance test.
+Do not start public APK execution until the API database/Storage credentials are configured, Vercel SSO no longer blocks server-to-server worker calls, and the full production acceptance test in WORKER_DEPLOYMENT.md passes. Supabase Auth and worker-token authentication must remain enabled when SSO is removed.
