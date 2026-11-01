@@ -27,9 +27,10 @@ function isTrustedStorageUrl(value: string, expectedPathPrefix: string): boolean
     const parsed = new URL(value);
     if (parsed.protocol !== "https:" || !parsed.pathname.startsWith(expectedPathPrefix)) return false;
     const configuredUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-    const expectedHost = configuredUrl
-      ? new URL(configuredUrl).hostname.replace(/\\.supabase\\.co$/, ".storage.supabase.co")
-      : "";
+    const configuredHost = configuredUrl ? new URL(configuredUrl).hostname : "";
+    const expectedHost = configuredHost.endsWith(".supabase.co")
+      ? configuredHost.slice(0, -".supabase.co".length) + ".storage.supabase.co"
+      : configuredHost;
     return expectedHost ? parsed.hostname === expectedHost : parsed.hostname.endsWith(".storage.supabase.co");
   } catch {
     return false;
