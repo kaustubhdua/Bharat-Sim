@@ -1263,6 +1263,14 @@ def worker_submit_result(run_id: str, request: Request, payload: WorkerResultReq
         )
         if updated.rowcount != 1:
             raise HTTPException(status_code=409, detail="Worker lease changed or expired before result submission")
+        actor_id = lease["worker_id"] or (worker["worker_id"] if worker else None)
+        action = "run.completed" if payload.status == "completed" else "run.failed"
+        record_run_event(conn, run_id, "worker_result_submitted", "worker", actor_id, {
+            "status": payload.status, "attempt": lease["attempts"], "apk_sha256": reported_hash,
+        })
+        record_audit_event(conn, lease["owner_id"], "worker", actor_id, action, "run", run_id, {
+            "status": payload.status, "attempt": lease["attempts"], "apk_sha256": reported_hash,
+        })
         if worker and worker["worker_id"]:
             conn.execute(
                 "UPDATE workers SET last_seen=?,status='idle',current_run_id=NULL WHERE id=?",
@@ -1314,12 +1322,12 @@ def delete_run(run_id: str, request: Request):
     with db() as conn:
         if AUTH_REQUIRED:
             row = conn.execute(
-                "SELECT id,status,apk_path,apk_storage_path FROM runs WHERE id=? AND owner_id=?",
+                "SELECT id,status,apk_path,apk_storage_path,owner_id FROM runs WHERE id=? AND owner_id=?",
                 (run_id, request.state.owner_id),
             ).fetchone()
         else:
             row = conn.execute(
-                "SELECT id,status,apk_path,apk_storage_path FROM runs WHERE id=?",
+                "SELECT id,status,apk_path,apk_storage_path,owner_id FROM runs WHERE id=?",
                 (run_id,),
             ).fetchone()
         if not row:
@@ -1346,6 +1354,9 @@ def delete_run(run_id: str, request: Request):
             )
         if updated.rowcount != 1:
             raise HTTPException(status_code=409, detail="Run state changed; refresh before deleting")
+        record_audit_event(conn, row["owner_id"], "user" if row["owner_id"] else "system",
+                           getattr(request.state, "owner_id", None), "run.deletion_requested", "run", run_id,
+                           {"previous_status": row["status"]})
         conn.execute(
             "UPDATE workers SET status='idle',current_run_id=NULL WHERE current_run_id=?",
             (run_id,),
