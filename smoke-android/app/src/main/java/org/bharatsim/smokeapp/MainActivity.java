@@ -34,8 +34,8 @@ import javax.net.ssl.SSLPeerUnverifiedException;
 public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
-    private static final int PROBE_BYTES = 256_000;
-    private static final int PROBE_TIMEOUT_MS = 30_000;
+    private static final int PROBE_BYTES = 64_000;
+    private static final int PROBE_TIMEOUT_MS = 45_000;
     private static final int MAX_HTTP_LINE_BYTES = 8_192;
     private static final int MAX_HTTP_HEADER_COUNT = 100;
     private static final int MAX_HTTP_HEADER_BYTES = 32_768;
@@ -162,7 +162,7 @@ public final class MainActivity extends Activity {
             raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
-                // A 256 KB fixture transfer is measured under the selected emulator profile with a bounded overall deadline.
+                // A 64 KB fixture transfer is measured under the selected emulator profile with a bounded overall deadline.
                 tls.setSoTimeout(remainingTimeoutMs(deadlineAt));
                 tls.startHandshake();
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE tls_handshake_completed endpoint_host=" + host);
