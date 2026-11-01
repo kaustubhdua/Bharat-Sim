@@ -42,11 +42,11 @@ def test_default_quota_limits_two_active_runs_per_user(monkeypatch, tmp_path):
 def test_daily_quota_counts_completed_and_cancelled_runs(monkeypatch, tmp_path):
     prepare_quota_database(monkeypatch, tmp_path)
     owner_id = str(uuid.uuid4())
-    insert_runs(owner_id, ["completed"])
+    insert_runs(owner_id, ["completed", "cancelled"])
     with main.db() as conn:
         conn.execute(
             "INSERT INTO quotas(owner_id,daily_run_limit,active_run_limit) VALUES(?,?,?)",
-            (owner_id, 1, 2),
+            (owner_id, 2, 2),
         )
 
     with pytest.raises(HTTPException) as error:
@@ -79,6 +79,7 @@ def test_signed_upload_route_rejects_user_over_active_limit_before_signing(monke
     owner_id = str(uuid.uuid4())
     insert_runs(owner_id, ["queued", "awaiting_worker"])
     monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setenv("BHARATSIM_REQUIRE_API_KEY", "false")
     monkeypatch.setattr(main, "verify_supabase_access_token", lambda token: owner_id)
     monkeypatch.setattr(main, "STORAGE_ENABLED", True)
     signed_calls = []
