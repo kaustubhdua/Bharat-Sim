@@ -62,6 +62,15 @@ Vercel functions are short-lived/serverless. Supabase recommends the shared Tran
 4. Set the allowed redirect URLs for the dashboard's production and preview origins.
 5. Never grant browser roles direct access to the private `bharatsim` schema or the service-role key.
 
+## Environment state observed during the 2026-11-01 integration pass
+
+The following non-secret configuration has been applied directly to the two Vercel projects:
+
+- Frontend: `VITE_API_BASE_URL` is split by target (production API alias for Production, matching feature-branch API alias for Preview); common1 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured for both.
+- Backend: `SUPABASE_URL`, `BHARATSIM_AUTH_REQUIRED=true`, `BHARATSIM_STORAGE_BUCKET=bharatsim-private`, and explicit CORS origins are configured for both.
+- Backend: `BHARATSIM_ENV=production` is Production-only. Preview uses `BHARATSIM_ENV=development` and is for protected UI/integration smoke tests only; its SQLite `/tmp` database is ephemeral and must not be used for real user data.
+
+The following required values are not present in the inspected Vercel environment and must be added before production can start: `BHARATSIM_DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured. The production API deliberately fails closed without the database and server-only Storage credential. No production deployment or real APK upload/execution is claimed.
 ## Safe rollout order
 
 1. Add the server-only API variables and the correct dashboard variable names in Vercel.
