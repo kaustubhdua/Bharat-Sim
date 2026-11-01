@@ -99,19 +99,19 @@ jobs:
         id: probe-address
         shell: bash
         run: |
-          ip="$(timeout 10s getent ahostsv4 cdn.jsdelivr.net | awk 'NR == 1 { print $1 }')"
+          ip="$(timeout 10s getent ahostsv4 api.github.com | awk 'NR == 1 { print $1 }')"
           if [[ ! "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-            echo "Could not resolve cdn.jsdelivr.net to an IPv4 address on the CI host" >&2
+            echo "Could not resolve api.github.com to an IPv4 address on the CI host" >&2
             exit 1
           fi
-          echo "Resolved cdn.jsdelivr.net to $ip"
+          echo "Resolved api.github.com to $ip"
           # Fail early if the public test endpoint is unavailable from the CI host.
-          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 --range 0-0 --output /dev/null https://cdn.jsdelivr.net/gh/kaustubhdua/Bharat-Sim@${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
+          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 --range 0-0 -H "Accept: application/vnd.github.raw+json" -H "User-Agent: BharatSimNetworkProbe/1.0" --output /dev/null "https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/smoke-android/probe-256k.bin?ref=${{ github.event.pull_request.head.sha || github.sha }}"
           echo "ip=$ip" >> "$GITHUB_OUTPUT"
       - name: Build known-good test APK
         working-directory: smoke-android
         env:
-          BHARATSIM_PROBE_URL: https://cdn.jsdelivr.net/gh/kaustubhdua/Bharat-Sim@${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
+          BHARATSIM_PROBE_URL: https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/smoke-android/probe-256k.bin?ref=${{ github.event.pull_request.head.sha || github.sha }}
           BHARATSIM_PROBE_IP: ${{ steps.probe-address.outputs.ip }}
         run: gradle --no-daemon assembleDebug
       - name: Add Android build-tools to PATH
@@ -130,7 +130,7 @@ jobs:
       - name: Boot disposable Android emulator and execute runner
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          BHARATSIM_PROBE_URL: https://cdn.jsdelivr.net/gh/kaustubhdua/Bharat-Sim@${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
+          BHARATSIM_PROBE_URL: https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/smoke-android/probe-256k.bin?ref=${{ github.event.pull_request.head.sha || github.sha }}
           BHARATSIM_PROBE_IP: ${{ steps.probe-address.outputs.ip }}
         with:
           api-level: 35
