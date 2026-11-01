@@ -61,6 +61,12 @@ export default function EvidenceSynthesisPanel({ diagnostics }: { diagnostics: E
         ))}
       </div>
 
+      <div className="evidence-condition-strip">
+        <div><b>Verified conditions</b><span>{diagnostics.verified_conditions.length ? diagnostics.verified_conditions.map(label).join(" · ") : "None"}</span></div>
+        <div><b>Pre-existing conditions</b><span>{diagnostics.preexisting_conditions?.length ? diagnostics.preexisting_conditions.map(label).join(" · ") : "None"}</span></div>
+        <div><b>Unsupported conditions</b><span>{diagnostics.unsupported_conditions.length ? diagnostics.unsupported_conditions.map(label).join(" · ") : "None"}</span></div>
+      </div>
+
       <div className="evidence-fusion-observations">
         <div className="section-kicker">OBSERVED SIGNALS</div>
         <div className="evidence-observation-grid">
