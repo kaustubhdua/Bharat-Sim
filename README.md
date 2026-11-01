@@ -24,7 +24,7 @@
 - Appium/UiAutomator2 is integrated for a fixture-app primary-action journey. Product-specific test-flow authoring, broader assertion coverage, and arbitrary-app compatibility remain incomplete.
 - Emulator console latency and upload/download bandwidth controls are wired to the worker and read back from the emulator. Battery-saver and bounded storage-pressure simulation are wired for disposable emulator targets with cleanup/readback evidence. Packet loss and CPU throttling remain unsupported, RAM is report-only, and arbitrary app traffic is not proven.
 - Supabase Auth JWT verification and per-user run/analysis ownership are implemented behind `BHARATSIM_AUTH_REQUIRED=true`; the frontend includes optional email/password sign-in. Owner-scoped run deletion and report export are also implemented and covered by cross-user regression tests. However, live Supabase Auth provider/redirect settings, server-side `BHARATSIM_DATABASE_URL`, Storage service credentials, and an actual application read/write test against `common 1` remain unverified. The isolated `bharatsim` schema and private APK bucket exist in `common 1`, but the application has not been shown to use them at runtime. Production-grade disposable-VM sandbox isolation, egress restrictions, quotas, and durable report/log/screenshot object storage are not implemented.
-- Sarvam translation is not wired into the product.
+- Optional Sarvam AI translation for condensed finding summaries in Hindi, Tamil, and Marathi. It is opt-in, sends no raw logcat, uses a server-only `SARVAM_API_KEY`, and remains disabled until that credential is configured. See [`docs/SARVAM_TRANSLATION.md`](docs/SARVAM_TRANSLATION.md).
 
 ## Architecture
 
