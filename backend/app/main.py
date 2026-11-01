@@ -1394,6 +1394,8 @@ def delete_run(run_id: str, request: Request):
             )
         if deleted.rowcount != 1:
             raise HTTPException(status_code=409, detail="Run cleanup completed, but the record changed; refresh and retry")
+        record_audit_event(conn, row["owner_id"], "user" if row["owner_id"] else "system",
+                           getattr(request.state, "owner_id", None), "run.deleted", "run", run_id, {})
     return {"id": run_id, "deleted": True}
 
 
