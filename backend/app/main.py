@@ -633,8 +633,21 @@ def failure_fingerprint(line: str) -> str:
     normalized = re.sub(r"\s+", " ", normalized).strip().lower()
     return hashlib.sha256(normalized.encode("utf-8", errors="replace")).hexdigest()[:12]
 
+def _redact_log_evidence(value: str) -> str:
+    """Remove common credentials before log snippets are returned or persisted."""
+    value = re.sub(r"(?i)(authorization\s*:\s*bearer\s+)[A-Za-z0-9._~+/=-]+", r"\1[REDACTED]", value)
+    value = re.sub(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]+", r"\1[REDACTED]", value)
+    value = re.sub(r"(?i)(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\b\s*[:=]\s*)[^\s,;&]+", r"\1[REDACTED]", value)
+    value = re.sub(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b", "[REDACTED_JWT]", value)
+    return value[:600]
+
+
 def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str, Any]:
-    """Deterministic baseline detector. Signals are evidence, not proof of root cause."""
+    """Build deterministic Failure DNA and evidence-linked hypotheses from supplied logcat.
+
+    This is deliberately rule-based: it does not claim an LLM diagnosis, confirmed
+    root cause, device-population exposure, or successful APK execution.
+    """
     if persona_id not in PERSONAS:
         raise ValueError("Unknown persona_id")
     lines = text.splitlines()
@@ -646,49 +659,120 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
         ("strictmode", re.compile(r"StrictMode policy violation|disk read on main thread|disk write on main thread", re.I), "Potential main-thread blocking signal"),
         ("storage", re.compile(r"ENOSPC|No space left on device|SQLiteFullException", re.I), "Storage exhaustion signal"),
     ]
-    findings: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
+    groups: dict[tuple[str, str], dict[str, Any]] = {}
     for index, line in enumerate(lines, start=1):
         for kind, pattern, title in rules:
             if pattern.search(line):
                 fingerprint = failure_fingerprint(f"{kind}:{line}")
                 key = (kind, fingerprint)
-                if key not in seen:
-                    seen.add(key)
-                    findings.append({
-                        "id": fingerprint, "kind": kind, "title": title,
-                        "severity": "critical" if kind in ("crash", "anr", "oom") else "high" if kind in ("storage", "network") else "medium",
-                        "evidence": [{"line": index, "text": line[:600]}],
-                        "fingerprint": fingerprint,
-                        "explanation": {
-                            "crash": "The log contains a fatal process or exception marker. Inspect the adjacent stack trace to locate the originating frame.",
-                            "anr": "The log contains an ANR or input-dispatch timeout marker. Main-thread traces and timing are needed to confirm the blocking operation.",
-                            "oom": "The log contains a memory allocation or low-memory marker. Compare heap/native memory, process importance and device RAM.",
-                            "network": "The log contains a connection or timeout failure. Check retry behavior, cancellation, timeout budgets and offline UI state.",
-                            "strictmode": "The log contains a StrictMode or main-thread disk I/O marker. Profile the affected interaction before attributing user-visible jank.",
-                            "storage": "The log contains a storage exhaustion marker. Check free-space handling, cache eviction and write-failure recovery.",
-                        }[kind],
-                        "recommendation": {
-                            "crash": "Review the first app-owned frame in the full stack trace and add a regression test for this path.",
-                            "anr": "Capture a thread dump and move blocking I/O or long work off the main thread.",
-                            "oom": "Capture a memory profile; bound caches and release large references on lifecycle transitions.",
-                            "network": "Use bounded retries with exponential backoff, explicit timeouts and a recoverable offline state.",
-                            "strictmode": "Move disk operations off the main thread and measure frame latency around the affected flow.",
-                            "storage": "Handle ENOSPC explicitly and test cache cleanup and failed writes with low free space.",
-                        }[kind],
-                    })
+                group = groups.setdefault(key, {
+                    "id": fingerprint,
+                    "kind": kind,
+                    "title": title,
+                    "severity": "critical" if kind in ("crash", "anr", "oom") else "high" if kind in ("storage", "network") else "medium",
+                    "fingerprint": fingerprint,
+                    "line_numbers": [],
+                    "evidence": [],
+                    "first_line": index,
+                    "last_line": index,
+                })
+                group["line_numbers"].append(index)
+                group["last_line"] = index
+                if len(group["evidence"]) < 5:
+                    group["evidence"].append({"line": index, "text": _redact_log_evidence(line)})
                 break
-    critical = sum(1 for x in findings if x["severity"] == "critical")
-    high = sum(1 for x in findings if x["severity"] == "high")
-    medium = sum(1 for x in findings if x["severity"] == "medium")
-    # Transparent heuristic, not a market/population estimate.
+
+    persona = PERSONAS[persona_id]
+    risk_multiplier = {"critical": 1.25, "high": 1.10, "low": 0.80}.get(persona["risk"], 1.0)
+    explanations = {
+        "crash": ("The log contains a fatal process or exception marker. Inspect the adjacent stack trace to locate the originating frame.",
+                  "Review the first app-owned frame in the full stack trace and add a regression test for this path.",
+                  ["Inspect the complete exception and cause chain.", "Identify the first app-owned stack frame.", "Reproduce on the same Android/API level."]),
+        "anr": ("The log contains an ANR or input-dispatch timeout marker. Main-thread traces and timing are needed to confirm the blocking operation.",
+                "Capture a thread dump and move blocking I/O or long work off the main thread.",
+                ["Inspect the ANR traces and main-thread stack.", "Correlate input-dispatch timestamps with slow operations.", "Repeat the interaction with a profiler attached."]),
+        "oom": ("The log contains a memory allocation or low-memory marker. Compare heap/native memory, process importance and device RAM.",
+                "Capture a memory profile; bound caches and release large references on lifecycle transitions.",
+                ["Compare Java heap, native heap and process RSS.", "Inspect large allocations and cache retention.", "Repeat under a measured low-memory device or emulator condition."]),
+        "network": ("The log contains a connection or timeout failure. Check retry behavior, cancellation, timeout budgets and offline UI state.",
+                    "Use bounded retries with exponential backoff, explicit timeouts and a recoverable offline state.",
+                    ["Inspect DNS/connect/read timeout boundaries.", "Verify retry backoff, cancellation and idempotency.", "Repeat with measured latency, bandwidth and disconnect conditions."]),
+        "strictmode": ("The log contains a StrictMode or main-thread disk I/O marker. Profile the affected interaction before attributing user-visible jank.",
+                       "Move disk operations off the main thread and measure frame latency around the affected flow.",
+                       ["Inspect the StrictMode policy and stack.", "Move blocking I/O off the main thread.", "Measure frame time during the affected interaction."]),
+        "storage": ("The log contains a storage exhaustion marker. Check free-space handling, cache eviction and write-failure recovery.",
+                    "Handle ENOSPC explicitly and test cache cleanup and failed writes with low free space.",
+                    ["Inspect the failing path and available disk space.", "Verify cache eviction and transactional write recovery.", "Repeat with a measured storage budget."]),
+    }
+    findings: list[dict[str, Any]] = []
+    for group in sorted(groups.values(), key=lambda item: (item["first_line"], item["kind"], item["fingerprint"])):
+        explanation, recommendation, validation = explanations[group["kind"]]
+        base = {"critical": 100, "high": 72, "medium": 44}[group["severity"]]
+        priority_score = min(100, round(base * risk_multiplier))
+        first_index = group["first_line"] - 1
+        context_start = max(0, first_index - 2)
+        context_end = min(len(lines), first_index + 3)
+        group["occurrence_count"] = len(group["line_numbers"])
+        group["evidence_context"] = [
+            {"line": i + 1, "text": _redact_log_evidence(lines[i]), "relation": "match" if i + 1 == group["first_line"] else "context"}
+            for i in range(context_start, context_end)
+        ]
+        group["explanation"] = explanation
+        group["recommendation"] = recommendation
+        group["impact_priority"] = {
+            "score": priority_score,
+            "label": "relative diagnostic priority",
+            "persona_risk": persona["risk"],
+            "warning": "Not an estimate of affected users or population exposure.",
+        }
+        group["root_cause_hypothesis"] = {
+            "statement": explanation,
+            "confidence": "low",
+            "validation_steps": validation,
+            "status": "unconfirmed",
+        }
+        findings.append(group)
+
+    critical = sum(1 for item in findings if item["severity"] == "critical")
+    high = sum(1 for item in findings if item["severity"] == "high")
+    medium = sum(1 for item in findings if item["severity"] == "medium")
     score = max(0, min(100, 100 - critical * 28 - high * 14 - medium * 6))
+    total_occurrences = sum(item["occurrence_count"] for item in findings)
+    impact_score = max((item["impact_priority"]["score"] for item in findings), default=0)
+    dna = [{
+        "fingerprint": item["fingerprint"],
+        "kind": item["kind"],
+        "severity": item["severity"],
+        "occurrence_count": item["occurrence_count"],
+        "line_numbers": item["line_numbers"],
+        "first_line": item["first_line"],
+        "last_line": item["last_line"],
+    } for item in findings]
     return {
-        "id": str(uuid.uuid4()), "created_at": utcnow(), "persona": PERSONAS[persona_id],
-        "source": "uploaded-log-text", "evidence_lines": len(lines),
-        "findings": findings, "summary": {
+        "id": str(uuid.uuid4()), "created_at": utcnow(), "persona": persona,
+        "source": "uploaded-log-text", "analysis_mode": "deterministic-rule-based",
+        "evidence_lines": len(lines), "findings": findings,
+        "failure_dna": {
+            "groups": dna,
+            "group_count": len(dna),
+            "total_occurrences": total_occurrences,
+            "method": "Normalized line fingerprints grouped by signal category; occurrences and source line numbers are retained.",
+        },
+        "root_cause_hypotheses": [item["root_cause_hypothesis"] | {"finding_id": item["id"], "kind": item["kind"]} for item in findings],
+        "user_impact": {
+            "priority_score": impact_score,
+            "label": "Relative exposure heuristic",
+            "persona_risk": persona["risk"],
+            "drivers": [item["kind"] for item in findings if item["impact_priority"]["score"] == impact_score] if impact_score else [],
+            "assumptions": [
+                "Priority combines signal severity with the selected persona's authored risk tier.",
+                "No install base, geography, telemetry denominator, or affected-user count is available.",
+                "This score orders investigation work; it is not a population estimate.",
+            ],
+        },
+        "summary": {
             "finding_count": len(findings), "critical": critical, "high": high, "medium": medium,
-            "clean": len(findings) == 0,
+            "occurrence_count": total_occurrences, "clean": len(findings) == 0,
         },
         "bharat_score": {
             "value": score, "label": "Log resilience heuristic",
@@ -697,7 +781,10 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
         },
         "limitations": [
             "Log markers are heuristic signals and may include false positives or miss failures.",
-            "Root-cause statements are hypotheses until corroborated by full traces and reproduction.",
+            "Failure DNA groups normalized log markers; it does not prove two incidents share the same root cause.",
+            "Root-cause statements are low-confidence hypotheses until corroborated by full traces and reproduction.",
+            "User impact is a relative persona/severity priority heuristic, not an affected-user or market estimate.",
+            "Credentials detected in evidence snippets are redacted before the analysis is returned or stored.",
             "This analysis does not mean the APK was installed or executed.",
         ],
     }
@@ -756,26 +843,92 @@ def list_personas():
 
 @app.post("/api/v1/plan")
 def create_plan(request: PlanRequest):
+    """Select risk-prioritized persona/flow scenarios and expose pairwise interactions."""
     unknown = sorted(set(request.persona_ids) - set(PERSONAS))
     if unknown:
         raise HTTPException(status_code=422, detail=f"Unknown persona IDs: {', '.join(unknown)}")
+    flows = request.critical_flows or ["cold start", "login", "primary action", "network retry"]
     scenarios = []
+    interaction_candidates = 0
     for pid in request.persona_ids:
         persona = PERSONAS[pid]
-        for flow in request.critical_flows:
+        conditions: list[dict[str, Any]] = []
+        if persona["latency_ms"] >= 150:
+            conditions.append({"id": "high_latency", "label": "High network latency", "target": f'{persona["latency_ms"]} ms'})
+        if persona["down_kbps"] <= 1200:
+            conditions.append({"id": "limited_bandwidth", "label": "Limited download bandwidth", "target": f'{persona["down_kbps"]} kbps'})
+        if persona["storage_free_mb"] < 300:
+            conditions.append({"id": "low_storage", "label": "Low free storage", "target": f'{persona["storage_free_mb"]} MB'})
+        if persona["battery_saver"]:
+            conditions.append({"id": "battery_saver", "label": "Battery saver enabled", "target": "enabled"})
+        if persona["ram_mb"] <= 3072:
+            conditions.append({"id": "low_memory_profile", "label": "Low-memory device profile", "target": f'{persona["ram_mb"]} MB (profile target; not a verified RAM cap)'})
+
+        interactions = []
+        for index, left in enumerate(conditions):
+            for right in conditions[index + 1:]:
+                interaction_candidates += 1
+                pair = {left["id"], right["id"]}
+                bonus = 8
+                if pair == {"high_latency", "limited_bandwidth"}:
+                    bonus = 18
+                    hypothesis = "High latency × limited bandwidth may amplify request timeouts and retry storms."
+                elif pair == {"low_storage", "battery_saver"}:
+                    bonus = 12
+                    hypothesis = "Low storage × battery saver may expose deferred writes, background scheduling and cache cleanup issues."
+                elif pair == {"low_storage", "limited_bandwidth"}:
+                    bonus = 14
+                    hypothesis = "Low storage × limited bandwidth may expose partial-download cleanup and resumability defects."
+                elif pair == {"high_latency", "battery_saver"}:
+                    bonus = 12
+                    hypothesis = "High latency × battery saver may expose lifecycle cancellation and background retry defects."
+                elif pair == {"low_memory_profile", "high_latency"}:
+                    bonus = 14
+                    hypothesis = "Low-memory profile × high latency may expose retained request state and process-recreation defects."
+                else:
+                    hypothesis = f'{left["label"]} × {right["label"]} may expose an interaction not visible in isolated tests.'
+                interactions.append({
+                    "conditions": [left["id"], right["id"]],
+                    "labels": [left["label"], right["label"]],
+                    "risk_bonus": bonus,
+                    "hypothesis": hypothesis,
+                    "validation": "Run the paired condition on a disposable target and compare with each single-condition baseline.",
+                })
+
+        for flow in flows:
             score = 25
             score += 25 if persona["risk"] == "critical" else 15 if persona["risk"] == "high" else 0
             score += 15 if any(k in flow.lower() for k in ("network", "retry", "payment", "login")) else 0
             score += 10 if persona["storage_free_mb"] < 300 else 0
+            interaction_bonus = min(25, max((item["risk_bonus"] for item in interactions), default=0))
+            score = min(100, score + interaction_bonus)
             scenarios.append({
                 "id": f"{pid}:{re.sub(r'[^a-z0-9]+', '-', flow.lower()).strip('-')}",
-                "persona_id": pid, "persona_name": persona["name"], "flow": flow,
+                "persona_id": pid,
+                "persona_name": persona["name"],
+                "flow": flow,
                 "risk_score": min(100, score),
-                "reason": "Risk heuristic prioritizes constrained profiles and network-sensitive flows; score is a test-ordering aid, not predicted failure probability.",
+                "reason": "Deterministic test-ordering heuristic using persona risk, critical-flow sensitivity and pairwise condition interactions; not predicted failure probability.",
+                "requested_conditions": conditions,
+                "interaction_hypotheses": interactions,
+                "interaction_count": len(interactions),
+                "interaction_risk_bonus": interaction_bonus,
             })
-    scenarios.sort(key=lambda x: (-x["risk_score"], x["id"]))
+    scenarios.sort(key=lambda item: (-item["risk_score"], item["id"]))
     selected = scenarios[:request.max_scenarios]
-    return {"generated_at": utcnow(), "strategy": "deterministic-risk-heuristic-v1", "scenarios": selected, "total_candidates": len(scenarios)}
+    selected_interactions = sum(item["interaction_count"] for item in selected)
+    return {
+        "generated_at": utcnow(),
+        "strategy": "deterministic-risk-and-pairwise-interaction-v2",
+        "scenarios": selected,
+        "total_candidates": len(scenarios),
+        "interaction_hunter": {
+            "candidate_pairwise_interactions": interaction_candidates,
+            "selected_scenario_interactions": selected_interactions,
+            "method": "Enumerates pairs of authored persona conditions and ranks scenarios by the strongest pairwise risk bonus.",
+            "warning": "These are test-selection hypotheses. They do not mean conditions were applied or that a failure was observed.",
+        },
+    }
 
 @app.post("/api/v1/uploads/sign")
 def sign_apk_upload(payload: SignedUploadRequest, request: Request):
