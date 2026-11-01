@@ -202,7 +202,7 @@ def create_private_upload_url(object_path: str) -> str:
         connection.close()
 
 
-def build_tus_signed_upload_config(signed_url: str, object_path: str) -> dict[str, str]:
+def build_tus_signed_upload_config(signed_url: str) -> dict[str, str]:
     """Convert a standard signed-upload URL into Supabase's signed TUS endpoint/token pair."""
     parsed = urlsplit(signed_url)
     token = parse_qs(parsed.query).get("token", [None])[0]
@@ -211,13 +211,10 @@ def build_tus_signed_upload_config(signed_url: str, object_path: str) -> dict[st
     storage_host = parsed.hostname
     if storage_host.endswith(".supabase.co"):
         storage_host = storage_host.removesuffix(".supabase.co") + ".storage.supabase.co"
-    encoded_bucket = quote(STORAGE_BUCKET, safe="")
-    encoded_path = "/".join(quote(part, safe="") for part in object_path.split("/"))
     return {
         "upload_token": token,
-        "tus_endpoint": f"https://{storage_host}/storage/v1/upload/resumable/sign/{encoded_bucket}/{encoded_path}",
+        "tus_endpoint": f"https://{storage_host}/storage/v1/upload/resumable/sign",
     }
-
 
 def private_object_size(object_path: str) -> int | None:
     """Read object size using a server-authenticated HEAD request."""
@@ -725,7 +722,7 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
     object_path = f"runs/{run_id}/input.apk"
     try:
         signed_url = create_private_upload_url(object_path)
-        upload_capability = build_tus_signed_upload_config(signed_url, object_path)
+        upload_capability = build_tus_signed_upload_config(signed_url)
     except Exception:
         raise HTTPException(status_code=503, detail="Private APK upload could not be prepared. No run was queued.")
     created = utcnow()
