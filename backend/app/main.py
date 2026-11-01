@@ -724,12 +724,12 @@ def complete_apk_upload(run_id: str, request: Request):
     with db() as conn:
         if AUTH_REQUIRED:
             row = conn.execute(
-                "SELECT id,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id FROM runs WHERE id=? AND owner_id=?",
+                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id FROM runs WHERE id=? AND owner_id=?",
                 (run_id, request.state.owner_id),
             ).fetchone()
         else:
             row = conn.execute(
-                "SELECT id,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id FROM runs WHERE id=?",
+                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id FROM runs WHERE id=?",
                 (run_id,),
             ).fetchone()
     if not row:
@@ -775,7 +775,7 @@ def complete_apk_upload(run_id: str, request: Request):
     )
     return {
         "id": run_id,
-        "created_at": row["created_at"] if "created_at" in row.keys() else None,
+        "created_at": row["created_at"],
         "status": status,
         "apk": {"name": row["apk_name"], "sha256": row["apk_sha256"], "size_bytes": actual_size, "uploaded": True},
         "persona": PERSONAS[row["persona_id"]],
