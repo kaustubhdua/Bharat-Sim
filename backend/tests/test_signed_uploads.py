@@ -25,7 +25,7 @@ def test_signed_upload_is_owner_bound_and_only_queued_after_storage_verification
     ticket = client.post(
         "/api/v1/uploads/sign",
         json={
-            "persona_id": "baseline",
+            "persona_id": "budget-android",
             "filename": "build.apk",
             "size_bytes": 123,
             "sha256": "a" * 64,
@@ -55,14 +55,14 @@ def test_signed_upload_rejects_missing_storage_and_bad_metadata(monkeypatch, tmp
     client = TestClient(main.app)
     disabled = client.post(
         "/api/v1/uploads/sign",
-        json={"persona_id": "baseline", "filename": "build.apk", "size_bytes": 123, "sha256": "a" * 64},
+        json={"persona_id": "budget-android", "filename": "build.apk", "size_bytes": 123, "sha256": "a" * 64},
     )
     assert disabled.status_code == 503
 
     monkeypatch.setattr(main, "STORAGE_ENABLED", True)
     bad = client.post(
         "/api/v1/uploads/sign",
-        json={"persona_id": "baseline", "filename": "notes.txt", "size_bytes": 123, "sha256": "a" * 64},
+        json={"persona_id": "budget-android", "filename": "notes.txt", "size_bytes": 123, "sha256": "a" * 64},
     )
     assert bad.status_code == 415
 
@@ -71,7 +71,7 @@ def test_signed_upload_confirmation_rejects_missing_or_mismatched_object(monkeyp
     client = configure_upload_test(monkeypatch, tmp_path, actual_size=None)
     ticket = client.post(
         "/api/v1/uploads/sign",
-        json={"persona_id": "baseline", "filename": "build.apk", "size_bytes": 123, "sha256": "b" * 64},
+        json={"persona_id": "budget-android", "filename": "build.apk", "size_bytes": 123, "sha256": "b" * 64},
     ).json()
     missing = client.post(f"/api/v1/runs/{ticket['run_id']}/upload-complete")
     assert missing.status_code == 409
@@ -89,7 +89,7 @@ def test_signed_upload_routes_require_supabase_auth_when_enabled(monkeypatch):
     monkeypatch.setenv("BHARATSIM_REQUIRE_API_KEY", "false")
     response = TestClient(main.app).post(
         "/api/v1/uploads/sign",
-        json={"persona_id": "baseline", "filename": "build.apk", "size_bytes": 123, "sha256": "c" * 64},
+        json={"persona_id": "budget-android", "filename": "build.apk", "size_bytes": 123, "sha256": "c" * 64},
     )
     assert response.status_code == 401
     monkeypatch.setattr(main, "AUTH_REQUIRED", False)
