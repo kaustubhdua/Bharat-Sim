@@ -9,6 +9,19 @@ FastAPI's interactive schema is available at /docs when the backend is running.
 - GET /api/v1/capabilities — current implementation flags and limitations.
 - GET /api/v1/personas — supported test personas.
 - POST /api/v1/plan — deterministic risk-ranked persona/flow plan with pairwise condition-interaction hypotheses, suggested validation and explicit non-execution caveats.
+
+Planner request example:
+
+```json
+{
+  "persona_ids": ["budget-android"],
+  "app_category": "fintech",
+  "critical_flows": ["UPI transfer", "balance refresh", "payment retry"],
+  "max_scenarios": 4
+}
+```
+
+Supported app categories are `general`, `ecommerce`, `fintech`, `social`, `education`, `delivery`, and `media`. The API accepts up to 10 critical journeys, normalizes whitespace, removes case-insensitive duplicates, and truncates each journey to 80 characters. Category keyword matches add a deterministic +15 prioritization bonus; this is not a failure probability. See [PLANNER.md](PLANNER.md) for the full scoring model.
 - POST /api/v1/runs — multipart form with persona_id and a required APK file.
 - GET /api/v1/runs — recent run metadata.
 - GET /api/v1/runs/{run_id} — owner-scoped run state and worker-submitted report, if present. When a structured worker report exists, the response adds a derived `result.diagnostics` evidence-synthesis object without mutating the stored worker report.
