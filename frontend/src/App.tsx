@@ -144,9 +144,23 @@ export default function App() {
         } else {
           setNotice("Resuming your interrupted APK upload…");
         }
-        await uploadApkResumable(apk, sha256, ticket, percentage => {
+        const uploadProgress = (percentage: number) => {
           setNotice("Uploading APK securely… " + percentage + "%");
-        });
+        };
+        try {
+          await uploadApkResumable(apk, sha256, ticket, uploadProgress);
+        } catch (uploadError) {
+          if (!(uploadError instanceof Error) || !uploadError.message.includes("fresh upload ticket")) throw uploadError;
+          clearPendingApkUpload(sha256);
+          ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ persona_id: selected, filename: apk.name, size_bytes: apk.size, sha256 })
+          });
+          savePendingApkUpload(sha256, apk, ticket);
+          setNotice("The previous upload expired. Restarting securely with a fresh upload ticket…");
+          await uploadApkResumable(apk, sha256, ticket, uploadProgress);
+        }
         setNotice("Upload complete. Verifying the private APK and preparing the test…");
         run = await api<Run & { message: string }>(
           "/api/v1/runs/" + encodeURIComponent(ticket.run_id) + "/upload-complete",
