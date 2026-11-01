@@ -1112,6 +1112,17 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             "ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen,status='idle',current_run_id=NULL",
             (payload.worker_id, now_text, "idle"),
         )
+        expired_leases = conn.execute(
+            "SELECT id,owner_id,worker_id,attempts FROM runs WHERE status='leased' AND lease_until < ?",
+            (now_text,),
+        ).fetchall()
+        for expired in expired_leases:
+            record_run_event(conn, expired["id"], "worker_lease_expired", "system", None, {
+                "worker_id": expired["worker_id"], "attempts": expired["attempts"],
+            })
+            record_audit_event(conn, expired["owner_id"], "system", None, "run.lease_expired", "run", expired["id"], {
+                "worker_id": expired["worker_id"], "attempts": expired["attempts"],
+            })
         conn.execute(
             "UPDATE runs SET status='queued', lease_token=NULL, lease_until=NULL, worker_id=NULL, updated_at=? "
             "WHERE status='leased' AND lease_until < ? AND attempts < 3",
@@ -1123,7 +1134,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             (now_text, now_text),
         )
         row = conn.execute(
-            "SELECT id,apk_name,apk_sha256,persona_id,attempts FROM runs "
+            "SELECT id,apk_name,apk_sha256,persona_id,attempts,owner_id FROM runs "
             "WHERE status='queued' AND (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) ORDER BY created_at ASC LIMIT 1"
         ).fetchone()
         if row is None:
@@ -1139,6 +1150,12 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             "UPDATE workers SET last_seen=?, status='running', current_run_id=? WHERE id=?",
             (now_text, row["id"], payload.worker_id),
         )
+        record_run_event(conn, row["id"], "worker_claimed", "worker", payload.worker_id, {
+            "attempt": row["attempts"] + 1,
+        })
+        record_audit_event(conn, row["owner_id"], "worker", payload.worker_id, "worker.run_claimed", "run", row["id"], {
+            "attempt": row["attempts"] + 1,
+        })
         return {"job": {
             "id": row["id"], "apk_name": row["apk_name"], "apk_sha256": row["apk_sha256"],
             "persona_id": row["persona_id"], "attempt": row["attempts"] + 1,
@@ -1152,7 +1169,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
 
 def require_live_lease(conn: sqlite3.Connection, run_id: str, lease_token: str) -> sqlite3.Row:
     row = conn.execute(
-        "SELECT id,status,lease_token,lease_until,apk_path,apk_storage_path,apk_sha256 FROM runs WHERE id=?", (run_id,)
+        "SELECT id,status,lease_token,lease_until,apk_path,apk_storage_path,apk_sha256,owner_id,worker_id,attempts FROM runs WHERE id=?", (run_id,)
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Run not found")
