@@ -822,7 +822,12 @@ def health_ready():
     except Exception:
         database_ok = False
         worker_online = False
-    worker_state = "online" if worker_online else "offline" if worker_configured else "not_configured"
+    worker_state = (
+        "online" if worker_online
+        else "safety_gate_closed" if worker_token_configured and not worker_configured
+        else "offline" if worker_configured
+        else "not_configured"
+    )
     payload = {
         # API readiness is deliberately separate from execution readiness:
         # an available API must never imply that an Android worker is alive.
