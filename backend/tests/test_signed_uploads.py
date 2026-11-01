@@ -95,13 +95,13 @@ def test_signed_upload_routes_require_supabase_auth_when_enabled(monkeypatch):
     monkeypatch.setattr(main, "AUTH_REQUIRED", False)
 
 
-def test_signed_upload_config_uses_direct_storage_host_and_encodes_path(monkeypatch):
+def test_signed_upload_config_uses_official_direct_storage_tus_endpoint(monkeypatch):
     monkeypatch.setattr(main, "STORAGE_BUCKET", "bharatsim-private")
     result = main.build_tus_signed_upload_config(
         "https://project.supabase.co/storage/v1/object/upload/sign/bharatsim-private/runs/run-1/input.apk?token=" + "s" * 48,
     )
     assert result["upload_token"] == "s" * 48
-    assert result["tus_endpoint"] == "https://project.storage.supabase.co/storage/v1/upload/resumable/sign/bharatsim-private/runs/run-1/input.apk"
+    assert result["tus_endpoint"] == "https://project.storage.supabase.co/storage/v1/upload/resumable/sign"
 
 
 def test_signed_upload_config_rejects_invalid_provider_response():
