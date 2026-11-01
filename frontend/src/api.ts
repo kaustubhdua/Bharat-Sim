@@ -1,7 +1,7 @@
 export const API = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 export type Capabilities = {
-  apk_upload: boolean; log_analysis: boolean; risk_planner: boolean;
+  apk_upload: boolean; direct_apk_upload: boolean; log_analysis: boolean; risk_planner: boolean;
   failure_fingerprinting: boolean; bharat_score: boolean; android_execution: boolean;
   worker_dispatch: boolean; network_shaping: boolean; sarvam_translation: boolean;
   emulator_network_controls: {
