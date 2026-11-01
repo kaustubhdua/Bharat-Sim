@@ -258,13 +258,6 @@ export type RunDetail = Run & {
   result?: WorkerReport | Record<string, unknown> | null;
 };
 
-export const demoLog = [
-  "10-25 10:21:02.114 1812 1812 E AndroidRuntime: FATAL EXCEPTION: main",
-  "10-25 10:21:02.114 1812 1812 E AndroidRuntime: java.lang.OutOfMemoryError: Failed to allocate 4194304 bytes",
-  "10-25 10:21:03.301 1812 1812 W Network: java.net.SocketTimeoutException: timeout",
-  "10-25 10:21:03.301 1812 1812 W Network: retry attempt 3 failed"
-].join("\n");
-
 export const fallbackPersonas: Persona[] = [
   {
     id: "budget-android",
