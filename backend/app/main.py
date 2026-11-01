@@ -387,7 +387,7 @@ def db():
             from psycopg.rows import dict_row
         except ImportError as exc:
             raise RuntimeError("BHARATSIM_DATABASE_URL requires the psycopg[binary] dependency") from exc
-        raw = psycopg.connect(DATABASE_URL, row_factory=dict_row, options="-c search_path=bharatsim,public")
+        raw = psycopg.connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None, options="-c search_path=bharatsim,public")
         conn = PostgresCompatConnection(raw)
     else:
         conn = sqlite3.connect(DB_PATH, timeout=15)
