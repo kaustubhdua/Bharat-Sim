@@ -1473,6 +1473,17 @@ def analyze_logs(payload: LogAnalysisRequest, request: Request):
     with db() as conn:
         conn.execute("INSERT INTO analyses(id,created_at,run_id,persona_id,result_json,owner_id) VALUES(?,?,?,?,?,?)",
                      (result["id"], result["created_at"], payload.run_id, payload.persona_id, json.dumps(result), getattr(request.state, "owner_id", None)))
+        owner_id = getattr(request.state, "owner_id", None)
+        actor_type = "user" if owner_id else "system"
+        record_audit_event(conn, owner_id, actor_type, owner_id, "analysis.created", "analysis", result["id"], {
+            "persona_id": payload.persona_id, "run_id": payload.run_id,
+            "finding_count": result["summary"]["finding_count"],
+            "occurrence_count": result["summary"].get("occurrence_count", result["summary"]["finding_count"]),
+        })
+        if payload.run_id:
+            record_run_event(conn, payload.run_id, "log_analysis_created", actor_type, owner_id, {
+                "analysis_id": result["id"], "finding_count": result["summary"]["finding_count"],
+            })
     return result
 
 @app.get("/api/v1/analyses")
