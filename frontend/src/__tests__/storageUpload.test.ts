@@ -9,7 +9,7 @@ import {
 const ticket: SignedApkUploadTicket = {
   run_id: "run-tus-123",
   upload_token: "signed-upload-token-abcdefghijklmnopqrstuvwxyz",
-  tus_endpoint: "https://project.storage.supabase.co/storage/v1/upload/resumable/sign",
+  tus_endpoint: "https://project.storage.supabase.co/storage/v1/upload/resumable",
   object_path: "runs/run-tus-123/input.apk",
   expires_in_seconds: 7200,
 };
