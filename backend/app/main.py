@@ -1606,19 +1606,57 @@ def get_run(run_id: str, request: Request):
     result["result"] = json.loads(result.pop("result_json")) if result.get("result_json") else None
     return result
 
+
+@app.get("/api/v1/runs/{run_id}/events")
+def list_run_events(run_id: str, request: Request, limit: int = 100):
+    limit = max(1, min(limit, 200))
+    with db() as conn:
+        if AUTH_REQUIRED:
+            owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (run_id, request.state.owner_id)).fetchone()
+            if not owned:
+                raise HTTPException(status_code=404, detail="Run not found")
+        else:
+            exists = conn.execute("SELECT id FROM runs WHERE id=?", (run_id,)).fetchone()
+            if not exists:
+                raise HTTPException(status_code=404, detail="Run not found")
+        rows = conn.execute(
+            "SELECT id,event_type,created_at,actor_type,actor_id,payload_json FROM run_events WHERE run_id=? ORDER BY id ASC LIMIT ?",
+            (run_id, limit),
+        ).fetchall()
+    return {"items": [
+        {"id": row["id"], "event_type": row["event_type"], "created_at": row["created_at"],
+         "actor_type": row["actor_type"], "actor_id": row["actor_id"], "payload": json.loads(row["payload_json"])}
+        for row in rows
+    ]}
+
+
 @app.post("/api/v1/analyze/logs")
 def analyze_logs(payload: LogAnalysisRequest, request: Request):
     if payload.persona_id not in PERSONAS:
         raise HTTPException(status_code=422, detail="Unknown persona_id")
-    if AUTH_REQUIRED and payload.run_id:
+    if payload.run_id:
         with db() as conn:
-            owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (payload.run_id, request.state.owner_id)).fetchone()
+            if AUTH_REQUIRED:
+                owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (payload.run_id, request.state.owner_id)).fetchone()
+            else:
+                owned = conn.execute("SELECT id FROM runs WHERE id=?", (payload.run_id,)).fetchone()
         if not owned:
             raise HTTPException(status_code=404, detail="Run not found")
     result = analyze_log_text(payload.text, payload.persona_id)
     with db() as conn:
         conn.execute("INSERT INTO analyses(id,created_at,run_id,persona_id,result_json,owner_id) VALUES(?,?,?,?,?,?)",
                      (result["id"], result["created_at"], payload.run_id, payload.persona_id, json.dumps(result), getattr(request.state, "owner_id", None)))
+        owner_id = getattr(request.state, "owner_id", None)
+        actor_type = "user" if owner_id else "system"
+        record_audit_event(conn, owner_id, actor_type, owner_id, "analysis.created", "analysis", result["id"], {
+            "persona_id": payload.persona_id, "run_id": payload.run_id,
+            "finding_count": result["summary"]["finding_count"],
+            "occurrence_count": result["summary"].get("occurrence_count", result["summary"]["finding_count"]),
+        })
+        if payload.run_id:
+            record_run_event(conn, payload.run_id, "log_analysis_created", actor_type, owner_id, {
+                "analysis_id": result["id"], "finding_count": result["summary"]["finding_count"],
+            })
     return result
 
 @app.get("/api/v1/analyses")
