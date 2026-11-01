@@ -36,6 +36,7 @@ public final class MainActivity extends Activity {
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
     private static final int PROBE_BYTES = 64_000;
     private static final int PROBE_TIMEOUT_MS = 45_000;
+    private static final int PROBE_ATTEMPT_TIMEOUT_MS = 20_000;
     private static final int MAX_HTTP_LINE_BYTES = 8_192;
     private static final int MAX_HTTP_HEADER_COUNT = 100;
     private static final int MAX_HTTP_HEADER_BYTES = 32_768;
@@ -110,7 +111,13 @@ public final class MainActivity extends Activity {
                 if (!"CELLULAR".equals(transport) && !"ETHERNET".equals(transport)) {
                     throw new IllegalStateException("Unsupported transport for emulator-console shaping: " + transport);
                 }
-                ProbeResult result = performPinnedHttpsProbe(activeNetwork, PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started, probeDeadline);
+                // Bound each attempt independently so a stalled first read can still
+                // retry within the overall probe deadline and record the retry count.
+                long attemptDeadline = Math.min(
+                        probeDeadline,
+                        SystemClock.elapsedRealtime() + PROBE_ATTEMPT_TIMEOUT_MS
+                );
+                ProbeResult result = performPinnedHttpsProbe(activeNetwork, PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started, attemptDeadline);
                 long duration = SystemClock.elapsedRealtime() - started;
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + result.statusCode + " duration_ms=" + duration
                         + " transport=" + transport + " probe=" + sequence
