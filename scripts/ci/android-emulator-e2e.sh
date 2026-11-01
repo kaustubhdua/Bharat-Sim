@@ -74,7 +74,7 @@ metadata = {
         "bandwidth_only": {"delay_ms": 0, "rate_kbps": 384},
     },
 }
-Path("artifacts/run-metadata.json").write_text(json.dumps(metadata, indent=2) + "\\n")
+Path("artifacts/run-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
 PY
 API_PID=
 WORKER_PID=
@@ -98,7 +98,7 @@ finished = datetime.now(timezone.utc)
 started = datetime.fromisoformat(metadata["started_at_utc"].replace("Z", "+00:00"))
 metadata["finished_at_utc"] = finished.isoformat()
 metadata["duration_seconds"] = round((finished - started).total_seconds(), 3)
-path.write_text(json.dumps(metadata, indent=2) + "\\n")
+path.write_text(json.dumps(metadata, indent=2) + "\n")
 PY
   fi
   [ -z "$APPIUM_PID" ] || kill "$APPIUM_PID" 2>/dev/null || true
