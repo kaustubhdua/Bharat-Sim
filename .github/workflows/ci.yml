@@ -70,7 +70,7 @@ jobs:
           PGPASSWORD: postgres
           BHARATSIM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
       - name: Verify API persistence across real PostgreSQL-backed API restarts
-        run: pytest -q tests/test_restart_persistence.py
+        run: pytest -q tests/test_restart_persistence.py tests/test_postgres_quotas.py
         working-directory: backend
         env:
           PGPASSWORD: postgres
