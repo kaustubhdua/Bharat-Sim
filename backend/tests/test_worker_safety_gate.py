@@ -1,6 +1,25 @@
+from contextlib import contextmanager
+
 from fastapi.testclient import TestClient
 
 from app import main
+
+
+class FakeConnection:
+    def execute(self, query, parameters=()):
+        class Result:
+            def fetchall(self):
+                return []
+            def fetchone(self):
+                if "to_regclass" in query:
+                    return {"runs": "bharatsim.runs", "run_events": "bharatsim.run_events", "audit_events": "bharatsim.audit_events"}
+                return {"ok": 1}
+        return Result()
+
+
+@contextmanager
+def fake_postgres():
+    yield FakeConnection()
 
 
 def worker_headers(token):
@@ -89,7 +108,8 @@ def test_capabilities_hide_production_worker_dispatch_until_gate_is_open(monkeyp
 
 def test_readiness_names_closed_worker_safety_gate(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "APP_ENV", "production")
-    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setattr(main, "DATABASE_URL", "postgresql://user:pass@db.example.com:5432/postgres?sslmode=require")
+    monkeypatch.setattr(main, "db", fake_postgres)
     monkeypatch.setattr(main, "DB_PATH", tmp_path / "readiness.sqlite3")
     monkeypatch.setattr(main, "AUTH_REQUIRED", True)
     monkeypatch.setattr(main, "SUPABASE_URL", "https://example.supabase.co")
