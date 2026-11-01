@@ -20,6 +20,7 @@ AVD_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 DEFAULT_BOOT_TIMEOUT_SECONDS = 240
 MIN_BOOT_TIMEOUT_SECONDS = 60
 MAX_BOOT_TIMEOUT_SECONDS = 600
+MAX_EMULATOR_LOG_BYTES = 10 * 1024 * 1024
 
 
 def run_cmd(args: Sequence[str], timeout: int = 10) -> subprocess.CompletedProcess[str]:
@@ -172,7 +173,14 @@ def recycle_emulator(
     _wait_for_device_absent(serial, 45, run=run, sleep=sleep, monotonic=monotonic)
 
     log_path = Path(os.getenv("BHARATSIM_EMULATOR_LOG", "/tmp/bharatsim-emulator.log"))
+    if log_path.is_symlink():
+        raise RuntimeError("BHARATSIM_EMULATOR_LOG must not be a symbolic link")
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    if log_path.exists() and log_path.stat().st_size >= MAX_EMULATOR_LOG_BYTES:
+        rotated = log_path.with_suffix(log_path.suffix + ".1")
+        if rotated.exists():
+            rotated.unlink()
+        log_path.replace(rotated)
     command = [
         binary,
         "-avd", avd_name,
