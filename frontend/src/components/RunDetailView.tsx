@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Wifi
 } from "lucide-react";
+import EvidenceSynthesisPanel from "./EvidenceSynthesisPanel";
 import {
   api,
   downloadApi,
@@ -342,6 +343,8 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
         </div>
       ) : (
         <div className="run-evidence-body">
+          {report.diagnostics ? <EvidenceSynthesisPanel diagnostics={report.diagnostics} /> : null}
+
           {/* Signal Chips for Crash, ANR, OOM, Network, and Storage */}
           <div className="evidence-section">
             <div className="section-kicker">01 / DIAGNOSTIC MARKERS</div>
