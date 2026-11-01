@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 
 import jwt
 from .sarvam import SarvamProviderError, SarvamRateLimited, translate_report_text
+from .evidence_fusion import fuse_worker_report
 from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError
 
@@ -1474,7 +1475,9 @@ def export_run_report(run_id: str, request: Request):
     if not row["result_json"]:
         raise HTTPException(status_code=409, detail="No worker report is available for this run yet")
     report = json.loads(row["result_json"])
+    diagnostics = fuse_worker_report(report)
     canonical_report = json.dumps(report, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    canonical_diagnostics = json.dumps(diagnostics, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     export = {
         "schema_version": "1.0",
         "generated_at": utcnow(),
@@ -1488,9 +1491,12 @@ def export_run_report(run_id: str, request: Request):
             "error": row["error"],
         },
         "report": report,
+        "diagnostics": diagnostics,
         "integrity": {
             "report_sha256": hashlib.sha256(canonical_report).hexdigest(),
-            "report_hash_method": "SHA-256 of UTF-8 JSON serialized with sorted keys and compact separators",
+            "report_hash_method": "SHA-256 of the original worker report JSON serialized with sorted keys and compact separators",
+            "diagnostics_sha256": hashlib.sha256(canonical_diagnostics).hexdigest(),
+            "diagnostics_hash_method": "SHA-256 of derived evidence synthesis JSON serialized with sorted keys and compact separators",
         },
     }
     content = json.dumps(export, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
@@ -1518,6 +1524,8 @@ def get_run(run_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Run not found")
     result = dict(row)
     result["result"] = json.loads(result.pop("result_json")) if result.get("result_json") else None
+    if isinstance(result["result"], dict):
+        result["result"]["diagnostics"] = fuse_worker_report(result["result"])
     return result
 
 @app.post("/api/v1/analyze/logs")
