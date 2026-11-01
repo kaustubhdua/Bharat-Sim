@@ -11,7 +11,7 @@
 - [x] Transparent heuristic BharatScore with explicit limitations.
 - [x] Responsive dashboard for persona selection, run registration/history, log analysis, worker heartbeat status, and report inspection.
 - [x] Real Chromium browser E2E against the actual local FastAPI service and isolated SQLite test database: connected API/profile loading, line-addressable log analysis, and disabled run registration until an APK is selected. The backend independently rejects run creation without an APK. These tests do not fabricate execution results.
-- [x] Authenticated worker claim protocol, short-lived leases, heartbeat extension, authorized APK download, result callbacks, stale-result rejection, and bounded inline results.
+- [x] Authenticated worker claim protocol, short-lived leases, heartbeat extension, authorized APK download, result callbacks, stale-result rejection, bounded inline results, append-only run timeline events and owner-level audit records for creation, uploads, worker outcomes, analysis and deletion.
 - [x] Polling worker agent using the Python standard library and a guarded ADB smoke runner.
 - [x] Backend API/security/worker protocol tests, frontend production build CI, worker guard/compile checks, and automated Python/JavaScript dependency vulnerability audits.
 - [x] Process-level test proves run metadata remains available after the FastAPI process restarts against the same SQLite data directory; it intentionally does not claim worker-heartbeat or artifact durability.
@@ -53,7 +53,7 @@
 - [x] Implement optional Supabase Auth JWT verification and owner-scoped run/analysis reads and writes, with cross-user regression tests. Live provider settings and deployed Auth/session verification remain pending.
 - [ ] Run untrusted APKs in disposable, resource-limited VMs/containers with no production secrets and restricted egress.
 - [x] Enforce per-user run quotas: 10 runs per UTC day and 2 active runs by default, with per-user transaction serialization and configurable limits in `bharatsim.quotas`.
-- [ ] Add per-user upload-frequency/byte quotas, active-run cancellation with verified child-process teardown, durable report/log/screenshot object storage and retention, and a complete audit trail. Private APK Storage and owner-scoped run deletion/report export are implemented, but do not complete these remaining controls.
+- [ ] Add per-user upload-frequency/byte quotas, active-run cancellation with verified child-process teardown, and durable report/log/screenshot object storage and retention. Core run lifecycle audit events are implemented; broader security/administrative event coverage and operational retention review remain. Private APK Storage and owner-scoped run deletion/report export are implemented, but do not complete these remaining controls.
 - [ ] Perform a threat-model review and security testing before public APK uploads.
 
 ### P1 — Production operations and quality
