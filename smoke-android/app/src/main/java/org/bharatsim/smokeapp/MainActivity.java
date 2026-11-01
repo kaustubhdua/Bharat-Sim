@@ -14,7 +14,6 @@ import android.widget.TextView;
 import android.widget.Button;
 
 import java.net.URL;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.Proxy;
@@ -178,7 +177,7 @@ public final class MainActivity extends Activity {
             raw.connect(new InetSocketAddress(host, port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
-                // A 64 KB fixture transfer is measured under the selected emulator profile with a bounded overall deadline.
+                // A 64 KB fixture transfer is measured under the selected proxy profile with a bounded overall deadline.
                 tls.setSoTimeout(remainingTimeoutMs(deadlineAt));
                 tls.startHandshake();
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE tls_handshake_completed endpoint_host=" + host);
