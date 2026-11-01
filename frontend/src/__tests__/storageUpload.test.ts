@@ -91,6 +91,24 @@ describe("resumable private APK uploads", () => {
     expect(getPendingApkUpload(sha256, file)).toBeNull();
   });
 
+  it("requests a fresh ticket when the persisted TUS session has expired", async () => {
+    const file = new File(["apk-binary-content"], "build.apk", {
+      type: "application/vnd.android.package-archive",
+      lastModified: 1234,
+    });
+    const sha256 = "d".repeat(64);
+    savePendingApkUpload(sha256, file, ticket);
+    const pendingKey = "bharatsim.pending-apk-upload.v1." + sha256;
+    sessionStorage.setItem(pendingKey, JSON.stringify({
+      ...JSON.parse(sessionStorage.getItem(pendingKey)!),
+      upload_url: "https://project.storage.supabase.co/storage/v1/upload/resumable/session-expired",
+    }));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 410 })));
+
+    await expect(uploadApkResumable(file, sha256, ticket, () => undefined))
+      .rejects.toThrow("fresh upload ticket");
+  });
+
   it("resumes an existing upload from the server-confirmed offset without creating a new session", async () => {
     const file = new File(["apk-binary-content"], "build.apk", {
       type: "application/vnd.android.package-archive",
