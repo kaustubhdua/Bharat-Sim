@@ -19,7 +19,7 @@ FastAPI's interactive schema is available at /docs when the backend is running.
 - POST /api/v1/translate/report — opt-in Sarvam translation of a user-selected condensed report summary (Hindi, Tamil, or Marathi); requires server-side `SARVAM_API_KEY`.
 - GET /api/v1/analyses — recent saved log analyses.
 
-When `BHARATSIM_AUTH_REQUIRED=true`, customer-data endpoints require a verified Supabase Auth access token in the `Authorization: Bearer` header. The backend validates the JWT against the configured project's JWKS and scopes run/analysis reads, writes, report exports, and run deletion by the verified user UUID. The frontend can use email/password Supabase Auth when its public URL and publishable/legacy anon key are configured.
+When `BHARATSIM_AUTH_REQUIRED=true`, customer-data endpoints require a verified Supabase Auth access token in the `Authorization: Bearer` header. The translation endpoint is covered by the same middleware. Translation is initiated only after an explicit user action and sends a condensed summary, not raw logcat; see [`SARVAM_TRANSLATION.md`](SARVAM_TRANSLATION.md). The backend validates the JWT against the configured project's JWKS and scopes run/analysis reads, writes, report exports, and run deletion by the verified user UUID. The frontend can use email/password Supabase Auth when its public URL and publishable/legacy anon key are configured.
 
 When `BHARATSIM_REQUIRE_API_KEY=true`, `/api/v1` routes additionally require `X-BharatSim-API-Key`. This is an optional shared-key gate for private deployments, not a substitute for multi-user authentication. The shared API key and the Supabase user JWT are separate credentials.
 
