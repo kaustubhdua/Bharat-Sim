@@ -11,7 +11,7 @@
 - [x] Transparent heuristic BharatScore with explicit limitations, plus a relative persona/severity investigation-priority score that is explicitly not an affected-user estimate.
 - [x] Responsive dashboard for persona selection, run registration/history, log analysis, worker heartbeat status, and report inspection.
 - [x] Real Chromium browser E2E against the actual local FastAPI service and isolated SQLite test database: connected API/profile loading, line-addressable log analysis, and disabled run registration until an APK is selected. The backend independently rejects run creation without an APK. These tests do not fabricate execution results.
-- [x] Authenticated worker claim protocol, short-lived leases, heartbeat extension, authorized APK download, result callbacks, stale-result rejection, and bounded inline results.
+- [x] Authenticated worker claim protocol, short-lived leases, heartbeat extension, authorized APK download, result callbacks, stale-result rejection, bounded inline results, append-only run timeline events and owner-level audit records for creation, uploads, worker claims/lease expiry, worker outcomes, analysis and deletion.
 - [x] Polling worker agent using the Python standard library and a guarded ADB smoke runner.
 - [x] Backend API/security/worker protocol tests, frontend production build CI, worker guard/compile checks, and automated Python/JavaScript dependency vulnerability audits.
 - [x] Process-level test proves run metadata remains available after the FastAPI process restarts against the same SQLite data directory; it intentionally does not claim worker-heartbeat or artifact durability.

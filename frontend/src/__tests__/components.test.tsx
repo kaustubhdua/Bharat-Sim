@@ -9,7 +9,8 @@ import RunsTable from "../components/RunsTable";
 import CapabilityPanel from "../components/CapabilityPanel";
 import EvidenceSynthesisPanel from "../components/EvidenceSynthesisPanel";
 import PlannerPanel from "../components/PlannerPanel";
-import { BrowserRouter } from "react-router-dom";
+import RunDetailView from "../components/RunDetailView";
+import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 import { cls, displayRunStatus, fallbackPersonas, isRunActive } from "../api";
 
 describe("api helper utilities", () => {
@@ -266,6 +267,49 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("App died upon launch.");
     expect(container.textContent).toContain("L12: FATAL EXCEPTION: main");
     expect(container.textContent).toContain("Inspect crash stack trace.");
+  });
+
+  it("RunDetailView renders the owner-scoped lifecycle timeline", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/events")) {
+        return { ok: true, json: async () => ({
+          items: [{
+            id: 1,
+            event_type: "worker_claimed",
+            created_at: "2026-11-01T10:00:00Z",
+            actor_type: "worker",
+            actor_id: "android-runner-1",
+            payload: { attempt: 1 }
+          }]
+        }) };
+      }
+      return { ok: true, json: async () => ({
+        id: "run-123",
+        created_at: "2026-11-01T09:55:00Z",
+        status: "queued",
+        apk_name: "sample.apk",
+        apk_sha256: "a".repeat(64),
+        persona_id: "budget-android",
+        result: null,
+        error: null
+      }) };
+    }));
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/runs/run-123"]}>
+          <Routes>
+            <Route path="/runs/:id" element={<RunDetailView personas={fallbackPersonas} />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain("Evidence timeline");
+    expect(container.textContent).toContain("worker claimed");
+    expect(container.textContent).toContain("attempt: 1");
   });
 
   it("UploadPanel disables submit button when apk is null", async () => {

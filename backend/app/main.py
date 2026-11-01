@@ -482,6 +482,7 @@ def db():
     else:
         conn = sqlite3.connect(DB_PATH, timeout=15)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys=ON")
     try:
         if DATABASE_URL:
             conn.execute("SET LOCAL search_path TO bharatsim, public")
@@ -494,15 +495,48 @@ def db():
         conn.close()
 
 
+def _event_json(payload: dict[str, Any] | None) -> str:
+    """Serialize bounded, caller-curated metadata; never pass credentials or raw logs."""
+    encoded = json.dumps(payload or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if len(encoded.encode("utf-8")) > 8_000:
+        return json.dumps({"truncated": True, "original_bytes": len(encoded.encode("utf-8"))})
+    return encoded
+
+
+def record_run_event(conn, run_id: str, event_type: str, actor_type: str = "system",
+                     actor_id: str | None = None, payload: dict[str, Any] | None = None) -> None:
+    if actor_type not in {"user", "worker", "system"}:
+        raise ValueError("Invalid run-event actor type")
+    conn.execute(
+        "INSERT INTO run_events(run_id,event_type,actor_type,actor_id,payload_json) VALUES(?,?,?,?,?)",
+        (run_id, event_type[:80], actor_type, actor_id, _event_json(payload)),
+    )
+
+
+def record_audit_event(conn, owner_id: str | None, actor_type: str, actor_id: str | None,
+                       action: str, resource_type: str, resource_id: str | None,
+                       metadata: dict[str, Any] | None = None) -> None:
+    if actor_type not in {"user", "worker", "system", "admin"}:
+        raise ValueError("Invalid audit-event actor type")
+    conn.execute(
+        "INSERT INTO audit_events(owner_id,actor_type,actor_id,action,resource_type,resource_id,metadata_json) VALUES(?,?,?,?,?,?,?)",
+        (owner_id, actor_type, actor_id, action[:120], resource_type[:80], resource_id, _event_json(metadata)),
+    )
+
+
 def init_db() -> None:
     if DATABASE_URL:
         # Schema is managed only by versioned Supabase migrations; never create or
         # mutate production tables implicitly during application startup.
         with db() as conn:
-            row = conn.execute("SELECT to_regclass('bharatsim.runs') AS runs").fetchone()
-            if not row or not row["runs"]:
+            row = conn.execute(
+                "SELECT to_regclass('bharatsim.runs') AS runs, "
+                "to_regclass('bharatsim.run_events') AS run_events, "
+                "to_regclass('bharatsim.audit_events') AS audit_events"
+            ).fetchone()
+            if not row or not row["runs"] or not row["run_events"] or not row["audit_events"]:
                 raise RuntimeError(
-                    "Supabase is configured but bharatsim.runs is missing; apply the reviewed Supabase migration first"
+                    "Supabase is configured but BharatSim core/run-event/audit tables are missing; apply the reviewed Supabase migrations first"
                 )
         return
 
@@ -526,6 +560,28 @@ def init_db() -> None:
             active_run_limit INTEGER NOT NULL DEFAULT 2 CHECK (active_run_limit > 0),
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS run_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+            event_type TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            actor_type TEXT NOT NULL CHECK (actor_type IN ('user','worker','system')),
+            actor_id TEXT,
+            payload_json TEXT NOT NULL DEFAULT '{}'
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS run_events_run_created_idx ON run_events(run_id,created_at)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS audit_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id TEXT,
+            actor_type TEXT NOT NULL CHECK (actor_type IN ('user','worker','system','admin')),
+            actor_id TEXT,
+            action TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS audit_events_owner_created_idx ON audit_events(owner_id,created_at DESC)")
         # Backward-compatible schema migration for local MVP databases.
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
         migrations = {
@@ -993,6 +1049,14 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
                 "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path,apk_size_bytes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (run_id, created, "awaiting_worker", safe_name, payload.sha256, None, payload.persona_id, None, None, created, owner_id, object_path, payload.size_bytes),
             )
+            actor_type = "user" if owner_id else "system"
+            record_run_event(conn, run_id, "run_created", actor_type, owner_id, {
+                "persona_id": payload.persona_id, "apk_name": safe_name,
+                "apk_size_bytes": payload.size_bytes, "upload_method": "tus",
+            })
+            record_audit_event(conn, owner_id, actor_type, owner_id, "run.created", "run", run_id, {
+                "persona_id": payload.persona_id, "apk_size_bytes": payload.size_bytes, "upload_method": "tus",
+            })
     except Exception:
         # The signed URL is short-lived and the object has not been uploaded yet.
         raise
@@ -1012,12 +1076,12 @@ def complete_apk_upload(run_id: str, request: Request):
     with db() as conn:
         if AUTH_REQUIRED:
             row = conn.execute(
-                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id FROM runs WHERE id=? AND owner_id=?",
+                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id,owner_id FROM runs WHERE id=? AND owner_id=?",
                 (run_id, request.state.owner_id),
             ).fetchone()
         else:
             row = conn.execute(
-                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id FROM runs WHERE id=?",
+                "SELECT id,created_at,status,apk_storage_path,apk_size_bytes,apk_name,apk_sha256,persona_id,owner_id FROM runs WHERE id=?",
                 (run_id,),
             ).fetchone()
     if not row:
@@ -1040,6 +1104,15 @@ def complete_apk_upload(run_id: str, request: Request):
                 "UPDATE runs SET status='failed',error=?,updated_at=? WHERE id=? AND status='awaiting_worker'",
                 ("Uploaded APK size did not match the signed upload request.", utcnow(), run_id),
             )
+            actor_type = "user" if row["owner_id"] else "system"
+            record_run_event(conn, run_id, "apk_upload_rejected", actor_type, row["owner_id"], {
+                "expected_size_bytes": row["apk_size_bytes"], "actual_size_bytes": actual_size,
+                "reason": "size_mismatch",
+            })
+            record_audit_event(conn, row["owner_id"], actor_type, row["owner_id"], "run.upload_rejected", "run", run_id, {
+                "expected_size_bytes": row["apk_size_bytes"], "actual_size_bytes": actual_size,
+                "reason": "size_mismatch",
+            })
         raise HTTPException(status_code=422, detail="Uploaded APK size did not match the signed upload request.")
     worker_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
     status = "queued" if worker_configured else "awaiting_worker"
@@ -1054,8 +1127,15 @@ def complete_apk_upload(run_id: str, request: Request):
                 "UPDATE runs SET status=?,updated_at=? WHERE id=? AND status='awaiting_worker'",
                 (status, utcnow(), run_id),
             ).rowcount
-    if not changed:
-        raise HTTPException(status_code=409, detail="Run changed while the upload was being confirmed.")
+        if not changed:
+            raise HTTPException(status_code=409, detail="Run changed while the upload was being confirmed.")
+        actor_type = "user" if row["owner_id"] else "system"
+        record_run_event(conn, run_id, "apk_upload_verified", actor_type, row["owner_id"], {
+            "apk_size_bytes": actual_size, "upload_method": "tus", "status": status,
+        })
+        record_audit_event(conn, row["owner_id"], actor_type, row["owner_id"], "run.apk_upload_verified", "run", run_id, {
+            "apk_size_bytes": actual_size, "upload_method": "tus", "status": status,
+        })
     message = (
         "APK upload verified in private storage and queued for an authenticated worker."
         if status == "queued" else
@@ -1140,6 +1220,15 @@ async def create_run(
                 "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, owner_id, apk_storage_path),
             )
+            actor_type = "user" if owner_id else "system"
+            record_run_event(conn, run_id, "run_created", actor_type, owner_id, {
+                "persona_id": persona_id, "apk_name": apk_name, "apk_sha256": apk_hash,
+                "upload_method": "multipart", "status": status,
+            })
+            record_audit_event(conn, owner_id, actor_type, owner_id, "run.created", "run", run_id, {
+                "persona_id": persona_id, "apk_name": apk_name, "apk_sha256": apk_hash,
+                "upload_method": "multipart", "status": status,
+            })
     except Exception:
         if apk_storage_path:
             try:
@@ -1221,6 +1310,17 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             "ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen,status='idle',current_run_id=NULL",
             (payload.worker_id, now_text, "idle"),
         )
+        expired_leases = conn.execute(
+            "SELECT id,owner_id,worker_id,attempts FROM runs WHERE status='leased' AND lease_until < ?",
+            (now_text,),
+        ).fetchall()
+        for expired in expired_leases:
+            record_run_event(conn, expired["id"], "worker_lease_expired", "system", None, {
+                "worker_id": expired["worker_id"], "attempts": expired["attempts"],
+            })
+            record_audit_event(conn, expired["owner_id"], "system", None, "run.lease_expired", "run", expired["id"], {
+                "worker_id": expired["worker_id"], "attempts": expired["attempts"],
+            })
         conn.execute(
             "UPDATE runs SET status='queued', lease_token=NULL, lease_until=NULL, worker_id=NULL, updated_at=? "
             "WHERE status='leased' AND lease_until < ? AND attempts < 3",
@@ -1232,7 +1332,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             (now_text, now_text),
         )
         row = conn.execute(
-            "SELECT id,apk_name,apk_sha256,persona_id,attempts FROM runs "
+            "SELECT id,apk_name,apk_sha256,persona_id,attempts,owner_id FROM runs "
             "WHERE status='queued' AND (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) ORDER BY created_at ASC LIMIT 1"
         ).fetchone()
         if row is None:
@@ -1248,6 +1348,12 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             "UPDATE workers SET last_seen=?, status='running', current_run_id=? WHERE id=?",
             (now_text, row["id"], payload.worker_id),
         )
+        record_run_event(conn, row["id"], "worker_claimed", "worker", payload.worker_id, {
+            "attempt": row["attempts"] + 1,
+        })
+        record_audit_event(conn, row["owner_id"], "worker", payload.worker_id, "worker.run_claimed", "run", row["id"], {
+            "attempt": row["attempts"] + 1,
+        })
         return {"job": {
             "id": row["id"], "apk_name": row["apk_name"], "apk_sha256": row["apk_sha256"],
             "persona_id": row["persona_id"], "attempt": row["attempts"] + 1,
@@ -1261,7 +1367,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
 
 def require_live_lease(conn: sqlite3.Connection, run_id: str, lease_token: str) -> sqlite3.Row:
     row = conn.execute(
-        "SELECT id,status,lease_token,lease_until,apk_path,apk_storage_path,apk_sha256 FROM runs WHERE id=?", (run_id,)
+        "SELECT id,status,lease_token,lease_until,apk_path,apk_storage_path,apk_sha256,owner_id,worker_id,attempts FROM runs WHERE id=?", (run_id,)
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -1355,6 +1461,14 @@ def worker_submit_result(run_id: str, request: Request, payload: WorkerResultReq
         )
         if updated.rowcount != 1:
             raise HTTPException(status_code=409, detail="Worker lease changed or expired before result submission")
+        actor_id = lease["worker_id"] or (worker["worker_id"] if worker else None)
+        action = "run.completed" if payload.status == "completed" else "run.failed"
+        record_run_event(conn, run_id, "worker_result_submitted", "worker", actor_id, {
+            "status": payload.status, "attempt": lease["attempts"], "apk_sha256": reported_hash,
+        })
+        record_audit_event(conn, lease["owner_id"], "worker", actor_id, action, "run", run_id, {
+            "status": payload.status, "attempt": lease["attempts"], "apk_sha256": reported_hash,
+        })
         if worker and worker["worker_id"]:
             conn.execute(
                 "UPDATE workers SET last_seen=?,status='idle',current_run_id=NULL WHERE id=?",
@@ -1406,12 +1520,12 @@ def delete_run(run_id: str, request: Request):
     with db() as conn:
         if AUTH_REQUIRED:
             row = conn.execute(
-                "SELECT id,status,apk_path,apk_storage_path FROM runs WHERE id=? AND owner_id=?",
+                "SELECT id,status,apk_path,apk_storage_path,owner_id FROM runs WHERE id=? AND owner_id=?",
                 (run_id, request.state.owner_id),
             ).fetchone()
         else:
             row = conn.execute(
-                "SELECT id,status,apk_path,apk_storage_path FROM runs WHERE id=?",
+                "SELECT id,status,apk_path,apk_storage_path,owner_id FROM runs WHERE id=?",
                 (run_id,),
             ).fetchone()
         if not row:
@@ -1438,6 +1552,9 @@ def delete_run(run_id: str, request: Request):
             )
         if updated.rowcount != 1:
             raise HTTPException(status_code=409, detail="Run state changed; refresh before deleting")
+        record_audit_event(conn, row["owner_id"], "user" if row["owner_id"] else "system",
+                           getattr(request.state, "owner_id", None), "run.deletion_requested", "run", run_id,
+                           {"previous_status": row["status"]})
         conn.execute(
             "UPDATE workers SET status='idle',current_run_id=NULL WHERE current_run_id=?",
             (run_id,),
@@ -1475,6 +1592,8 @@ def delete_run(run_id: str, request: Request):
             )
         if deleted.rowcount != 1:
             raise HTTPException(status_code=409, detail="Run cleanup completed, but the record changed; refresh and retry")
+        record_audit_event(conn, row["owner_id"], "user" if row["owner_id"] else "system",
+                           getattr(request.state, "owner_id", None), "run.deleted", "run", run_id, {})
     return {"id": run_id, "deleted": True}
 
 
@@ -1552,19 +1671,57 @@ def get_run(run_id: str, request: Request):
         result["result"]["diagnostics"] = fuse_worker_report(result["result"])
     return result
 
+
+@app.get("/api/v1/runs/{run_id}/events")
+def list_run_events(run_id: str, request: Request, limit: int = 100):
+    limit = max(1, min(limit, 200))
+    with db() as conn:
+        if AUTH_REQUIRED:
+            owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (run_id, request.state.owner_id)).fetchone()
+            if not owned:
+                raise HTTPException(status_code=404, detail="Run not found")
+        else:
+            exists = conn.execute("SELECT id FROM runs WHERE id=?", (run_id,)).fetchone()
+            if not exists:
+                raise HTTPException(status_code=404, detail="Run not found")
+        rows = conn.execute(
+            "SELECT id,event_type,created_at,actor_type,actor_id,payload_json FROM run_events WHERE run_id=? ORDER BY id ASC LIMIT ?",
+            (run_id, limit),
+        ).fetchall()
+    return {"items": [
+        {"id": row["id"], "event_type": row["event_type"], "created_at": row["created_at"],
+         "actor_type": row["actor_type"], "actor_id": row["actor_id"], "payload": json.loads(row["payload_json"])}
+        for row in rows
+    ]}
+
+
 @app.post("/api/v1/analyze/logs")
 def analyze_logs(payload: LogAnalysisRequest, request: Request):
     if payload.persona_id not in PERSONAS:
         raise HTTPException(status_code=422, detail="Unknown persona_id")
-    if AUTH_REQUIRED and payload.run_id:
+    if payload.run_id:
         with db() as conn:
-            owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (payload.run_id, request.state.owner_id)).fetchone()
+            if AUTH_REQUIRED:
+                owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (payload.run_id, request.state.owner_id)).fetchone()
+            else:
+                owned = conn.execute("SELECT id FROM runs WHERE id=?", (payload.run_id,)).fetchone()
         if not owned:
             raise HTTPException(status_code=404, detail="Run not found")
     result = analyze_log_text(payload.text, payload.persona_id)
     with db() as conn:
         conn.execute("INSERT INTO analyses(id,created_at,run_id,persona_id,result_json,owner_id) VALUES(?,?,?,?,?,?)",
                      (result["id"], result["created_at"], payload.run_id, payload.persona_id, json.dumps(result), getattr(request.state, "owner_id", None)))
+        owner_id = getattr(request.state, "owner_id", None)
+        actor_type = "user" if owner_id else "system"
+        record_audit_event(conn, owner_id, actor_type, owner_id, "analysis.created", "analysis", result["id"], {
+            "persona_id": payload.persona_id, "run_id": payload.run_id,
+            "finding_count": result["summary"]["finding_count"],
+            "occurrence_count": result["summary"].get("occurrence_count", result["summary"]["finding_count"]),
+        })
+        if payload.run_id:
+            record_run_event(conn, payload.run_id, "log_analysis_created", actor_type, owner_id, {
+                "analysis_id": result["id"], "finding_count": result["summary"]["finding_count"],
+            })
     return result
 
 @app.get("/api/v1/analyses")

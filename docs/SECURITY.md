@@ -80,3 +80,8 @@ The `bharatsim` schema is server-only: `anon` and `authenticated` have no `USAGE
 ## Supabase server credentials
 
 Prefer the modern Supabase `sb_secret_...` API key for server-side Storage calls. It is an opaque API key, not a JWT, and must be sent in the `apikey` header only. The backend retains compatibility with the legacy `service_role` JWT by sending it in both `apikey` and `Authorization: Bearer` headers. Keep either credential server-side and rotate it through Supabase/Vercel controls; never place it in Vite or `NEXT_PUBLIC_*` variables.
+
+
+## Run timeline and audit metadata
+
+Run events are scoped to the owning run and exposed only after owner verification. Lifecycle audit events are written by the trusted API using the service role; browser roles have no schema/table grants or RLS policies. Metadata is bounded and intentionally excludes raw logs, access tokens, worker lease tokens, and signed Storage URLs. Run timeline rows cascade with run deletion; owner-level audit records retain only action/resource metadata after deletion.

@@ -27,7 +27,8 @@ import {
   type WorkerReport,
   type LogSignal,
   type SmokeStep,
-  type ConditionRecord
+  type ConditionRecord,
+  type RunEvent
 } from "../api";
 
 interface RunDetailViewProps {
@@ -61,6 +62,7 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
   const [error, setError] = useState("");
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [events, setEvents] = useState<RunEvent[]>([]);
 
   const fetchRun = useCallback(
     async (showLoadingSpinner = true) => {
@@ -69,6 +71,13 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
       try {
         const detail = await api<RunDetail>("/api/v1/runs/" + encodeURIComponent(id));
         setRun(detail);
+        try {
+          const timeline = await api<{ items: RunEvent[] }>("/api/v1/runs/" + encodeURIComponent(id) + "/events");
+          setEvents(timeline.items);
+        } catch {
+          // Older or offline API deployments may not expose the timeline endpoint yet.
+          setEvents([]);
+        }
         setError("");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not load test run");
@@ -299,6 +308,35 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
           </span>
         </div>
       </div>
+
+      <section className="run-timeline">
+        <div className="run-timeline-heading">
+          <div className="section-kicker">RUN LIFECYCLE</div>
+          <b>Evidence timeline</b>
+          <span>{events.length} recorded events</span>
+        </div>
+        {events.length ? (
+          <ol>
+            {events.map((event) => {
+              const details = Object.entries(event.payload || {})
+                .map(([key, value]) => key.replaceAll("_", " ") + ": " + String(value))
+                .join(" · ");
+              return (
+                <li key={event.id}>
+                  <span className="timeline-marker" />
+                  <div>
+                    <b>{event.event_type.replaceAll("_", " ")}</b>
+                    <small>{date(event.created_at)} · {event.actor_type}</small>
+                    {details ? <p>{details}</p> : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
+          <p className="timeline-empty">No lifecycle events have been recorded for this run yet.</p>
+        )}
+      </section>
 
       {/* Inline alerts for run error or cleanup warnings */}
       {error && (

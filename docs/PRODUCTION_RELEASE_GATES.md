@@ -23,7 +23,7 @@ This document is the release checklist for turning BharatSim from a credible loc
 - [ ] Run each untrusted APK only in a disposable VM or equivalently strong isolation boundary. No host secrets, privileged container, Docker socket, host filesystem mounts, or access to cloud metadata; default-deny egress except explicitly approved test targets.
 - [ ] Enforce per-job CPU, memory, disk, process, wall-clock and network quotas. Ensure timeout/cancellation actually stops ADB, emulator, Appium and child processes.
 - [x] Enforce per-user daily run and active-run quotas (default 10 per UTC day and 2 active) with per-user transaction serialization; limits are configurable in `bharatsim.quotas`.
-- [ ] Add per-user upload-frequency/byte quotas, abuse controls, audit events, and documented artifact retention/deletion.
+- [ ] Add per-user upload-frequency/byte quotas, abuse controls, broader administrative/security audit coverage, and documented artifact retention/deletion. Core run lifecycle events are implemented.
 - [ ] Store reports, screenshots and logs in private object storage with generated object names, authorization checks, bounded retention, and integrity hashes. The current run-report download is generated from bounded database JSON and is not durable object storage. Do not rely on a local container filesystem for multi-instance production.
 - [ ] Add security tests for malformed APK archives, decompression bombs, oversized multipart bodies/results, path traversal, package-name injection, malicious redirect targets, replayed callbacks, stale leases, worker crashes and cleanup failures.
 - [ ] Obtain a documented threat-model/security review before enabling public execution.
