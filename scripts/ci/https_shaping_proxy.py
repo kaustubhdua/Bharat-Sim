@@ -100,12 +100,13 @@ class ShapingProxy:
 
     async def _send_proxy_response(self, writer: asyncio.StreamWriter, status: int, reason: str) -> None:
         body = (reason + "\n").encode("utf-8")
-        writer.write(
+        response = (
             f"HTTP/1.1 {status} {reason}\r\n"
             "Connection: close\r\n"
             f"Content-Length: {len(body)}\r\n"
-            "Content-Type: text/plain; charset=utf-8\r\n\r\n".encode("ascii") + body
+            "Content-Type: text/plain; charset=utf-8\r\n\r\n"
         )
+        writer.write(response.encode("ascii") + body)
         await writer.drain()
 
     async def _relay(
@@ -278,12 +279,13 @@ class ShapingProxy:
             payload = {"error": f"{type(exc).__name__}: {str(exc)[:240]}"}
         encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         reason = "OK" if status == 200 else "Bad Request" if status == 400 else "Not Found"
-        writer.write(
+        response = (
             f"HTTP/1.1 {status} {reason}\r\n"
             "Connection: close\r\n"
             "Content-Type: application/json\r\n"
-            f"Content-Length: {len(encoded)}\r\n\r\n".encode("ascii") + encoded
+            f"Content-Length: {len(encoded)}\r\n\r\n"
         )
+        writer.write(response.encode("ascii") + encoded)
         await writer.drain()
         writer.close()
         try:
