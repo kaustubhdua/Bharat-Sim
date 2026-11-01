@@ -674,7 +674,7 @@ def health_ready():
         "apk_execution_worker": worker_state,
         "worker_online": worker_online,
         "execution_capability": "external-worker-required",
-        "authentication_required": os.getenv("BHARATSIM_REQUIRE_API_KEY", "false").lower() == "true",
+        "authentication_required": AUTH_REQUIRED,
         "timestamp": utcnow(),
     }
     return JSONResponse(status_code=200 if database_ok else 503, content=payload)
