@@ -221,6 +221,7 @@ export type EvidenceFusion = {
   hypotheses: EvidenceFusionHypothesis[];
   sources: EvidenceFusionSource[];
   verified_conditions: string[];
+  preexisting_conditions?: string[];
   unsupported_conditions: string[];
   limitations: string[];
 };
