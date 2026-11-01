@@ -182,7 +182,6 @@ def recycle_emulator(
         "-no-window",
         "-no-audio",
         "-no-boot-anim",
-        "-no-metrics",
         "-gpu", "swiftshader_indirect",
         "-accel", accel,
     ]
