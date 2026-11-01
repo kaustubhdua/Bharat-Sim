@@ -63,12 +63,22 @@ def inspect_host(
 
     fc = firecracker or which("firecracker")
     jl = jailer or which("jailer")
-    checks.append(_check("firecracker_binary", bool(fc and Path(fc).is_file() and os.access(fc, os.X_OK)), fc or "firecracker not found in PATH"))
-    checks.append(_check("jailer_binary", bool(jl and Path(jl).is_file() and os.access(jl, os.X_OK)), jl or "jailer not found in PATH"))
+    trusted_binaries: dict[str, bool] = {}
+    for name, binary in (("firecracker", fc), ("jailer", jl)):
+        trusted = False
+        if binary and Path(binary).is_file() and os.access(binary, os.X_OK):
+            try:
+                info = Path(binary).stat()
+                trusted = info.st_uid == 0 and not (info.st_mode & (stat.S_IWGRP | stat.S_IWOTH))
+            except OSError:
+                trusted = False
+        trusted_binaries[name] = trusted
+        detail = f"{binary or name + ' not found in PATH'}; binary must be executable, root-owned and not group/world writable"
+        checks.append(_check(f"{name}_binary", trusted, detail))
 
     versions: dict[str, str] = {}
     for name, binary in (("firecracker", fc), ("jailer", jl)):
-        if not binary or not Path(binary).is_file():
+        if not binary or not trusted_binaries[name]:
             continue
         try:
             result = runner([binary, "--version"], check=True, capture_output=True, text=True, timeout=5)
@@ -85,7 +95,7 @@ def inspect_host(
     else:
         checks.append(_check("matching_release", False, "both version outputs are required"))
 
-    jailer_dir = Path(jl).resolve().parent if jl else None
+    jailer_dir = Path(jl).resolve().parent if jl and trusted_binaries["jailer"] else None
     if jailer_dir:
         try:
             info = jailer_dir.stat()
