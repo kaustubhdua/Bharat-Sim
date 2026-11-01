@@ -13,7 +13,7 @@ def configure_upload_test(monkeypatch, tmp_path, actual_size=123):
     main.init_db()
     monkeypatch.setattr(main, "AUTH_REQUIRED", False)
     monkeypatch.setattr(main, "STORAGE_ENABLED", True)
-    monkeypatch.setattr(main, "create_private_upload_url", lambda path: "https://example.supabase.co/storage/v1/object/upload/sign/bucket/" + path + "?token=temporary")
+    monkeypatch.setattr(main, "create_private_upload_url", lambda path: "https://example.supabase.co/storage/v1/object/upload/sign/bucket/" + path + "?token=" + "t" * 48)
     monkeypatch.setattr(main, "private_object_size", lambda path: actual_size)
     monkeypatch.setenv("BHARATSIM_WORKER_TOKEN", "worker-test-token-" + "x" * 32)
     return TestClient(main.app)
@@ -33,8 +33,9 @@ def test_signed_upload_is_only_queued_after_storage_verification(monkeypatch, tm
     assert ticket.status_code == 200
     payload = ticket.json()
     assert payload["run_id"]
-    assert payload["signed_url"].startswith("https://example.supabase.co/")
-    assert "SUPABASE_SERVICE_ROLE_KEY" not in payload["signed_url"]
+    assert payload["tus_endpoint"].startswith("https://example.storage.supabase.co/storage/v1/upload/resumable/sign/")
+    assert len(payload["upload_token"]) == 48
+    assert "SUPABASE_SERVICE_ROLE_KEY" not in payload
     assert payload["expires_in_seconds"] == 7200
 
     with main.db() as conn:
@@ -92,3 +93,19 @@ def test_signed_upload_routes_require_supabase_auth_when_enabled(monkeypatch):
     )
     assert response.status_code == 401
     monkeypatch.setattr(main, "AUTH_REQUIRED", False)
+
+
+def test_signed_upload_config_uses_direct_storage_host_and_encodes_path(monkeypatch):
+    monkeypatch.setattr(main, "STORAGE_BUCKET", "bharatsim-private")
+    result = main.build_tus_signed_upload_config(
+        "https://project.supabase.co/storage/v1/object/upload/sign/bharatsim-private/runs/run-1/input.apk?token=" + "s" * 48,
+        "runs/run-1/input.apk",
+    )
+    assert result["upload_token"] == "s" * 48
+    assert result["tus_endpoint"] == "https://project.storage.supabase.co/storage/v1/upload/resumable/sign/bharatsim-private/runs/run-1/input.apk"
+
+
+def test_signed_upload_config_rejects_invalid_provider_response():
+    import pytest
+    with pytest.raises(RuntimeError, match="invalid signed upload capability"):
+        main.build_tus_signed_upload_config("https://project.supabase.co/not-a-signed-url", "runs/run-1/input.apk")
