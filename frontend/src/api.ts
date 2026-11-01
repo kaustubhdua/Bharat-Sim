@@ -178,6 +178,53 @@ export type ConditionEvidence = {
   note?: string;
 };
 
+export type EvidenceFusionObservation = {
+  category: string;
+  status: string;
+  count: number;
+  evidence: Array<{
+    line_number: number | null;
+    marker: string;
+    evidence: Array<{ line_number: number | null; text: string }>;
+  }>;
+  interpretation: string;
+};
+
+export type EvidenceFusionHypothesis = {
+  id: string;
+  category: string;
+  confidence: "low" | "medium" | string;
+  status: string;
+  statement: string;
+  supporting_sources: string[];
+  validation_steps: string[];
+};
+
+export type EvidenceFusionSource = {
+  id: string;
+  status: string;
+  detail: string;
+};
+
+export type EvidenceFusion = {
+  schema_version: string;
+  status: "INCOMPLETE" | "OBSERVED_ONLY" | "CORRELATED" | "NO_MARKER_OBSERVED" | string;
+  review_required: boolean;
+  summary: string;
+  execution: {
+    status: string;
+    logcat_collected: boolean;
+    apk_sha256_valid: boolean;
+    successful_steps: string[];
+  };
+  observations: EvidenceFusionObservation[];
+  hypotheses: EvidenceFusionHypothesis[];
+  sources: EvidenceFusionSource[];
+  verified_conditions: string[];
+  unsupported_conditions: string[];
+  limitations: string[];
+};
+
 export type WorkerReport = {
   schema_version?: string;
   started_at?: string;
@@ -203,6 +250,7 @@ export type WorkerReport = {
   steps?: SmokeStep[];
   limitations?: string[];
   result_interpretation?: string;
+  diagnostics?: EvidenceFusion;
 };
 
 export type RunDetail = Run & {
