@@ -240,6 +240,19 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
     raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}\nDevice probe logcat:\n{network_probe_log_tail()}")
 
 
+def summarize_samples(samples: list[dict]) -> dict:
+    durations = [int(sample["duration_ms"]) for sample in samples]
+    return {
+        "sample_count": len(durations),
+        "successful_samples": len(durations),
+        "failed_samples": 0,
+        "min_ms": min(durations),
+        "max_ms": max(durations),
+        "spread_ms": max(durations) - min(durations),
+        "median_ms": statistics.median(durations),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifacts", type=Path, default=Path("artifacts"))
@@ -433,6 +446,11 @@ def main() -> int:
             "baseline_probes": baseline_probes,
             "latency_probes": latency_probes,
             "bandwidth_probes": bandwidth_probes,
+            "sample_summary": {
+                "baseline": summarize_samples(baseline_probes),
+                "latency_only": summarize_samples(latency_probes),
+                "bandwidth_only": summarize_samples(bandwidth_probes),
+            },
             "proxy_events": all_proxy_events,
             "baseline_median_ms": baseline_median_ms,
             "latency_median_ms": latency_median_ms,
