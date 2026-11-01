@@ -12,6 +12,7 @@
 - Worker queue with authenticated job claims, short-lived leases, heartbeats, lease-bound APK downloads, SHA-256 evidence matching (completed results must include the matching APK hash), result callbacks, stale-result rejection, and bounded inline report JSON. Protocol tests cover lease renewal, expired-lease reclamation, stale-token rejection, retry exhaustion, and duplicate result rejection.
 - Optional polling worker that refuses credential-bearing HTTP redirects, enforces same-origin `/internal/worker/` paths for job URLs, verifies APK hashes, and runs an explicitly enabled ADB smoke test against a configured disposable Android device. APK-derived package names are validated before use in ADB shell commands, the runner attempts package cleanup after execution, and common secret patterns are redacted from report text before persistence (best effort, not exhaustive).
 - Deterministic logcat signal analysis, failure fingerprints, evidence-linked findings, and a transparent heuristic BharatScore. Worker reports also include bounded, line-addressable crash, ANR, OOM, network, and storage marker excerpts from actual collected logcat; markers remain diagnostic signals, not confirmed root causes.
+- Cross-source evidence synthesis on each run detail and report export correlates logcat markers with condition-manager verification, network control/data-plane evidence, and ADB step outcomes. It emits only low/medium unconfirmed hypotheses, distinguishes pre-existing from applied conditions, and hashes derived diagnostics separately from the original worker report. See [docs/EVIDENCE_SYNTHESIS.md](docs/EVIDENCE_SYNTHESIS.md); the fail-closed review pattern was informed by `jai-hack` without importing its cybersecurity classifiers.
 - React/Vite dashboard with searchable/filterable run history, live capability status, worker heartbeat status, log analysis, report inspection, owner-scoped run deletion, and on-demand JSON report export with SHA-256 integrity metadata. Report JSON remains in the database; this export is not separate durable object storage.
 - Docker Compose setup for local API/dashboard deployment, with a loopback-only web binding by default.
 - CI for backend tests, frontend production build, real-browser Playwright E2E against a live local FastAPI instance (API/profile loading, source-line log analysis, and disabled run registration until an APK is selected), worker safety guards, container builds, and scheduled/PR-triggered Python and JavaScript dependency vulnerability audits. The audit workflow passed on the merged revision; passing an audit is not a full security certification. The dashboard labels worker `completed` states as `smoke completed`, not as a product-health pass.
@@ -28,7 +29,7 @@
 
 ## Architecture
 
-- backend/: FastAPI API, SQLite local persistence plus opt-in PostgreSQL adapter, upload handling, log analysis, run/job lifecycle, and worker callbacks.
+- backend/: FastAPI API, SQLite local persistence plus opt-in PostgreSQL adapter, upload handling, log analysis, cross-source evidence fusion, run/job lifecycle, and worker callbacks.
 - supabase/: isolated BharatSim schema migration and local CLI configuration; this schema is not exposed to browser clients.
 - frontend/: Vite + React dashboard.
 - backend/tests/: backend, upload-security, and worker-protocol tests.
@@ -37,7 +38,7 @@
 - worker/condition_planner.py: persona-to-condition planning with explicit supported, control-plane-verifiable, report-only, and unsupported classifications.
 - worker/condition_applicator.py: reversible battery-saver/storage-pressure application, RAM readback, structured condition evidence, and cleanup/reset handling.
 - worker/network_shaper.py: guarded Linux tc/netem prototype; not integrated into Android job execution. `scripts/ci/network-shaper-e2e.sh` measures traffic across an isolated shaped veth in CI.
-- docs/: architecture, API, security, open-source references, and roadmap.
+- docs/: architecture, API, security, evidence-synthesis method, open-source references, and roadmap.
 
 ## Run locally
 
