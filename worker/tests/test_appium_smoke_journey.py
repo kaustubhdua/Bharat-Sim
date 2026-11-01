@@ -12,7 +12,7 @@ class ProbeContractTests(unittest.TestCase):
         workflow = (root / ".github/workflows/android-emulator-smoke.yml").read_text()
         gradle = (root / "smoke-android/app/build.gradle").read_text()
         self.assertEqual(journey.PROBE_BYTES, 256_000)
-        self.assertEqual(journey.BANDWIDTH_PROFILE, "1920:1920")
+        self.assertEqual(journey.BANDWIDTH_PROFILE, "edge")
         self.assertIn("timeout: int = 45", (root / "worker/tests/appium_smoke_journey.py").read_text())
         self.assertIn('"appium:newCommandTimeout": 60', (root / "worker/tests/appium_smoke_journey.py").read_text())
         self.assertEqual(journey.speed_limits_bps("1920:1920"), (1_920_000, 1_920_000))
