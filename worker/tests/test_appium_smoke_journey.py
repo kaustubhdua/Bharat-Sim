@@ -18,6 +18,7 @@ class ProbeContractTests(unittest.TestCase):
         self.assertEqual(journey.speed_limits_bps("umts"), (384_000, 384_000))
         self.assertIn("PROBE_BYTES = 64_000", java)
         self.assertIn("PROBE_TIMEOUT_MS = 45_000", java)
+        self.assertIn("PROBE_ATTEMPT_TIMEOUT_MS = 20_000", java)
         self.assertEqual(workflow.count("https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/"), 3)
         self.assertIn("/smoke-android/probe-256k.bin", workflow)
         self.assertNotIn("speed.cloudflare.com", workflow)
