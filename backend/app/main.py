@@ -799,7 +799,8 @@ def health_live():
 
 @app.get("/health/ready")
 def health_ready():
-    worker_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
+    worker_token_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
+    worker_configured = worker_token_configured and production_worker_execution_enabled()
     worker_online = False
     try:
         with db() as conn:
@@ -831,6 +832,7 @@ def health_ready():
         "database": "available" if database_ok else "unavailable",
         "apk_execution_worker": worker_state,
         "worker_online": worker_online,
+        "worker_execution_enabled": worker_configured,
         "execution_capability": "external-worker-required",
         "authentication_required": AUTH_REQUIRED,
         "timestamp": utcnow(),
@@ -1149,9 +1151,35 @@ def require_worker_token(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Missing or invalid worker token")
 
 
+def production_worker_execution_enabled() -> bool:
+    """Require explicit operator approval and isolation assertions before public APK execution."""
+    if APP_ENV not in {"production", "prod"}:
+        return True
+    return all(
+        os.getenv(name, "false").strip().lower() == "true"
+        for name in (
+            "BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED",
+            "BHARATSIM_WORKER_ISOLATION_ATTESTED",
+            "BHARATSIM_WORKER_EGRESS_RESTRICTED",
+        )
+    )
+
+
+def require_production_worker_execution_approval() -> None:
+    if not production_worker_execution_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Public APK execution is disabled. Enable it only after provisioning a disposable worker VM, "
+                "independently verifying isolation and default-deny egress, and setting all three worker safety flags."
+            ),
+        )
+
+
 @app.post("/internal/worker/claim")
 def worker_claim(request: Request, payload: WorkerClaimRequest):
     require_worker_token(request)
+    require_production_worker_execution_approval()
     cleanup_expired_uploads()
     now = datetime.now(timezone.utc)
     now_text = now.isoformat()
@@ -1533,7 +1561,7 @@ def translate_report(payload: SarvamTranslationRequest):
 
 @app.get("/api/v1/capabilities")
 def capabilities():
-    worker = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
+    worker = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32 and production_worker_execution_enabled()
     return {
         "apk_upload": True, "direct_apk_upload": STORAGE_ENABLED, "log_analysis": True, "risk_planner": True,
         "failure_fingerprinting": True, "bharat_score": True,
@@ -1558,7 +1586,8 @@ def capabilities():
         },
         "sarvam_translation": len(os.getenv("SARVAM_API_KEY", "").strip()) >= 16,
         "notes": [
-            "Worker dispatch is configured only when BHARATSIM_WORKER_TOKEN is set; android_execution remains false here because this API cannot prove a live emulator has executed an APK. Check /api/v1/workers for recent worker heartbeats.",
+            "Production worker dispatch remains disabled until BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED, BHARATSIM_WORKER_ISOLATION_ATTESTED, and BHARATSIM_WORKER_EGRESS_RESTRICTED are all true. These flags are operator attestations, not cryptographic proof; independently verify the disposable VM and egress policy before enabling them.",
+            "Worker dispatch is configured only when BHARATSIM_WORKER_TOKEN is set and the production safety gate is open; android_execution remains false here because this API cannot prove a live emulator has executed an APK. Check /api/v1/workers for recent worker heartbeats.",
             "The worker supports Android Emulator console latency and bandwidth controls plus reversible battery-saver and bounded storage-pressure simulation with readback/reset evidence. Full persona shaping remains false because packet loss, CPU throttling, RAM restriction, outage/recovery, and arbitrary-app traffic verification are not supported.",
             "Sarvam translation is available only when SARVAM_API_KEY is configured; only the user-selected condensed report summary is sent.",
             "When private Storage is configured, APK bytes use short-lived signed uploads directly to Supabase Storage, bypassing Vercel function request-body limits. The API verifies the stored object size before queueing.",
