@@ -1048,6 +1048,15 @@ async def create_run(
                 "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, owner_id, apk_storage_path),
             )
+            actor_type = "user" if owner_id else "system"
+            record_run_event(conn, run_id, "run_created", actor_type, owner_id, {
+                "persona_id": persona_id, "apk_name": apk_name, "apk_sha256": apk_hash,
+                "upload_method": "multipart", "status": status,
+            })
+            record_audit_event(conn, owner_id, actor_type, owner_id, "run.created", "run", run_id, {
+                "persona_id": persona_id, "apk_name": apk_name, "apk_sha256": apk_hash,
+                "upload_method": "multipart", "status": status,
+            })
     except Exception:
         if apk_storage_path:
             try:
