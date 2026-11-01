@@ -179,7 +179,6 @@ public final class MainActivity extends Activity {
                         + "Host: " + host + "\r\n"
                         + "Connection: close\r\n"
                         + "Accept-Encoding: identity\r\n"
-                        + "Cache-Control: no-cache\r\n"
                         + "Range: bytes=0-" + (expectedBytes - 1) + "\r\n\r\n";
                 output.write(request.getBytes(StandardCharsets.US_ASCII));
                 output.flush();
@@ -200,7 +199,6 @@ public final class MainActivity extends Activity {
                     throw new IOException("Unexpected HTTP status " + statusCode);
                 }
 
-                Log.i(TAG, "BHARATSIM_NETWORK_PROBE response_headers_received status=HTTP_" + statusCode);
                 Map<String, String> headers = new HashMap<>();
                 String headerLine;
                 int headerCount = 0;
@@ -221,6 +219,10 @@ public final class MainActivity extends Activity {
                 }
                 String transferEncoding = headers.getOrDefault("transfer-encoding", "").toLowerCase(Locale.ROOT);
                 String contentLength = headers.get("content-length");
+                Log.i(TAG, "BHARATSIM_NETWORK_PROBE response_headers_complete status=HTTP_" + statusCode
+                        + " content_length=" + (contentLength == null ? "unknown" : contentLength)
+                        + " transfer_encoding=" + (transferEncoding.isEmpty() ? "none" : transferEncoding));
+                Log.i(TAG, "BHARATSIM_NETWORK_PROBE response_body_started expected_bytes=" + expectedBytes);
                 if (!transferEncoding.contains("chunked") && contentLength != null) {
                     try {
                         if (Long.parseLong(contentLength) < expectedBytes) {
