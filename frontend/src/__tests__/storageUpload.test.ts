@@ -72,6 +72,21 @@ describe("resumable private APK uploads", () => {
     expect(getPendingApkUpload(sha256, file)).toMatchObject({ run_id: ticket.run_id });
   });
 
+  it("rejects a tampered resumable URL before sending APK bytes", () => {
+    const file = new File(["apk-binary-content"], "build.apk", {
+      type: "application/vnd.android.package-archive",
+      lastModified: 1234,
+    });
+    const sha256 = "c".repeat(64);
+    savePendingApkUpload(sha256, file, ticket);
+    const key = "bharatsim.pending-apk-upload.v1." + sha256;
+    const pending = JSON.parse(sessionStorage.getItem(key)!);
+    pending.upload_url = "https://attacker.example/collect";
+    sessionStorage.setItem(key, JSON.stringify(pending));
+
+    expect(getPendingApkUpload(sha256, file)).toBeNull();
+  });
+
   it("resumes an existing upload from the server-confirmed offset without creating a new session", async () => {
     const file = new File(["apk-binary-content"], "build.apk", {
       type: "application/vnd.android.package-archive",
