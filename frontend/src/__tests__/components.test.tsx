@@ -7,6 +7,7 @@ import FindingCard from "../components/FindingCard";
 import PersonaPanel from "../components/PersonaPanel";
 import RunsTable from "../components/RunsTable";
 import CapabilityPanel from "../components/CapabilityPanel";
+import EvidenceSynthesisPanel from "../components/EvidenceSynthesisPanel";
 import PlannerPanel from "../components/PlannerPanel";
 import { BrowserRouter } from "react-router-dom";
 import { cls, displayRunStatus, fallbackPersonas, isRunActive } from "../api";
@@ -110,6 +111,84 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("92 / 100");
     expect(container.textContent).toContain("High latency × limited bandwidth");
     expect(container.textContent).toContain("test-selection hypotheses only");
+  });
+
+  it("EvidenceSynthesisPanel distinguishes correlated evidence from confirmed root cause", async () => {
+    const diagnostics = {
+      schema_version: "1.0",
+      status: "CORRELATED",
+      review_required: true,
+      summary: "At least one symptom has independent condition and traffic evidence; all root-cause hypotheses remain unconfirmed.",
+      execution: { status: "completed", logcat_collected: true, apk_sha256_valid: true, successful_steps: ["collect_logcat"] },
+      observations: [{
+        category: "network",
+        status: "observed",
+        count: 1,
+        evidence: [{
+          line_number: 42,
+          marker: "SocketTimeoutException",
+          evidence: [{ line_number: 41, text: "request timed out" }]
+        }],
+        interpretation: "A bounded logcat marker was observed; it identifies a symptom, not a proven cause."
+      }],
+      hypotheses: [{
+        id: "network_failure_under_profile",
+        category: "network",
+        confidence: "medium",
+        status: "unconfirmed",
+        statement: "A network failure marker coincided with verified network controls and a verified fixture traffic path.",
+        supporting_sources: ["logcat", "network_control_plane", "network_data_plane"],
+        validation_steps: ["Repeat the same app flow under baseline and shaped profiles."]
+      }],
+      sources: [
+        { id: "logcat", status: "available", detail: "Bounded threadtime logcat capture." },
+        { id: "network_data_plane", status: "verified", detail: "Fixture path only." }
+      ],
+      verified_conditions: ["network_latency"],
+      unsupported_conditions: ["packet_loss"],
+      limitations: ["Correlations are deterministic heuristics, not a confirmed root-cause diagnosis."]
+    };
+
+    await act(async () => {
+      root.render(<EvidenceSynthesisPanel diagnostics={diagnostics} />);
+    });
+
+    expect(container.textContent).toContain("Diagnostic evidence synthesis");
+    expect(container.textContent).toContain("correlated");
+    expect(container.textContent).toContain("Human review required");
+    expect(container.textContent).toContain("medium confidence");
+    expect(container.textContent).toContain("unconfirmed");
+    expect(container.textContent).toContain("not a confirmed root-cause diagnosis");
+  });
+
+  it("EvidenceSynthesisPanel does not treat an empty logcat as an app health pass", async () => {
+    const diagnostics = {
+      schema_version: "1.0",
+      status: "NO_MARKER_OBSERVED",
+      review_required: true,
+      summary: "No known diagnostic markers were found in the captured logcat window. This is not proof that the app is healthy.",
+      execution: { status: "completed", logcat_collected: true, apk_sha256_valid: true, successful_steps: ["collect_logcat"] },
+      observations: [{
+        category: "crash",
+        status: "not_observed",
+        count: 0,
+        evidence: [],
+        interpretation: "No known marker was found in the captured logcat window; this is not a health pass."
+      }],
+      hypotheses: [],
+      sources: [{ id: "logcat", status: "available", detail: "Bounded threadtime logcat capture." }],
+      verified_conditions: [],
+      unsupported_conditions: [],
+      limitations: ["A missing marker in bounded logcat does not prove the application is healthy."]
+    };
+
+    await act(async () => {
+      root.render(<EvidenceSynthesisPanel diagnostics={diagnostics} />);
+    });
+
+    expect(container.textContent).toContain("No marker observed");
+    expect(container.textContent).toContain("not proof that the app is healthy");
+    expect(container.textContent).not.toContain("Application passed");
   });
 
   it("FindingCard renders finding details and evidence", async () => {
