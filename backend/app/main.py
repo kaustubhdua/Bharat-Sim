@@ -869,7 +869,7 @@ def create_plan(request: PlanRequest):
     flows = []
     seen_flows = set()
     for raw_flow in request.critical_flows:
-        flow = re.sub(r"\\s+", " ", raw_flow).strip()[:80]
+        flow = re.sub(r"\s+", " ", raw_flow).strip()[:80]
         if flow and flow.casefold() not in seen_flows:
             flows.append(flow)
             seen_flows.add(flow.casefold())
