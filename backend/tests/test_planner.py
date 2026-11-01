@@ -1,4 +1,4 @@
-from backend.app.main import PlanRequest, create_plan
+from app.main import PlanRequest, create_plan
 
 
 def test_planner_surfaces_pairwise_interaction_hypotheses():
