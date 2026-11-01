@@ -37,3 +37,11 @@ def test_production_rejects_missing_server_side_storage_credential():
         assert "SUPABASE_SERVICE_ROLE_KEY" in str(exc)
     else:
         raise AssertionError("production startup must reject missing server-only storage credentials")
+
+
+
+def test_production_accepts_modern_supabase_secret_key_without_legacy_jwt():
+    values = production_environment()
+    values["SUPABASE_SERVICE_ROLE_KEY"] = ""
+    values["SUPABASE_SECRET_KEY"] = "sb_secret_" + "x" * 48
+    validate_runtime_security_config(values)
