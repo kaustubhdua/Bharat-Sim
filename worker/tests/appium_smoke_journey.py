@@ -365,15 +365,35 @@ def main() -> int:
         latency_delta_ms = latency_median_ms - baseline_median_ms
         bandwidth_delta_ms = bandwidth_median_ms - baseline_median_ms
         minimum_injected_latency_ms = float(latency_profile["delay_ms"]) * 0.9
-        minimum_bandwidth_delta_ms = 500
 
-        if bandwidth_delta_ms < minimum_bandwidth_delta_ms:
-            raise RuntimeError(
-                "Configured proxy bandwidth cap was not observed in repeated fixture downloads: "
-                f"baseline={baseline_probes}, bandwidth_only={bandwidth_probes}, "
-                f"baseline_median_ms={baseline_median_ms}, bandwidth_median_ms={bandwidth_median_ms}, "
-                f"delta_ms={bandwidth_delta_ms}, minimum_required_delta_ms={minimum_bandwidth_delta_ms}"
-            )
+        # Do not gate on shaped-minus-baseline wall time: the public HTTPS
+        # origin's RTT varies between adjacent requests, which made a fixed
+        # 500 ms delta flaky even when the proxy's 384 kbps limiter was active.
+        # Instead, verify every completed tunnel's own byte/time telemetry.
+        expected_bandwidth_kbps = int(bandwidth_profile["rate_kbps"])
+        for sample in bandwidth_probes:
+            event = sample.get("proxy_event") or {}
+            transferred_bytes = int(event.get("bytes_upstream_to_client", 0))
+            duration_ms = float(event.get("duration_ms", 0))
+            configured_rate_kbps = int(event.get("rate_kbps", 0))
+            if (
+                event.get("status") != "completed"
+                or event.get("label") != "bandwidth-only"
+                or configured_rate_kbps != expected_bandwidth_kbps
+                or transferred_bytes < 64_000
+                or duration_ms <= 0
+            ):
+                raise RuntimeError(
+                    "Bandwidth fixture is missing valid proxy data-plane evidence: "
+                    f"sample={sample}, expected_rate_kbps={expected_bandwidth_kbps}"
+                )
+            observed_rate_kbps = transferred_bytes * 8 / duration_ms
+            if observed_rate_kbps > expected_bandwidth_kbps * 1.10:
+                raise RuntimeError(
+                    "Observed fixture throughput exceeded the configured proxy cap: "
+                    f"sample={sample}, observed_rate_kbps={observed_rate_kbps:.1f}, "
+                    f"configured_rate_kbps={expected_bandwidth_kbps}"
+                )
 
         phase = "verify_proxy_reset"
         reset_evidence = reset_proxy()
@@ -435,7 +455,7 @@ def main() -> int:
                 "baseline, latency-only, and bandwidth-only probes used the same Android Network transport and proxy route",
                 "each latency-only proxy event recorded the requested injected RTT split across both relay directions",
                 "end-to-end latency medians are retained as measurements but are not used as a deterministic pass gate because the external HTTPS endpoint has variable RTT",
-                "bandwidth-only median duration exceeded baseline by at least 500 ms",
+                "each bandwidth-only proxy event recorded the configured cap and bounded measured throughput",
                 "proxy control readback matched each requested delay/rate profile",
                 "proxy settings were reset and read back at baseline",
             ],
