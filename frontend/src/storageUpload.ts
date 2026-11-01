@@ -74,7 +74,7 @@ function updatePendingUploadUrl(sha256: string, uploadUrl: string): void {
 }
 
 function encodeMetadata(value: string): string {
-  return btoa(unescape(encodeURIComponent(value)));
+  return btoa(value);
 }
 
 function metadataHeader(file: File, objectPath: string): string {
@@ -90,7 +90,7 @@ function sleep(milliseconds: number): Promise<void> {
   return new Promise(resolve => window.setTimeout(resolve, milliseconds));
 }
 
-async function createTusUpload(file: File, ticket: SignedApkUploadTicket): Promise<string> {
+async function createTusUpload(file: File, sha256: string, ticket: SignedApkUploadTicket): Promise<string> {
   const response = await fetch(ticket.tus_endpoint, {
     method: "POST",
     headers: {
@@ -108,35 +108,8 @@ async function createTusUpload(file: File, ticket: SignedApkUploadTicket): Promi
     throw new Error("Storage did not return a resumable upload location. Check Storage CORS expose headers.");
   }
   const uploadUrl = new URL(location, ticket.tus_endpoint).toString();
-  updatePendingUploadUrlFromTicket(ticket, uploadUrl);
+  updatePendingUploadUrl(sha256, uploadUrl);
   return uploadUrl;
-}
-
-function updatePendingUploadUrlFromTicket(ticket: SignedApkUploadTicket, uploadUrl: string): void {
-  try {
-    const raw = sessionStorage.getItem(storageKeyForTicket(ticket));
-    if (!raw) return;
-    const pending = JSON.parse(raw) as PendingUpload;
-    if (pending.run_id === ticket.run_id) {
-      pending.upload_url = uploadUrl;
-      sessionStorage.setItem(storageKeyForTicket(ticket), JSON.stringify(pending));
-    }
-  } catch {
-    // Upload can still proceed; a later page reload simply starts a fresh signed upload.
-  }
-}
-
-function storageKeyForTicket(ticket: SignedApkUploadTicket): string {
-  const entries = Object.keys(sessionStorage);
-  const key = entries.find(candidate => {
-    if (!candidate.startsWith(STORAGE_KEY_PREFIX)) return false;
-    try {
-      return (JSON.parse(sessionStorage.getItem(candidate) || "{}") as PendingUpload).run_id === ticket.run_id;
-    } catch {
-      return false;
-    }
-  });
-  return key || "";
 }
 
 async function getUploadOffset(uploadUrl: string, token: string): Promise<number> {
@@ -176,7 +149,7 @@ export async function uploadApkResumable(
   }
 
   if (!uploadUrl) {
-    uploadUrl = await createTusUpload(file, ticket);
+    uploadUrl = await createTusUpload(file, sha256, ticket);
     offset = 0;
   }
 
