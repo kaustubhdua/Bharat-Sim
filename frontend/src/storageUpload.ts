@@ -145,8 +145,14 @@ export async function uploadApkResumable(
   if (uploadUrl) {
     try {
       offset = await getUploadOffset(uploadUrl);
-    } catch {
-      uploadUrl = undefined;
+    } catch (error) {
+      // Only create a new TUS session when the old one has expired. A transient
+      // network failure must not silently abandon a resumable upload.
+      if (error instanceof Error && /resumable upload \((404|410)\)/.test(error.message)) {
+        uploadUrl = undefined;
+      } else {
+        throw new Error("Could not reach Storage to resume the existing upload. Check your connection and retry.");
+      }
     }
   }
 
