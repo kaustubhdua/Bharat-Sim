@@ -94,7 +94,7 @@ This means GitHub `main` is updated, but the current Vercel Production aliases a
 
 ## Current blockers
 
-The Vercel variable audit confirms that the public frontend variable names and non-secret backend settings are now aligned. It still does not show the required API database URL or server-side Supabase secret key. No database password or Supabase secret/service-role credential is available through the current project inspection. These values must be added by the project owner directly in Vercel; do not paste them into GitHub or chat. The latest production deployments point to commit `2b125971f8ab6c7c0e943d57790b4ae631021dbd`, two commits behind `main` at `453e417be76562288afc956e545c2d5822643e07`; the projects remain SSO-protected and current deployment checks report `build-rate-limit`. Until the credentials are added and the new commit is deployed and verified, the production API must not be considered connected to common1, and the dashboard must not be considered end-to-end live.
+The Vercel variable audit confirms that the public frontend variable names and non-secret backend settings are aligned. The backend Production environment is missing `BHARATSIM_DATABASE_URL` (the Supabase common 1 Transaction Pooler URI) and `SUPABASE_SECRET_KEY` (the server-only Supabase secret key). No database password or Supabase secret/service-role credential is available through project inspection; the project owner must add these values directly in Vercel and must not paste them into GitHub or chat. `BHARATSIM_REQUIRE_API_KEY` is an optional additional shared-key gate, not a required production setting when Supabase JWT authentication is enabled. The production API currently fails startup/readiness because the database URL and server-side secret are absent. A dedicated isolated Android worker host is also not provisioned/attested, so production APK execution must remain fail-closed. The projects remain SSO-protected. Until the credentials are added, a deployment is permitted, and production API plus worker readiness are verified, the production dashboard must not be considered end-to-end live.
 
 ### Deployment-volume protection
 
@@ -102,8 +102,3 @@ Both Vercel projects (bharat-sim-81g2 frontend and bharat-sim backend) have affe
 
 The team currently exceeded Vercel's 100-deployments-per-day allowance. New preview/production deployments are blocked until the quota window resets (or the plan limit is raised). The CORS environment changes are saved but are not active in existing deployments until redeployed.
 
-### Current production blockers
-
-- The backend Production environment is missing BHARATSIM_DATABASE_URL (Supabase common 1 Transaction Pooler URI) and SUPABASE_SECRET_KEY (server-only Supabase secret key). Do not place either value in frontend VITE_* variables or commit them.
-- The production API currently fails startup/readiness because those required values are absent. BHARATSIM_REQUIRE_API_KEY is an optional additional shared-key gate; it is not required when Supabase JWT authentication is enabled.
-- A dedicated isolated Android worker host is not yet provisioned/attested. Production APK execution remains fail-closed until the worker-host security checklist is satisfied.
