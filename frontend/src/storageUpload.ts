@@ -96,6 +96,12 @@ function updatePendingUploadUrl(sha256: string, uploadUrl: string): void {
   sessionStorage.setItem(storageKey(sha256), JSON.stringify(pending));
 }
 
+function storageApiKey(): string {
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+  if (!key) throw new Error("Supabase Storage publishable key is not configured.");
+  return key;
+}
+
 function encodeMetadata(value: string): string {
   return btoa(value);
 }
@@ -121,6 +127,7 @@ async function createTusUpload(file: File, sha256: string, ticket: SignedApkUplo
       "Upload-Length": String(file.size),
       "Upload-Metadata": metadataHeader(file, ticket.object_path),
       "x-signature": ticket.upload_token,
+      "apikey": storageApiKey(),
     },
   });
   if (response.status !== 201) {
@@ -143,6 +150,7 @@ async function getUploadOffset(uploadUrl: string): Promise<number> {
     method: "HEAD",
     headers: {
       "Tus-Resumable": TUS_VERSION,
+      "apikey": storageApiKey(),
     },
   });
   if (!response.ok) {
@@ -205,6 +213,7 @@ export async function uploadApkResumable(
             "Tus-Resumable": TUS_VERSION,
             "Upload-Offset": String(offset),
             "Content-Type": "application/offset+octet-stream",
+            "apikey": storageApiKey(),
           },
           body: chunk,
         });
