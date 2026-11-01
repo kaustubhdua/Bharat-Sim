@@ -100,14 +100,40 @@ jobs:
         id: probe-address
         shell: bash
         run: |
-          ip="$(timeout 10s getent ahostsv4 raw.githubusercontent.com | awk 'NR == 1 { print $1 }')"
-          if [[ ! "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-            echo "Could not resolve raw.githubusercontent.com to an IPv4 address on the CI host" >&2
+          ip="$(python - <<'PY'
+          import socket
+          import subprocess
+          import sys
+
+          result = subprocess.run(
+              ["timeout", "10s", "getent", "ahostsv4", "raw.githubusercontent.com"],
+              check=True, capture_output=True, text=True,
+          )
+          candidates = list(dict.fromkeys(
+              line.split()[0] for line in result.stdout.splitlines() if line.split()
+          ))
+          for candidate in candidates:
+              try:
+                  with socket.create_connection((candidate, 443), timeout=5):
+                      print(candidate)
+                      break
+              except OSError as exc:
+                  print(f"Skipping unreachable raw.githubusercontent.com IPv4 {candidate}: {exc}", file=sys.stderr)
+          else:
+              raise SystemExit("No raw.githubusercontent.com IPv4 address accepts direct TCP/443 from this runner")
+          PY
+          )"
+          if [[ ! "$ip" =~ ^([0-9]{1,3}\\.){3}[0-9]{1,3}$ ]]; then
+            echo "Could not select a reachable raw.githubusercontent.com IPv4 address" >&2
             exit 1
           fi
-          echo "Resolved raw.githubusercontent.com to $ip"
-          # Fail early if the public test endpoint is unavailable from the CI host.
-          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 --range 0-0 --output /dev/null https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
+          echo "Selected reachable raw.githubusercontent.com IPv4 $ip"
+          mkdir -p artifacts
+          printf '%s\\n' "$ip" > artifacts/probe-ip.txt
+          # Verify the exact pinned address used by the CONNECT proxy, not a second DNS choice.
+          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 \\
+            --resolve "raw.githubusercontent.com:443:$ip" --range 0-0 --output /dev/null \\
+            https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
           echo "ip=$ip" >> "$GITHUB_OUTPUT"
       - name: Start allowlisted HTTPS shaping proxy
         shell: bash
