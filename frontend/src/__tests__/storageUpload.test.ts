@@ -29,7 +29,7 @@ describe("resumable private APK uploads", () => {
     savePendingApkUpload(sha256, file, ticket);
     const calls: Array<{ method: string; headers: HeadersInit | undefined; body?: BodyInit | null }> = [];
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const method = init?.method || "GET";
       calls.push({ method, headers: init?.headers, body: init?.body });
       if (method === "POST") {
