@@ -186,7 +186,7 @@ describe("Components tests with jsdom", () => {
       root.render(<EvidenceSynthesisPanel diagnostics={diagnostics} />);
     });
 
-    expect(container.textContent).toContain("No marker observed");
+    expect(container.textContent).toContain("no marker observed");
     expect(container.textContent).toContain("not proof that the app is healthy");
     expect(container.textContent).not.toContain("Application passed");
   });
