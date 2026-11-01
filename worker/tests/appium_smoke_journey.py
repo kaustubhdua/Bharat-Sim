@@ -261,7 +261,7 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
     }
 
 
-# Each fixture probe transfers 256 KB. The custom 1.92 Mbps upload/download profile is checked against this image's console readback.
+# Each fixture probe transfers 256 KB. The built-in EDGE preset is checked against this image's console readback.
 def network_probe_log_tail() -> str:
     """Return real device-side probe diagnostics when a UI wait fails."""
     try:
