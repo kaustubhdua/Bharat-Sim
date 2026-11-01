@@ -1,5 +1,5 @@
 plugins { id "com.android.application" }
-def probeUrl = System.getenv("BHARATSIM_PROBE_URL") ?: "https://cdn.jsdelivr.net/gh/kaustubhdua/Bharat-Sim@main/smoke-android/probe-256k.bin"
+def probeUrl = System.getenv("BHARATSIM_PROBE_URL") ?: "https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/smoke-android/probe-256k.bin?ref=main"
 def probeIp = System.getenv("BHARATSIM_PROBE_IP") ?: "0.0.0.0"
 if (!(probeIp ==~ /^[0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}$/)) throw new GradleException("BHARATSIM_PROBE_IP must be an IPv4 address")
 android {
