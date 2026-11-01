@@ -1,0 +1,77 @@
+# Vercel deployment and common1 Supabase wiring
+
+This runbook describes the two existing Vercel projects and the environment contract expected by the code. It does not contain credentials.
+
+## Existing projects (audited 2026-11-01)
+
+| Role | Vercel project | Framework | Stable project alias |
+|---|---|---|---|
+| Dashboard | \`bharat-sim-81g2\` | Vite | \`https://bharat-sim-81g2.vercel.app\` |
+| API | \`bharat-sim\` | FastAPI | \`https://bharat-sim-bay.vercel.app\` |
+
+Both projects currently report Vercel SSO protection enabled for all non-custom domains. Their latest production deployments report READY, but the projects report \`live: false\`. A READY build is not proof of an authenticated, persistent, publicly accessible application. Keep SSO protection enabled until the app-level authentication and persistence checks below pass.
+
+## Environment-variable audit
+
+The current variable names do not match the application code:
+
+- Dashboard currently has \`SUPABASE_URL\` and \`SUPABASE_PUBLISHABLE_KEY\`. The Vite code reads \`VITE_SUPABASE_URL\`, \`VITE_SUPABASE_ANON_KEY\`, and \`VITE_API_BASE_URL\`.
+- API currently has \`NEXT_PUBLIC_SUPABASE_URL\` and \`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY\`. The FastAPI code reads server-only \`SUPABASE_URL\`, \`SUPABASE_SERVICE_ROLE_KEY\`, and \`BHARATSIM_DATABASE_URL\`, plus the runtime flags below.
+- Do not rename a secret to a \`NEXT_PUBLIC_*\` or \`VITE_*\` variable. Only the Supabase publishable/anon key belongs in the browser.
+
+## Dashboard project variables
+
+Configure these on the \`bharat-sim-81g2\` Vercel project for Production and Preview:
+
+| Variable | Value |
+|---|---|
+| \`VITE_API_BASE_URL\` | \`https://bharat-sim-bay.vercel.app\` |
+| \`VITE_SUPABASE_URL\` | The HTTPS project URL for common1 |
+| \`VITE_SUPABASE_ANON_KEY\` | The common1 publishable key (the code's variable name is legacy-compatible; the value may be the current publishable key) |
+
+The current frontend defaults \`VITE_API_BASE_URL\` to an empty string. Because the dashboard and API are separate Vercel projects, leaving it empty sends requests to the dashboard origin rather than the FastAPI project.
+
+## API project variables
+
+Configure these on the \`bharat-sim\` Vercel project. Keep every value server-side:
+
+| Variable | Requirement |
+|---|---|
+| \`BHARATSIM_ENV\` | \`production\` |
+| \`BHARATSIM_DATABASE_URL\` | common1 Supabase **Transaction pooler** URI from the dashboard Connect panel, with \`sslmode=require\` |
+| \`SUPABASE_URL\` | common1 HTTPS project URL |
+| \`SUPABASE_SERVICE_ROLE_KEY\` | common1 server-only secret key; never expose it to the browser |
+| \`BHARATSIM_AUTH_REQUIRED\` | \`true\` |
+| \`BHARATSIM_STORAGE_BUCKET\` | \`bharatsim-private\` |
+| \`BHARATSIM_CORS_ORIGINS\` | Exact dashboard origin(s), comma-separated; start with \`https://bharat-sim-81g2.vercel.app\` and add only verified custom domains |
+| \`BHARATSIM_WORKER_TOKEN\` | Strong random value of at least 32 characters, only after the isolated worker is provisioned |
+| \`SARVAM_API_KEY\` | Optional server-only key; required to enable the Sarvam capability |
+
+The API's production startup requires PostgreSQL, verified Supabase Auth, and the server-side Storage credential. The optional shared \`BHARATSIM_API_KEY\` is not required for a Supabase-authenticated browser application and must not be placed in frontend code. Leave \`BHARATSIM_REQUIRE_API_KEY=false\` unless a private server-side gateway is deliberately configured to inject it.
+
+### Why transaction pooler mode
+
+Vercel functions are short-lived/serverless. Supabase recommends the shared Transaction pooler for serverless application traffic. The backend's psycopg connection now sets \`prepare_threshold=None\`, because transaction pooler mode does not support prepared statements. Use the exact URI shown by common1's Connect panel rather than guessing a pooler hostname or region. Keep SSL enabled.
+
+## Supabase prerequisites
+
+1. Confirm the \`bharatsim\` schema and the \`bharatsim-private\` bucket exist in common1. The bucket must remain private.
+2. Confirm the core and foreign-key-index migrations are present in remote migration history.
+3. Enable the email/password Auth provider if password sign-in is the selected onboarding method.
+4. Set the allowed redirect URLs for the dashboard's production and preview origins.
+5. Never grant browser roles direct access to the private \`bharatsim\` schema or the service-role key.
+
+## Safe rollout order
+
+1. Add the server-only API variables and the correct dashboard variable names in Vercel.
+2. Verify the API starts with PostgreSQL and that \`/health/ready\` reports database readiness. Confirm a create/read/delete run round trip persists across separate API invocations.
+3. Verify sign-up/sign-in, refresh, expiry, sign-out, and cross-user 404/denial behavior against common1.
+4. Verify private APK upload, lease-authorized worker download, terminal cleanup, and object deletion.
+5. Configure \`VITE_API_BASE_URL\` and exact CORS origins; test dashboard API requests with an authenticated user.
+6. Provision the worker on a disposable VM with strict egress and resource limits; then add \`BHARATSIM_WORKER_TOKEN\` and verify a real upload-to-report journey.
+7. Add \`SARVAM_API_KEY\` only if the Sarvam partner feature is required; verify a real Hindi, Tamil, and Marathi translation call.
+8. Only after these checks pass, review whether Vercel SSO protection can be disabled for the production aliases. Application-level Supabase Auth must remain enabled.
+
+## Current blockers
+
+The Vercel variable audit shows naming mismatches and does not show the required API database URL or server-side service-role key. No database password or service-role credential is stored in this repository or available through the current project inspection. These values must be added by the project owner directly in Vercel; do not paste them into GitHub or chat. Until that is done, the production API must not be considered connected to common1, and the dashboard must not be considered end-to-end live.
