@@ -11,8 +11,8 @@ FastAPI's interactive schema is available at /docs when the backend is running.
 - POST /api/v1/plan — deterministic risk-ranked persona/flow plan with pairwise condition-interaction hypotheses, suggested validation and explicit non-execution caveats.
 - POST /api/v1/runs — multipart form with persona_id and a required APK file.
 - GET /api/v1/runs — recent run metadata.
-- GET /api/v1/runs/{run_id} — owner-scoped run state and worker-submitted report, if present.
-- GET /api/v1/runs/{run_id}/report — owner-scoped JSON report export. Includes a SHA-256 digest of the canonical report and an ETag / X-Content-SHA256 digest of the downloaded export; responses are private and non-cacheable.
+- GET /api/v1/runs/{run_id} — owner-scoped run state and worker-submitted report, if present. When a structured worker report exists, the response adds a derived `result.diagnostics` evidence-synthesis object without mutating the stored worker report.
+- GET /api/v1/runs/{run_id}/report — owner-scoped JSON report export. Includes the original worker report, a separate derived `diagnostics` object, independent SHA-256 digests for both, and an ETag / X-Content-SHA256 digest of the downloaded export; responses are private and non-cacheable. Diagnostic hypotheses remain unconfirmed and a missing logcat marker is not an app-health pass.
 - DELETE /api/v1/runs/{run_id} — owner-scoped deletion of a run and associated analysis evidence. Queued/awaiting runs are first marked cancelled so a worker cannot claim them during cleanup. Active leased/running jobs return 409 and must finish before deletion. If APK cleanup fails, the cancelled row is retained so deletion can be retried.
 - GET /api/v1/workers — authenticated worker heartbeat summary for the last 90 seconds. It exposes a busy indicator but never another user's current run ID.
 - POST /api/v1/analyze/logs — deterministic log analysis with grouped Failure DNA fingerprints, repeated occurrence counts, redacted line/context evidence, low-confidence root-cause hypotheses and a relative persona/severity investigation-priority heuristic. It is not an LLM diagnosis or affected-user estimate.
