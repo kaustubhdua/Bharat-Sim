@@ -33,7 +33,7 @@ def test_signed_upload_is_only_queued_after_storage_verification(monkeypatch, tm
     assert ticket.status_code == 200
     payload = ticket.json()
     assert payload["run_id"]
-    assert payload["tus_endpoint"].startswith("https://example.storage.supabase.co/storage/v1/upload/resumable/sign")
+    assert payload["tus_endpoint"].startswith("https://example.storage.supabase.co/storage/v1/upload/resumable")
     assert len(payload["upload_token"]) == 48
     assert "SUPABASE_SERVICE_ROLE_KEY" not in payload
     assert payload["expires_in_seconds"] == 7200
@@ -101,7 +101,7 @@ def test_signed_upload_config_uses_official_direct_storage_tus_endpoint(monkeypa
         "https://project.supabase.co/storage/v1/object/upload/sign/bharatsim-private/runs/run-1/input.apk?token=" + "s" * 48,
     )
     assert result["upload_token"] == "s" * 48
-    assert result["tus_endpoint"] == "https://project.storage.supabase.co/storage/v1/upload/resumable/sign"
+    assert result["tus_endpoint"] == "https://project.storage.supabase.co/storage/v1/upload/resumable"
 
 
 def test_signed_upload_config_rejects_invalid_provider_response():
