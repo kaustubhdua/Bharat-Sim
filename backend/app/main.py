@@ -530,10 +530,14 @@ def init_db() -> None:
         # Schema is managed only by versioned Supabase migrations; never create or
         # mutate production tables implicitly during application startup.
         with db() as conn:
-            row = conn.execute("SELECT to_regclass('bharatsim.runs') AS runs").fetchone()
-            if not row or not row["runs"]:
+            row = conn.execute(
+                "SELECT to_regclass('bharatsim.runs') AS runs, "
+                "to_regclass('bharatsim.run_events') AS run_events, "
+                "to_regclass('bharatsim.audit_events') AS audit_events"
+            ).fetchone()
+            if not row or not row["runs"] or not row["run_events"] or not row["audit_events"]:
                 raise RuntimeError(
-                    "Supabase is configured but bharatsim.runs is missing; apply the reviewed Supabase migration first"
+                    "Supabase is configured but BharatSim core/run-event/audit tables are missing; apply the reviewed Supabase migrations first"
                 )
         return
 
