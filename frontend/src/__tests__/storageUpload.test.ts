@@ -18,6 +18,8 @@ describe("resumable private APK uploads", () => {
   beforeEach(() => {
     sessionStorage.clear();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
   });
 
   it("creates a signed TUS session, uploads chunks and persists the resumable URL", async () => {
@@ -62,11 +64,13 @@ describe("resumable private APK uploads", () => {
       "Tus-Resumable": "1.0.0",
       "Upload-Length": String(file.size),
       "x-signature": ticket.upload_token,
+      apikey: "sb_publishable_test_key",
     });
     expect(calls[1].headers).toMatchObject({
       "Tus-Resumable": "1.0.0",
       "Upload-Offset": "0",
       "Content-Type": "application/offset+octet-stream",
+      apikey: "sb_publishable_test_key",
     });
     expect(progress.at(-1)).toBe(100);
     expect(getPendingApkUpload(sha256, file)).toMatchObject({ run_id: ticket.run_id });
