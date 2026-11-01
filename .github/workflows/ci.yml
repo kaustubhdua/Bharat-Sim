@@ -124,7 +124,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m unittest worker.tests.test_network_shaper worker.tests.test_runner worker.tests.test_agent worker.tests.test_appium_smoke_journey worker.tests.test_https_shaping_proxy worker.tests.test_android_connect_source
-      - run: python -m py_compile worker/agent.py worker/runner.py worker/network_shaper.py worker/tests/appium_smoke_journey.py worker/tests/test_appium_smoke_journey.py scripts/ci/https_shaping_proxy.py worker/tests/test_android_connect_source.py
+      - run: python -m py_compile worker/agent.py worker/runner.py worker/network_shaper.py worker/tests/appium_smoke_journey.py worker/tests/test_appium_smoke_journey.py scripts/ci/https_shaping_proxy.py worker/tests/test_android_connect_source.py scripts/firecracker_host_preflight.py
+      - name: Test read-only Firecracker host preflight
+        run: python -m unittest discover -s backend/tests -p test_firecracker_host_preflight.py
 
   container-build:
     runs-on: ubuntu-latest
