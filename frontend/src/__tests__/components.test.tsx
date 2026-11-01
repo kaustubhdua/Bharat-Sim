@@ -117,6 +117,58 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("test-selection hypotheses only");
   });
 
+  it("PlannerPanel submits selected app category and edited critical journeys", async () => {
+    const plan = {
+      generated_at: "2026-11-01T00:00:00Z",
+      strategy: "deterministic-category-aware-risk-and-pairwise-interaction-v3",
+      app_category: "fintech",
+      critical_flows: ["UPI transfer", "Balance refresh"],
+      total_candidates: 2,
+      interaction_hunter: {
+        candidate_pairwise_interactions: 3,
+        selected_scenario_interactions: 3,
+        method: "category-aware pairwise",
+        warning: "These are test-selection hypotheses only."
+      },
+      scenarios: []
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => plan
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await act(async () => {
+      root.render(<PlannerPanel selected="budget-android" />);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const select = container.querySelector("select") as HTMLSelectElement;
+    const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    await act(async () => {
+      selectSetter?.call(select, "fintech");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    const textareaSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+    await act(async () => {
+      textareaSetter?.call(textarea, "UPI transfer\nBalance refresh");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const generate = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Generate plan"));
+    await act(async () => {
+      generate?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const lastOptions = fetchMock.mock.calls[fetchMock.mock.calls.length - 1][1] as RequestInit;
+    const payload = JSON.parse(String(lastOptions.body));
+    expect(payload.app_category).toBe("fintech");
+    expect(payload.critical_flows).toEqual(["UPI transfer", "Balance refresh"]);
+  });
+
   it("EvidenceSynthesisPanel distinguishes correlated evidence from confirmed root cause", async () => {
     const diagnostics = {
       schema_version: "1.0",
