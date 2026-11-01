@@ -416,7 +416,7 @@ def reset_storage_pressure(
 
     rm_cmd = runner(["adb", "-s", serial, "shell", "rm", "-f", temp_file], timeout=15)
     check_cmd = runner(["adb", "-s", serial, "shell", "ls", temp_file], timeout=15)
-    file_removed = check_cmd.returncode != 0 or "No such file" in (check_cmd.stdout + check_cmd.stderr)
+    file_removed = check_cmd.returncode != 0 and "No such file" in (check_cmd.stdout + check_cmd.stderr)
 
     free_mb_after = get_free_storage_mb(serial, runner)
 
