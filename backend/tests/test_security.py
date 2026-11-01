@@ -55,28 +55,30 @@ def test_api_key_gate_fails_closed_without_configured_key(monkeypatch):
 
 
 
-def test_production_config_refuses_disabled_api_auth():
+def test_production_config_refuses_disabled_supabase_user_auth():
     import pytest
-    with pytest.raises(RuntimeError, match="BHARATSIM_REQUIRE_API_KEY=true"):
+    with pytest.raises(RuntimeError, match="BHARATSIM_AUTH_REQUIRED=true"):
         validate_runtime_security_config({
             "BHARATSIM_ENV": "production",
-            "BHARATSIM_REQUIRE_API_KEY": "false",
+            "BHARATSIM_AUTH_REQUIRED": "false",
         })
 
 
-def test_production_config_refuses_missing_or_weak_api_key():
+def test_production_config_validates_optional_shared_api_key_when_enabled():
     import pytest
+    base = {
+        "BHARATSIM_ENV": "production",
+        "BHARATSIM_AUTH_REQUIRED": "true",
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "s" * 40,
+        "BHARATSIM_STORAGE_BUCKET": "bharatsim-private",
+        "BHARATSIM_REQUIRE_API_KEY": "true",
+    }
     with pytest.raises(RuntimeError, match="at least 32 characters"):
-        validate_runtime_security_config({
-            "BHARATSIM_ENV": "production",
-            "BHARATSIM_REQUIRE_API_KEY": "true",
-        })
+        validate_runtime_security_config(base)
+    base["BHARATSIM_API_KEY"] = "short"
     with pytest.raises(RuntimeError, match="at least 32 characters"):
-        validate_runtime_security_config({
-            "BHARATSIM_ENV": "production",
-            "BHARATSIM_REQUIRE_API_KEY": "true",
-            "BHARATSIM_API_KEY": "short",
-        })
+        validate_runtime_security_config(base)
 
 
 def test_production_config_accepts_strong_server_side_key_and_user_auth():
