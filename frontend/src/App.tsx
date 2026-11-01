@@ -25,7 +25,6 @@ import {
   API,
   api,
   date,
-  demoLog,
   displayRunStatus,
   fallbackPersonas,
   isRunActive,
@@ -193,7 +192,7 @@ export default function App() {
 
   async function analyzeLogs(text = logText) {
     if (!text.trim()) {
-      setError("Paste logcat output first, or load the sample log.");
+      setError("Paste logcat output first.");
       return;
     }
     setBusy(true);
@@ -241,7 +240,7 @@ export default function App() {
           </span>
           <span>
             <b>BharatSim</b>
-            <small>THE CHEAP PHONE TEST</small>
+            <small>ANDROID TESTING WORKSPACE</small>
           </span>
         </button>
 
@@ -369,12 +368,12 @@ export default function App() {
           <section className="hero">
             <div>
               <h1>
-                Built for the phones
+                Test Android apps
                 <br />
-                the world <em>actually uses.</em>
+                under <em>real-world constraints.</em>
               </h1>
               <p>
-                Find edge cases worth investigating. Register Android smoke runs, inspect real logcat evidence, and prioritize what to fix. Emulator latency and bandwidth controls are applied and read back; storage pressure and battery-saver simulation are supported on disposable emulators. Packet loss and CPU throttling remain unsupported, RAM is report-only, and arbitrary-app traffic-path verification is not claimed.
+                Configure a test profile, register an APK run, and review the execution evidence. Inspect submitted logcat, compare measured network conditions, and see exactly which device controls were applied, verified, or are not yet supported.
               </p>
               <div className="hero-actions">
                 <button
@@ -392,66 +391,30 @@ export default function App() {
                 >
                   <FlaskConical size={16} /> Configure a test <ArrowUpRight size={15} />
                 </button>
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    setLogText(demoLog);
-                    void analyzeLogs(demoLog);
-                  }}
-                >
-                  <FileSearch size={16} /> Try illustrative sample
-                </button>
               </div>
             </div>
 
             <div className="hero-visual">
-              <div className="orbit orbit-one" />
-              <div className="orbit orbit-two" />
-              <div className="phone">
-                <div className="phone-speaker" />
-                <div className="phone-screen">
-                  <div className="screen-top">
-                    <span>9:41</span>
-                    <span>▮ ▴ ▰</span>
-                  </div>
-                  <div className="phone-logo">
-                    <Activity size={19} />
-                  </div>
-                  <span className="phone-label">ILLUSTRATIVE PROFILE VIEW</span>
-                  <b>
-                    Testing in
-                    <br />
-                    the real world.
-                  </b>
-                  <div className="screen-metric">
-                    <span>Selected network profile</span>
-                    <b>
-                      <i /> {persona.network.replaceAll("-", " ")}
-                    </b>
-                  </div>
-                  <div className="screen-bars">
-                    {Array.from({ length: 12 }, (_, i) => (
-                      <i key={i} />
-                    ))}
-                  </div>
+              <section className="workspace-status-card" aria-label="Live workspace readiness">
+                <div className="workspace-status-heading">
+                  <span className="workspace-status-kicker">LIVE WORKSPACE</span>
+                  <span className={"workspace-status-pill " + apiStatus}>
+                    <i /> {apiStatus === "online" ? "Connected" : apiStatus === "offline" ? "Unavailable" : "Checking"}
+                  </span>
                 </div>
-              </div>
-              <div className="float-chip chip-top">
-                <Wifi size={15} />
-                <span>
-                  <b>{persona.latency_ms} ms</b>
-                  <small>Requested latency · not verified</small>
-                </span>
-              </div>
-              <div className="float-chip chip-bottom">
-                <Cpu size={15} />
-                <span>
-                  <b>{persona.ram_mb / 1024} GB RAM</b>
-                  <small>Profile target · not measured</small>
-                </span>
-              </div>
-              <span className="visual-cross cross-one">✳</span>
-              <span className="visual-cross cross-two">✳</span>
+                <h2>Run readiness</h2>
+                <p>Current service and worker state, reported by the connected API.</p>
+                <div className="workspace-status-grid">
+                  <div><small>API</small><b>{apiStatus === "online" ? "Connected" : apiStatus === "offline" ? "Unavailable" : "Checking"}</b></div>
+                  <div><small>Execution workers</small><b>{workers.filter((worker) => worker.online).length} online</b></div>
+                  <div><small>APK upload</small><b>{capabilities ? (capabilities.apk_upload ? "Available" : "Unavailable") : "Checking"}</b></div>
+                  <div><small>APK execution</small><b>{capabilities ? (capabilities.android_execution ? "Enabled" : "Disabled") : "Checking"}</b></div>
+                </div>
+                <div className="workspace-status-foot">
+                  <ShieldCheck size={16} />
+                  <span>{capabilities?.notes?.[0] || "Capabilities appear here after the API responds. No sample execution metrics are shown."}</span>
+                </div>
+              </section>
             </div>
           </section>
 
@@ -592,12 +555,6 @@ export default function App() {
                       rows={5}
                     />
                     <div className="log-actions">
-                      <button
-                        className="text-button"
-                        onClick={() => setLogText(demoLog)}
-                      >
-                        Load illustrative sample
-                      </button>
                       <button
                         className="primary-button"
                         disabled={busy}
