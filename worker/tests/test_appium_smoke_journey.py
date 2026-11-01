@@ -18,10 +18,13 @@ class ProbeContractTests(unittest.TestCase):
         self.assertEqual(journey.speed_limits_bps("1920:1920"), (1_920_000, 1_920_000))
         self.assertIn("PROBE_BYTES = 256_000", java)
         self.assertIn("PROBE_TIMEOUT_MS = 30_000", java)
-        self.assertEqual(workflow.count("https://cdn.jsdelivr.net/gh/kaustubhdua/Bharat-Sim@"), 3)
-        self.assertIn("/smoke-android/probe-256k.bin", workflow)
+        self.assertEqual(workflow.count("https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/"), 3)
+        self.assertIn("/smoke-android/probe-256k.bin?ref=", workflow)
+        self.assertIn("Accept: application/vnd.github.raw+json", java)
+        self.assertIn("User-Agent: BharatSimNetworkProbe/1.0", java)
         self.assertNotIn("speed.cloudflare.com", workflow)
-        self.assertIn("cdn.jsdelivr.net", gradle)
+        self.assertNotIn("cdn.jsdelivr.net", workflow)
+        self.assertIn("api.github.com/repos/kaustubhdua/Bharat-Sim/contents/", gradle)
         self.assertIn("probe-256k.bin", gradle)
 
 
