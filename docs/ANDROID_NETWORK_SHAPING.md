@@ -26,13 +26,13 @@ References:
 ## Current fixture experiment
 
 - Fixture asset: 256,000 bytes hosted in this repository; each sample requests a bounded 64,000-byte HTTPS range.
-- Transport: the active Android Network may be Wi-Fi, Cellular or Ethernet; the fixture explicitly binds its proxy socket to that Network.
+- Transport: the latest CI evidence uses Wi-Fi; the fixture explicitly binds its proxy socket to the active Android Network. Cellular/Ethernet proxy-path measurements are not claimed by this run.
 - Bandwidth profile: 384 kbps in both tunnel directions.
 - Latency profile: 150 ms initial round-trip setup delay (75 ms each direction).
 - Per-attempt timeout: 20 seconds; overall Android probe deadline: 45 seconds; Appium wait: 60 seconds.
 - Data-plane evidence: Android probe logcat, proxy event ID/generation, exact upstream IP, response byte count, per-sample duration and reset readback.
 
-Verified in GitHub Actions run 41327852971 (PR head 6da6d0cd74f76846ef2e29cb55ad5621453a513c): the source-built fixture completed repeated baseline, latency-only and bandwidth-only HTTPS range requests on the active Wi-Fi network. Every measured response transferred 64,000 bytes through the pinned upstream IP. The 384 kbps bandwidth profile increased median end-to-end transfer time by 1,161 ms. The 150 ms latency profile recorded 150.43–150.52 ms of actual injected delay across both relay directions; end-to-end RTT medians remain diagnostic because the public upstream varies. The proxy profile readback and reset-to-baseline verification both passed. This is fixture-only evidence: it does not prove arbitrary uploaded APK traffic, production isolation, or physical-device fidelity.
+Verified in GitHub Actions run 41328703086 (PR head ea8ecf800641e688d39b9cf1dbd043b983cdba1f): the source-built fixture completed repeated baseline, latency-only and bandwidth-only HTTPS range requests on the active Wi-Fi network. Every measured response transferred 64,000 bytes through the pinned upstream IP. The 384 kbps bandwidth profile increased median end-to-end transfer time by 757 ms. The 150 ms latency profile recorded 150.47–150.59 ms of actual injected delay across both relay directions; end-to-end RTT medians remain diagnostic because the public upstream varies. The proxy profile readback and reset-to-baseline verification both passed. This is fixture-only evidence: it does not prove arbitrary uploaded APK traffic, production isolation, or physical-device fidelity.
 
 ## Claim boundaries
 
