@@ -5,6 +5,7 @@ import zipfile
 from fastapi.testclient import TestClient
 
 from app.main import app, validate_apk_archive, validate_runtime_security_config
+from app import main as main_module
 
 client = TestClient(app)
 
@@ -95,3 +96,19 @@ def test_production_config_accepts_strong_server_side_key_and_user_auth():
 
 def test_development_config_remains_available_without_shared_key():
     validate_runtime_security_config({"BHARATSIM_ENV": "development"})
+
+
+
+def test_readiness_reports_supabase_auth_not_optional_shared_key(monkeypatch, tmp_path):
+    monkeypatch.setattr(main_module, "DB_PATH", tmp_path / "readiness.sqlite3")
+    monkeypatch.setattr(main_module, "AUTH_REQUIRED", True)
+    monkeypatch.setenv("BHARATSIM_REQUIRE_API_KEY", "false")
+    monkeypatch.delenv("BHARATSIM_WORKER_TOKEN", raising=False)
+
+    response = TestClient(main_module.app).get("/health/ready")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["authentication_required"] is True
+    assert payload["api_readiness"] == "ready"
+    assert payload["execution_readiness"] == "not_ready"
