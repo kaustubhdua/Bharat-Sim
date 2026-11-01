@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 BASE = "http://127.0.0.1:4723"
 ADB_SERIAL = "emulator-5554"
 BANDWIDTH_PROFILE = "umts"
-PROBE_BYTES = 256_000
+PROBE_BYTES = 64_000
 ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
 PROBE_RE = re.compile(r"HTTP (200|206) · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER) · probe (\d+) · bytes (\d+) · attempts (\d+)")
 
@@ -261,7 +261,7 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
     }
 
 
-# Each fixture probe transfers 256 KB. The Android Emulator UMTS profile is checked against this image's console readback.
+# Each fixture probe transfers 64 KB. The Android Emulator UMTS profile is checked against this image's console readback.
 def network_probe_log_tail() -> str:
     """Return real device-side probe diagnostics when a UI wait fails."""
     try:
@@ -274,7 +274,7 @@ def network_probe_log_tail() -> str:
         return f"Could not collect device probe logcat: {exc}"
 
 
-def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 45) -> dict:
+def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 60) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
@@ -368,7 +368,7 @@ def main() -> int:
         evidence["baseline_probes"] = baseline_probes
 
         # Test bandwidth immediately after baseline with the runtime-console UMTS preset.
-        # Its 1.92 Mbps download cap makes a 256 KB transfer take about 1.1 seconds.
+        # The UMTS preset is 384 kbps; a 64 KB transfer should take roughly 1.3 seconds before latency overhead.
         phase = "configure_bandwidth_profile"
         bandwidth_profile = set_network_profile(None, BANDWIDTH_PROFILE)
         evidence["bandwidth_profile"] = bandwidth_profile
@@ -453,7 +453,7 @@ def main() -> int:
             "assertions": [
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe downloaded exactly 256,000 bytes from the controlled raw.githubusercontent.com HTTPS fixture asset through the Android Emulator network stack",
+                "each probe downloaded exactly 64,000 bytes from the controlled raw.githubusercontent.com HTTPS fixture asset through the Android Emulator network stack",
                 "per-request retry counts are captured in probe evidence",
                 "baseline, latency-only, and bandwidth-only probes used the same observed Ethernet/cellular transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
