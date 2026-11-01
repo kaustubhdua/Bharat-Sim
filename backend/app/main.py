@@ -454,12 +454,16 @@ def db():
             from psycopg.rows import dict_row
         except ImportError as exc:
             raise RuntimeError("BHARATSIM_DATABASE_URL requires the psycopg[binary] dependency") from exc
-        raw = psycopg.connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None, options="-c search_path=bharatsim,public")
+        # Transaction poolers do not preserve session-level settings between
+        # clients. Set the private schema path locally for this transaction only.
+        raw = psycopg.connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None)
         conn = PostgresCompatConnection(raw)
     else:
         conn = sqlite3.connect(DB_PATH, timeout=15)
         conn.row_factory = sqlite3.Row
     try:
+        if DATABASE_URL:
+            conn.execute("SET LOCAL search_path TO bharatsim, public")
         yield conn
         conn.commit()
     except Exception:
@@ -773,6 +777,7 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
         raise HTTPException(status_code=422, detail="Unknown persona_id")
     if payload.size_bytes > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail=f"APK exceeds {MAX_UPLOAD_BYTES // (1024*1024)} MB limit")
+    cleanup_expired_uploads()
     safe_name = payload.filename.replace("\\", "/").rsplit("/", 1)[-1].strip()[:180]
     if not safe_name.lower().endswith(".apk"):
         raise HTTPException(status_code=415, detail="Upload must have an .apk filename")
