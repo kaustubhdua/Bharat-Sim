@@ -44,6 +44,7 @@ import ScoreRing from "./components/ScoreRing";
 import RunDetailView from "./components/RunDetailView";
 import CapabilityPanel from "./components/CapabilityPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
+import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
 
 const API_DOCS_URL = API || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
 
@@ -132,29 +133,26 @@ export default function App() {
         if (!globalThis.crypto?.subtle) throw new Error("Secure file hashing is unavailable in this browser.");
         const digest = await crypto.subtle.digest("SHA-256", await apk.arrayBuffer());
         const sha256 = Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
-        const ticket = await api<{ run_id: string; signed_url: string }>("/api/v1/uploads/sign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ persona_id: selected, filename: apk.name, size_bytes: apk.size, sha256 })
-        });
-        try {
-          const uploaded = await fetch(ticket.signed_url, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/vnd.android.package-archive",
-              "x-upsert": "false"
-            },
-            body: apk
+        let ticket = getPendingApkUpload(sha256, apk);
+        if (!ticket) {
+          ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ persona_id: selected, filename: apk.name, size_bytes: apk.size, sha256 })
           });
-          if (!uploaded.ok) throw new Error("Private APK upload failed (" + uploaded.status + ").");
-          run = await api<Run & { message: string }>(
-            "/api/v1/runs/" + encodeURIComponent(ticket.run_id) + "/upload-complete",
-            { method: "POST" }
-          );
-        } catch (uploadError) {
-          await api("/api/v1/runs/" + encodeURIComponent(ticket.run_id), { method: "DELETE" }).catch(() => undefined);
-          throw uploadError;
+          savePendingApkUpload(sha256, apk, ticket);
+        } else {
+          setNotice("Resuming your interrupted APK upload…");
         }
+        await uploadApkResumable(apk, sha256, ticket, percentage => {
+          setNotice("Uploading APK securely… " + percentage + "%");
+        });
+        setNotice("Upload complete. Verifying the private APK and preparing the test…");
+        run = await api<Run & { message: string }>(
+          "/api/v1/runs/" + encodeURIComponent(ticket.run_id) + "/upload-complete",
+          { method: "POST" }
+        );
+        clearPendingApkUpload(sha256);
       } else {
         if (import.meta.env.PROD && apk.size > 4 * 1024 * 1024) {
           throw new Error("Large APK upload is unavailable until private Supabase Storage is configured. This deployment can accept files up to 4 MB.");
