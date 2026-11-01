@@ -40,7 +40,7 @@ This document is the release checklist for turning BharatSim from a credible loc
 - [ ] Distinguish procedure status from app verdict. A smoke runner completing is not equivalent to an app journey passing. Show each authored assertion as pass/fail/not-run with evidence and timestamps.
 - [ ] Record the exact APK SHA-256, emulator image/API, OS/worker revision, test profile, requested controls, observed controls, request measurements, retry counts, start/end times and report schema version.
 - [ ] Keep baseline and constrained measurements paired on the same transport and endpoint. Use repeated samples and report medians/spread, sample count, failures and environmental caveats.
-- [ ] For every control, distinguish requested, applied/read back, traffic-path verified and unsupported. A console setting alone does not prove the app's request used that path.
+- [x] For every control, distinguish requested, applied/read back, traffic-path verified and unsupported. The CI proxy records profile generation/readback and per-connection upstream/byte evidence; the worker report does not claim arbitrary-app traffic verification. A console setting alone does not prove the app's request used that path.
 - [x] Keep fixture/test data unmistakably labelled as fixture evidence. The README, Appium report and artifact manifest identify the source-built fixture and explicitly limit the claim to that fixture; never present fixture metrics as customer results or general device-population claims.
 
 **Acceptance evidence:** downloadable report and CI artifacts generated from the same run, with hashes and a clear provenance chain; a clean run and a deliberately failing run both reach correct terminal states.
