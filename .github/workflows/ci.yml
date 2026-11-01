@@ -1,4 +1,5 @@
 name: CI
+# Planner request/response changes are covered by the backend and frontend contract suites.
 on:
   push:
     branches: [main, "draft/**"]
