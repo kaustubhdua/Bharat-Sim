@@ -4,7 +4,7 @@ This guide is the operational summary for the production worker. The full securi
 
 ## Production host
 
-Use a dedicated Ubuntu 24.04 x86_64 VM with at least 4 vCPU, 12 GB RAM, 40 GB free disk, hardware virtualization, and readable/writable /dev/kvm. The worker executes untrusted APKs. Do not share the host with the API, database, browser profiles, cloud credentials, personal files, or unrelated workloads.
+Use a dedicated Ubuntu 24.04 x86_64 VM with at least 4 vCPU, 8 GB RAM (12 GB recommended), 40 GB free disk, hardware virtualization, and readable/writable /dev/kvm. The worker executes untrusted APKs. Do not share the host with the API, database, browser profiles, cloud credentials, personal files, or unrelated workloads.
 
 Do not expose ADB/emulator console ports or host management interfaces. Block cloud metadata and private/control-plane network ranges from the worker. Restrict egress to the BharatSim API, common1 Supabase Storage/Auth endpoints, and public test destinations required by the app under test. A worker token is authentication, not a sandbox.
 
