@@ -72,9 +72,18 @@ The following non-secret configuration has been applied directly to the two Verc
 - Backend: `BHARATSIM_ENV=production` is Production-only. Preview uses `BHARATSIM_ENV=development` and is for protected UI/integration smoke tests only; its SQLite `/tmp` database is ephemeral and must not be used for real user data.
 
 The following required values are not present in the inspected Vercel environment and must be added before production can start: `BHARATSIM_DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured. The production API deliberately fails closed without the database and server-only Storage credential. No production deployment or real APK upload/execution is claimed.
+## Deployment audit observed on 2026-11-01
+
+- The latest Production deployment for both Vercel projects still references commit `e20f933523bbda56c4a4688d1260a93d8265c3fc`. The current GitHub `main` commit is newer: `a8f4b3310c5d5b0dfca161a6500d31087de887fa`.
+- The frontend's most recent preview build for an intermediate TUS-fix commit failed because its tests still expected the old `/storage/v1/upload/resumable/sign` path. The tests and implementation were corrected, the corresponding GitHub CI build passed, and the fix was merged into `main`. That earlier failed Vercel preview is not the current main build.
+- Subsequent Vercel deployment-creation requests were rejected with HTTP 402, resource `api-deployments-free-per-day`, because the team exceeded 100 deployments in the daily window. Vercel returned a 24-hour retry period. Do not repeatedly retry or bypass this limit; wait for the quota window to reset or have the account owner resolve the plan limit.
+- Both projects still have SSO protection enabled for non-custom domains. The latest production deployment records are READY, but they are old builds and do not prove that the newly merged code is live.
+
+This means GitHub `main` is updated, but the current Vercel Production aliases have **not** been verified against the latest commit. Once the deployment quota resets, deploy a Preview from the current main commit first, inspect the build logs and protected preview, then deploy Production only after the missing database and Storage credentials have been added.
+
 ## Safe rollout order
 
-1. Add the server-only API variables and the correct dashboard variable names in Vercel.
+1. Add the missing server-only API variables directly in Vercel; the frontend variable names are already aligned. Do not expose service-role, database, worker, or Sarvam secrets to the browser.
 2. Verify the API starts with PostgreSQL and that `/health/ready` reports database readiness. Confirm a create/read/delete run round trip persists across separate API invocations.
 3. Verify sign-up/sign-in, refresh, expiry, sign-out, and cross-user 404/denial behavior against common1.
 4. Verify private APK upload, lease-authorized worker download, terminal cleanup, and object deletion.
