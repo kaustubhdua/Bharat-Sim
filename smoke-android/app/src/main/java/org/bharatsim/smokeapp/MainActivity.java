@@ -35,7 +35,8 @@ public final class MainActivity extends Activity {
     private static final String TAG = "BharatSimNetworkProbe";
     private static final String PROBE_URL = BuildConfig.PROBE_URL;
     private static final int PROBE_BYTES = 256_000;
-    private static final int PROBE_TIMEOUT_MS = 30_000;
+    private static final int PROBE_TIMEOUT_MS = 35_000;
+    private static final int PROBE_ATTEMPT_TIMEOUT_MS = 15_000;
     private static final int MAX_HTTP_LINE_BYTES = 8_192;
     private static final int MAX_HTTP_HEADER_COUNT = 100;
     private static final int MAX_HTTP_HEADER_BYTES = 32_768;
@@ -96,9 +97,12 @@ public final class MainActivity extends Activity {
     }
 
     private void performNetworkProbe(TextView target, int sequence) {
-        final long probeDeadline = SystemClock.elapsedRealtime() + PROBE_TIMEOUT_MS;
+        final long overallDeadline = SystemClock.elapsedRealtime() + PROBE_TIMEOUT_MS;
         for (int attempt = 1; attempt <= 2; attempt++) {
             long started = SystemClock.elapsedRealtime();
+            // Bound each attempt separately so a stalled socket cannot consume the
+            // entire retry budget and silently prevent the second attempt from running.
+            final long attemptDeadline = Math.min(overallDeadline, started + PROBE_ATTEMPT_TIMEOUT_MS);
             String transport = "UNKNOWN";
             try {
                 ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
@@ -110,7 +114,7 @@ public final class MainActivity extends Activity {
                 if (!"CELLULAR".equals(transport) && !"ETHERNET".equals(transport)) {
                     throw new IllegalStateException("Unsupported transport for emulator-console shaping: " + transport);
                 }
-                ProbeResult result = performPinnedHttpsProbe(activeNetwork, PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started, probeDeadline);
+                ProbeResult result = performPinnedHttpsProbe(activeNetwork, PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started, attemptDeadline);
                 long duration = SystemClock.elapsedRealtime() - started;
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + result.statusCode + " duration_ms=" + duration
                         + " transport=" + transport + " probe=" + sequence
@@ -121,7 +125,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> target.setText(message));
                 return;
             } catch (Exception exception) {
-                if (exception instanceof IOException && attempt < 2 && SystemClock.elapsedRealtime() < probeDeadline) {
+                if (exception instanceof IOException && attempt < 2 && SystemClock.elapsedRealtime() < overallDeadline) {
                     Log.w(TAG, "BHARATSIM_NETWORK_PROBE retrying sequence=" + sequence
                             + " attempt=" + attempt + " after=" + exception.getClass().getSimpleName(), exception);
                     try {
