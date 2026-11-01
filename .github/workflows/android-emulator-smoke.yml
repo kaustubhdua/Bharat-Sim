@@ -106,7 +106,7 @@ jobs:
           fi
           echo "Resolved api.github.com to $ip"
           # Fail early if the public test endpoint is unavailable from the CI host.
-          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 --range 0-0 -H "Accept: application/vnd.github.raw+json" -H "User-Agent: BharatSimNetworkProbe/1.0" --output /dev/null "https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/smoke-android/probe-256k.bin?ref=${{ github.event.pull_request.head.sha || github.sha }}"
+          curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 -H "Accept: application/vnd.github.raw+json" -H "User-Agent: BharatSimNetworkProbe/1.0" --output /dev/null "https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/smoke-android/probe-256k.bin?ref=${{ github.event.pull_request.head.sha || github.sha }}"
           echo "ip=$ip" >> "$GITHUB_OUTPUT"
       - name: Build known-good test APK
         working-directory: smoke-android
