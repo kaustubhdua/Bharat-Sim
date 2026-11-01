@@ -174,11 +174,10 @@ public final class MainActivity extends Activity {
                 String request = "GET " + requestPath + " HTTP/1.1\r\n"
                         + "Host: " + host + "\r\n"
                         + "User-Agent: BharatSimNetworkProbe/1.0\r\n"
-                        + "Accept: application/vnd.github.raw+json\r\n"
+                        + "Accept: application/octet-stream\r\n"
                         + "Connection: close\r\n"
                         + "Accept-Encoding: identity\r\n"
-                        + "Cache-Control: no-cache\r\n"
-                        + "Range: bytes=0-" + (expectedBytes - 1) + "\r\n\r\n";
+                        + "\r\n";
                 output.write(request.getBytes(StandardCharsets.US_ASCII));
                 output.flush();
 
@@ -198,7 +197,9 @@ public final class MainActivity extends Activity {
                     throw new IOException("Unexpected HTTP status " + statusCode);
                 }
 
-                Log.i(TAG, "BHARATSIM_NETWORK_PROBE response_headers_received status=HTTP_" + statusCode);
+                Log.i(TAG, "BHARATSIM_NETWORK_PROBE response_headers_received status=HTTP_" + statusCode
+                        + " content_length=" + headers.getOrDefault("content-length", "unknown")
+                        + " transfer_encoding=" + headers.getOrDefault("transfer-encoding", "none"));
                 Map<String, String> headers = new HashMap<>();
                 String headerLine;
                 int headerCount = 0;
