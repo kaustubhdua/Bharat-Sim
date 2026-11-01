@@ -481,7 +481,7 @@ def main() -> int:
                 float(p["proxy_event"].get("delay_injected_ms", 0.0)) for p in latency_probes
             ],
             "minimum_required_injected_latency_ms": minimum_injected_latency_ms,
-            "minimum_required_bandwidth_delta_ms": minimum_bandwidth_delta_ms,
+            "bandwidth_gate": "per-tunnel proxy telemetry",
             "traffic_path_verified": True,
             "reset_profile": reset_evidence,
             "screenshot": str(screenshot_path),
