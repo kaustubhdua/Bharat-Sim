@@ -5,6 +5,22 @@ from worker.tests import appium_smoke_journey as journey
 
 
 class ProbeParsingTests(unittest.TestCase):
+    def test_sample_summary_reports_count_median_and_spread(self):
+        summary = journey.summarize_samples([
+            {"duration_ms": 100},
+            {"duration_ms": 150},
+            {"duration_ms": 220},
+        ])
+        self.assertEqual(summary, {
+            "sample_count": 3,
+            "successful_samples": 3,
+            "failed_samples": 0,
+            "min_ms": 100,
+            "max_ms": 220,
+            "spread_ms": 120,
+            "median_ms": 150,
+        })
+
     def test_parses_successful_probe_status(self):
         parsed = journey.parse_probe_text(
             "HTTP 206 · 347 ms · CELLULAR · probe 3 · bytes 64000 · attempts 2"
