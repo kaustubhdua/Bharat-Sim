@@ -92,6 +92,8 @@ def test_readiness_names_closed_worker_safety_gate(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "DATABASE_URL", "")
     monkeypatch.setattr(main, "DB_PATH", tmp_path / "readiness.sqlite3")
     monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setattr(main, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", True)
     monkeypatch.setenv("BHARATSIM_WORKER_TOKEN", "w" * 48)
     monkeypatch.setenv("BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED", "false")
     monkeypatch.setenv("BHARATSIM_WORKER_ISOLATION_ATTESTED", "false")
