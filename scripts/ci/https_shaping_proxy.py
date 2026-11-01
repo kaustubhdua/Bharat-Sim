@@ -184,6 +184,7 @@ class ShapingProxy:
                 "rate_kbps": config["rate_kbps"],
             })
             upstream_host = self.target_ips.get(host, host)
+            event["upstream_target_ip"] = upstream_host
             upstream_reader, upstream_writer = await asyncio.wait_for(
                 asyncio.open_connection(upstream_host, port), timeout=10
             )
@@ -223,6 +224,9 @@ class ShapingProxy:
             event["duration_ms"] = round((time.time() - event["started_at"]) * 1000, 2)
             event.pop("started_at", None)
             self.events.append(event)
+            # Keep exact upstream-connect failure and byte/timing evidence in
+            # the CI artifact; a generic HTTP 502 alone is not diagnosable.
+            print(json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
             if upstream_writer is not None:
                 upstream_writer.close()
                 try:
