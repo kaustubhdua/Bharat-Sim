@@ -22,6 +22,20 @@ function storageKey(sha256: string): string {
   return STORAGE_KEY_PREFIX + sha256;
 }
 
+function isTrustedStorageUrl(value: string, expectedPathPrefix: string): boolean {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" || !parsed.pathname.startsWith(expectedPathPrefix)) return false;
+    const configuredUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    const expectedHost = configuredUrl
+      ? new URL(configuredUrl).hostname.replace(/\\.supabase\\.co$/, ".storage.supabase.co")
+      : "";
+    return expectedHost ? parsed.hostname === expectedHost : parsed.hostname.endsWith(".storage.supabase.co");
+  } catch {
+    return false;
+  }
+}
+
 function readPending(sha256: string): PendingUpload | null {
   try {
     const raw = sessionStorage.getItem(storageKey(sha256));
@@ -31,9 +45,15 @@ function readPending(sha256: string): PendingUpload | null {
       !value.run_id ||
       !value.upload_token ||
       !value.tus_endpoint ||
-      !value.object_path ||
+      value.object_path !== "runs/" + value.run_id + "/input.apk" ||
+      !Number.isFinite(value.file_size) ||
+      value.file_size <= 0 ||
+      value.file_size > 150 * 1024 * 1024 ||
+      !Number.isFinite(value.file_last_modified) ||
       !Number.isFinite(value.expires_at) ||
-      value.expires_at <= Date.now()
+      value.expires_at <= Date.now() ||
+      !isTrustedStorageUrl(value.tus_endpoint, "/storage/v1/upload/resumable/sign/") ||
+      (value.upload_url !== undefined && !isTrustedStorageUrl(value.upload_url, "/storage/v1/upload/resumable/"))
     ) {
       sessionStorage.removeItem(storageKey(sha256));
       return null;
@@ -110,6 +130,9 @@ async function createTusUpload(file: File, sha256: string, ticket: SignedApkUplo
     throw new Error("Storage did not return a resumable upload location. Check Storage CORS expose headers.");
   }
   const uploadUrl = new URL(location, ticket.tus_endpoint).toString();
+  if (!isTrustedStorageUrl(uploadUrl, "/storage/v1/upload/resumable/")) {
+    throw new Error("Storage returned an untrusted resumable upload location.");
+  }
   updatePendingUploadUrl(sha256, uploadUrl);
   return uploadUrl;
 }
