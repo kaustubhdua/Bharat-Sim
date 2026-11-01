@@ -16,6 +16,7 @@ FastAPI's interactive schema is available at /docs when the backend is running.
 - DELETE /api/v1/runs/{run_id} — owner-scoped deletion of a run and associated analysis evidence. Queued/awaiting runs are first marked cancelled so a worker cannot claim them during cleanup. Active leased/running jobs return 409 and must finish before deletion. If APK cleanup fails, the cancelled row is retained so deletion can be retried.
 - GET /api/v1/workers — authenticated worker heartbeat summary for the last 90 seconds. It exposes a busy indicator but never another user's current run ID.
 - POST /api/v1/analyze/logs — deterministic analysis of supplied log text.
+- POST /api/v1/translate/report — opt-in Sarvam translation of a user-selected condensed report summary (Hindi, Tamil, or Marathi); requires server-side `SARVAM_API_KEY`.
 - GET /api/v1/analyses — recent saved log analyses.
 
 When `BHARATSIM_AUTH_REQUIRED=true`, customer-data endpoints require a verified Supabase Auth access token in the `Authorization: Bearer` header. The backend validates the JWT against the configured project's JWKS and scopes run/analysis reads, writes, report exports, and run deletion by the verified user UUID. The frontend can use email/password Supabase Auth when its public URL and publishable/legacy anon key are configured.
