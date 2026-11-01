@@ -72,7 +72,7 @@ export default function EvidenceSynthesisPanel({ diagnostics }: { diagnostics: E
               </div>
               <p>{observation.interpretation}</p>
               {observation.evidence.slice(0, 2).map((item, index) => (
-                <div className="evidence-observation-marker" key={item.category + index}>
+                <div className="evidence-observation-marker" key={item.marker + index}>
                   <small>{item.marker || "Marker flag"}{item.line_number ? " · L" + item.line_number : ""}</small>
                   {item.evidence.slice(0, 2).map((line, lineIndex) => (
                     <code key={line.line_number ?? lineIndex}>
