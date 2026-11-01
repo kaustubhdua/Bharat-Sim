@@ -41,7 +41,7 @@ def _condition_states(report: dict[str, Any]) -> dict[str, str]:
     states: dict[str, str] = {}
     if not isinstance(conditions, list):
         return states
-    for item in conditions:
+    for item in conditions[:32]:
         if not isinstance(item, dict):
             continue
         name = item.get("condition")
@@ -86,7 +86,7 @@ def fuse_worker_report(report: Any) -> dict[str, Any]:
         if not isinstance(signal, dict):
             continue
         category = signal.get("category")
-        if category not in normalized:
+        if not isinstance(category, str) or category not in normalized:
             continue
         line = signal.get("line_number")
         line_number = line if isinstance(line, int) and line > 0 else None
@@ -108,11 +108,11 @@ def fuse_worker_report(report: Any) -> dict[str, Any]:
         })
 
     marker_flags = {
-        "crash": bool(report.get("fatal_exception_marker")),
-        "anr": bool(report.get("anr_marker")),
-        "oom": bool(report.get("oom_marker")),
-        "network": bool(report.get("network_failure_marker")),
-        "storage": bool(report.get("storage_failure_marker")),
+        "crash": report.get("fatal_exception_marker") is True,
+        "anr": report.get("anr_marker") is True,
+        "oom": report.get("oom_marker") is True,
+        "network": report.get("network_failure_marker") is True,
+        "storage": report.get("storage_failure_marker") is True,
     }
     observations: list[dict[str, Any]] = []
     observed_categories: set[str] = set()
@@ -140,7 +140,7 @@ def fuse_worker_report(report: Any) -> dict[str, Any]:
     control_plane = control_plane if isinstance(control_plane, dict) else {}
     network_control_verified = control_plane.get("status") == "verified"
     traffic_path_verified = network.get("traffic_path_verified") is True
-    storage_verified = condition_states.get("storage_pressure") in {"verified", "preexisting_verified"}
+    storage_verified = condition_states.get("storage_pressure") == "verified"
     ram_state = condition_states.get("ram_constraint", "not_requested")
 
     hypotheses: list[dict[str, Any]] = []
@@ -185,7 +185,7 @@ def fuse_worker_report(report: Any) -> dict[str, Any]:
         })
 
     if "oom" in observed_categories:
-        ram_verified = ram_state in {"verified", "preexisting_verified"}
+        ram_verified = ram_state == "verified"
         hypotheses.append({
             "id": "memory_pressure_and_oom",
             "category": "oom",
@@ -270,7 +270,8 @@ def fuse_worker_report(report: Any) -> dict[str, Any]:
         "observations": observations,
         "hypotheses": hypotheses,
         "sources": sources,
-        "verified_conditions": sorted(name for name, state in condition_states.items() if state in {"verified", "preexisting_verified"}),
+        "verified_conditions": sorted(name for name, state in condition_states.items() if state == "verified"),
+        "preexisting_conditions": sorted(name for name, state in condition_states.items() if state == "preexisting_verified"),
         "unsupported_conditions": sorted(name for name, state in condition_states.items() if state == "unsupported"),
         "limitations": limitations[:16],
     }
