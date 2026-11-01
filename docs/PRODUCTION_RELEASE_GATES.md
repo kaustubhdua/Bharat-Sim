@@ -8,7 +8,7 @@ This document is the release checklist for turning BharatSim from a credible loc
 
 ## Observed infrastructure status (2026-11-01)
 
-- common1 has the private `bharatsim` schema, RLS enabled on its tables, no schema USAGE for `anon`/`authenticated`, and the private `bharatsim-private` bucket. The signed-upload size migration is applied.
+- common1 has the private `bharatsim` schema, RLS enabled on its tables, no schema USAGE for `anon`/`authenticated`, and the private `bharatsim-private` bucket. The signed-upload size migration is applied. Per-user run quotas are now enforced in code; live common1 quota-row locking is not yet verified because the Vercel API database connection is not configured.
 - Vercel frontend has the correct public common1 URL/publishable key and target-specific API base URLs. Backend has the common1 URL, required Supabase JWT auth, private bucket name, CORS origins, and fail-closed Production mode; Preview is explicitly Development-only.
 - Production Vercel is still missing `BHARATSIM_DATABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. The worker token and Sarvam key are also not configured. The API intentionally cannot be considered production-ready without the first two.
 - Vercel SSO protection remains enabled and deployment builds are currently blocked by the team's `build-rate-limit`. The latest production aliases still point to an older commit.
@@ -20,7 +20,8 @@ This document is the release checklist for turning BharatSim from a credible loc
 - [ ] Complete cross-user denial coverage for every customer-data route, including list/read/report export/delete, analyses, and any future artifact endpoints. Current regression tests cover run listing/detail, report export, deletion, analysis listing, and worker run-ID non-disclosure; live Supabase Auth and expired-session behavior still require deployment-level verification.
 - [ ] Run each untrusted APK only in a disposable VM or equivalently strong isolation boundary. No host secrets, privileged container, Docker socket, host filesystem mounts, or access to cloud metadata; default-deny egress except explicitly approved test targets.
 - [ ] Enforce per-job CPU, memory, disk, process, wall-clock and network quotas. Ensure timeout/cancellation actually stops ADB, emulator, Appium and child processes.
-- [ ] Add per-user upload/run/concurrency quotas, abuse controls, audit events, and documented artifact retention/deletion.
+- [x] Enforce per-user daily run and active-run quotas (default 10 per UTC day and 2 active) with per-user transaction serialization; limits are configurable in `bharatsim.quotas`.
+- [ ] Add per-user upload-frequency/byte quotas, abuse controls, audit events, and documented artifact retention/deletion.
 - [ ] Store reports, screenshots and logs in private object storage with generated object names, authorization checks, bounded retention, and integrity hashes. The current run-report download is generated from bounded database JSON and is not durable object storage. Do not rely on a local container filesystem for multi-instance production.
 - [ ] Add security tests for malformed APK archives, decompression bombs, oversized multipart bodies/results, path traversal, package-name injection, malicious redirect targets, replayed callbacks, stale leases, worker crashes and cleanup failures.
 - [ ] Obtain a documented threat-model/security review before enabling public execution.
