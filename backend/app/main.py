@@ -109,7 +109,9 @@ def validate_database_configuration(database_url: str, app_env: str) -> None:
         )
 
 
-validate_database_configuration(DATABASE_URL, APP_ENV)
+# Configuration is validated by readiness checks, not at module import. Serverless
+# platforms must be able to start the ASGI app so liveness and actionable 503
+# readiness responses remain observable when production secrets are missing.
 
 def validate_runtime_security_config(environment: dict[str, str] | None = None) -> None:
     """Refuse production startup without verified user auth and private server credentials.
@@ -137,8 +139,6 @@ def validate_runtime_security_config(environment: dict[str, str] | None = None) 
         raise RuntimeError("Production startup blocked: configure BHARATSIM_STORAGE_BUCKET")
 
 
-validate_runtime_security_config()
-validate_auth_configuration()
 MAX_UPLOAD_BYTES = max(1, min(int(os.getenv("BHARATSIM_MAX_UPLOAD_MB", "150")), 150)) * 1024 * 1024
 MAX_APK_ENTRIES = 10000
 MAX_APK_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
@@ -309,6 +309,14 @@ async def enforce_api_authentication(request: Request, call_next):
         or request.url.path in {"/api/v1/analyze/logs", "/api/v1/analyses", "/api/v1/workers", "/api/v1/translate/report"}
         or request.url.path.startswith("/api/v1/uploads/")
     )
+    if APP_ENV in {"production", "prod"} and protected:
+        if not DATABASE_URL:
+            return JSONResponse(status_code=503, content={"detail": "Production persistence is not configured"})
+        if not AUTH_REQUIRED or not SUPABASE_URL.startswith("https://"):
+            return JSONResponse(status_code=503, content={"detail": "Production authentication is not configured"})
+        if (request.url.path.startswith("/api/v1/uploads/") or
+                (request.method == "POST" and request.url.path == "/api/v1/runs")) and not STORAGE_ENABLED:
+            return JSONResponse(status_code=503, content={"detail": "Private APK storage is not configured"})
     if AUTH_REQUIRED and protected:
         scheme, _, token = request.headers.get("Authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not token.strip() or len(token) > 16384:
@@ -601,7 +609,10 @@ def init_db() -> None:
             if column not in columns:
                 conn.execute(f"ALTER TABLE runs ADD COLUMN {column} {definition}")
 
-init_db()
+# Local SQLite is initialized for development/test only. Production schema is
+# managed exclusively by versioned Supabase migrations and checked by readiness.
+if APP_ENV not in {"production", "prod"}:
+    init_db()
 
 
 def enforce_run_quota(conn, owner_id: str | None, now: datetime | None = None) -> None:
@@ -859,7 +870,7 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
 
 @app.get("/")
 def root():
-    return {"name": "BharatSim API", "version": "0.1.0", "docs": "/docs", "status": "development"}
+    return {"name": "BharatSim API", "version": "0.1.0", "docs": "/docs", "status": APP_ENV}
 
 @app.get("/health/live")
 def health_live():
@@ -876,9 +887,25 @@ def health_ready():
     worker_token_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
     worker_configured = worker_token_configured and production_worker_execution_enabled()
     worker_online = False
+    production = APP_ENV in {"production", "prod"}
+    database_ok = False
     try:
+        # Production must never report a temporary local SQLite file as its
+        # persistence layer. Verify the configured Postgres schema as well as
+        # basic connectivity before advertising readiness.
+        if production and not DATABASE_URL:
+            raise RuntimeError("Production PostgreSQL URL is not configured")
+        validate_database_configuration(DATABASE_URL, APP_ENV)
         with db() as conn:
             conn.execute("SELECT 1").fetchone()
+            if DATABASE_URL:
+                schema = conn.execute(
+                    "SELECT to_regclass('bharatsim.runs') AS runs, "
+                    "to_regclass('bharatsim.run_events') AS run_events, "
+                    "to_regclass('bharatsim.audit_events') AS audit_events"
+                ).fetchone()
+                if not schema or not all(schema[key] for key in ("runs", "run_events", "audit_events")):
+                    raise RuntimeError("BharatSim production schema is incomplete")
             database_ok = True
             if worker_configured:
                 rows = conn.execute("SELECT last_seen,status FROM workers ORDER BY last_seen DESC LIMIT 50").fetchall()
@@ -897,7 +924,6 @@ def health_ready():
         database_ok = False
         worker_online = False
 
-    production = APP_ENV in {"production", "prod"}
     auth_configured = AUTH_REQUIRED and SUPABASE_URL.startswith("https://")
     storage_configured = STORAGE_ENABLED and SUPABASE_URL.startswith("https://")
     auth_required = production or AUTH_REQUIRED
