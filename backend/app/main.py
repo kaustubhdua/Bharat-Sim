@@ -43,9 +43,13 @@ DB_PATH = DATA_DIR / "bharatsim.sqlite3"
 DATABASE_URL = os.getenv("BHARATSIM_DATABASE_URL", "").strip()
 APP_ENV = os.getenv("BHARATSIM_ENV", "development").strip().lower()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+# Prefer the modern opaque secret key; retain the legacy service_role JWT as a
+# compatibility fallback while Supabase phases legacy keys out.
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY", "").strip()
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+STORAGE_API_KEY = SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY
 STORAGE_BUCKET = os.getenv("BHARATSIM_STORAGE_BUCKET", "bharatsim-private").strip()
-STORAGE_ENABLED = bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and STORAGE_BUCKET)
+STORAGE_ENABLED = bool(SUPABASE_URL and STORAGE_API_KEY and STORAGE_BUCKET)
 AUTH_REQUIRED = os.getenv("BHARATSIM_AUTH_REQUIRED", "false").strip().lower() == "true"
 _jwks_client: PyJWKClient | None = None
 
@@ -125,8 +129,9 @@ def validate_runtime_security_config(environment: dict[str, str] | None = None) 
         raise RuntimeError("Production startup blocked: BHARATSIM_API_KEY must contain at least 32 characters when the shared API-key gate is enabled")
     if not values.get("SUPABASE_URL", "").strip().startswith("https://"):
         raise RuntimeError("Production startup blocked: configure SUPABASE_URL for Supabase Auth and Storage")
-    if len(values.get("SUPABASE_SERVICE_ROLE_KEY", "")) < 32:
-        raise RuntimeError("Production startup blocked: configure a server-only SUPABASE_SERVICE_ROLE_KEY for private artifact storage")
+    storage_key = values.get("SUPABASE_SECRET_KEY", "").strip() or values.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if len(storage_key) < 32:
+        raise RuntimeError("Production startup blocked: configure a server-only SUPABASE_SECRET_KEY (preferred) or legacy SUPABASE_SERVICE_ROLE_KEY for private artifact storage")
     if not values.get("BHARATSIM_STORAGE_BUCKET", "bharatsim-private").strip():
         raise RuntimeError("Production startup blocked: configure BHARATSIM_STORAGE_BUCKET")
 
@@ -150,11 +155,15 @@ def _storage_connection_and_path(object_path: str):
 
 
 def _storage_headers(content_type: str = "application/octet-stream") -> dict[str, str]:
-    return {
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+    headers = {
+        "apikey": STORAGE_API_KEY,
         "Content-Type": content_type,
     }
+    # Modern sb_secret_* keys are opaque API keys, not JWTs. Supabase expects
+    # them in the apikey header only; legacy service_role keys remain JWT bearers.
+    if not SUPABASE_SECRET_KEY:
+        headers["Authorization"] = f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"
+    return headers
 
 
 def upload_private_object(source: Path, object_path: str) -> None:
