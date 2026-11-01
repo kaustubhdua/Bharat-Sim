@@ -17,7 +17,7 @@ The latest environment inspection (2026-11-01) confirms that the public frontend
 
 - Dashboard: `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured for Production and Preview. The Preview API URL is branch-specific.
 - API: `SUPABASE_URL`, `BHARATSIM_ENV`, `BHARATSIM_AUTH_REQUIRED`, `BHARATSIM_STORAGE_BUCKET`, and `BHARATSIM_CORS_ORIGINS` are configured. Preview uses development mode with ephemeral SQLite; Production is set to production mode.
-- API credentials `BHARATSIM_DATABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are not present in the inspected environment. `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured.
+- API credentials `BHARATSIM_DATABASE_URL` and `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`) are not present in the inspected environment. `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured.
 - Never rename a server secret to a `NEXT_PUBLIC_*` or `VITE_*` variable. Only the Supabase publishable key belongs in the browser.
 
 ## Dashboard project variables
@@ -42,7 +42,7 @@ Configure these on the `bharat-sim` Vercel project. Keep every value server-side
 | `BHARATSIM_ENV` | `production` |
 | `BHARATSIM_DATABASE_URL` | common1 Supabase **Transaction pooler** URI from the dashboard Connect panel, with `sslmode=require` |
 | `SUPABASE_URL` | common1 HTTPS project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | common1 server-only secret key; never expose it to the browser |
+| `SUPABASE_SECRET_KEY` | common1 modern `sb_secret_...` server-only key (preferred); sent in `apikey` only. Legacy `SUPABASE_SERVICE_ROLE_KEY` JWT is supported as fallback. |
 | `BHARATSIM_AUTH_REQUIRED` | `true` |
 | `BHARATSIM_STORAGE_BUCKET` | `bharatsim-private` |
 | `BHARATSIM_CORS_ORIGINS` | Exact dashboard origin(s), comma-separated; include the production dashboard aliases and the active preview dashboard branch alias; remove stale branch aliases when preview deployments are retired |
@@ -61,7 +61,7 @@ Vercel functions are short-lived/serverless. Supabase recommends the shared Tran
 2. Confirm the core and foreign-key-index migrations are present in remote migration history.
 3. Enable the email/password Auth provider if password sign-in is the selected onboarding method.
 4. Set the allowed redirect URLs for the dashboard's production and preview origins.
-5. Never grant browser roles direct access to the private `bharatsim` schema or the service-role key.
+5. Never grant browser roles direct access to the private `bharatsim` schema or any server-side Supabase secret key.
 
 ## Environment state observed during the 2026-11-01 integration pass
 
@@ -71,7 +71,7 @@ The following non-secret configuration has been applied directly to the two Verc
 - Backend: `SUPABASE_URL`, `BHARATSIM_AUTH_REQUIRED=true`, `BHARATSIM_STORAGE_BUCKET=bharatsim-private`, and explicit CORS origins are configured for both.
 - Backend: `BHARATSIM_ENV=production` is Production-only. Preview uses `BHARATSIM_ENV=development` and is for protected UI/integration smoke tests only; its SQLite `/tmp` database is ephemeral and must not be used for real user data.
 
-The following required values are not present in the inspected Vercel environment and must be added before production can start: `BHARATSIM_DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured. The production API deliberately fails closed without the database and server-only Storage credential. No production deployment or real APK upload/execution is claimed.
+The following required values are not present in the inspected Vercel environment and must be added before production can start: `BHARATSIM_DATABASE_URL`, `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`). `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured. The production API deliberately fails closed without the database and server-only Storage credential. No production deployment or real APK upload/execution is claimed.
 ## Deployment audit observed on 2026-11-01
 
 - The latest Production deployment for both Vercel projects still references commit `e20f933523bbda56c4a4688d1260a93d8265c3fc`. The current GitHub `main` commit is newer: `a8f4b3310c5d5b0dfca161a6500d31087de887fa`.
@@ -94,4 +94,4 @@ This means GitHub `main` is updated, but the current Vercel Production aliases h
 
 ## Current blockers
 
-The Vercel variable audit confirms that the public frontend variable names and non-secret backend settings are now aligned. It still does not show the required API database URL or server-side service-role key. No database password or service-role credential is available through the current project inspection. These values must be added by the project owner directly in Vercel; do not paste them into GitHub or chat. The latest production deployments still point to an older commit, and the projects remain SSO-protected. Until the credentials are added and the new commit is deployed and verified, the production API must not be considered connected to common1, and the dashboard must not be considered end-to-end live.
+The Vercel variable audit confirms that the public frontend variable names and non-secret backend settings are now aligned. It still does not show the required API database URL or server-side service-role key. No database password or Supabase secret/service-role credential is available through the current project inspection. These values must be added by the project owner directly in Vercel; do not paste them into GitHub or chat. The latest production deployments still point to an older commit, and the projects remain SSO-protected. Until the credentials are added and the new commit is deployed and verified, the production API must not be considered connected to common1, and the dashboard must not be considered end-to-end live.
