@@ -106,7 +106,7 @@ jobs:
           fi
           echo "Resolved api.github.com to $ip"
           # Fail early if the public test endpoint is unavailable from the CI host.
-          probe_result="$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 --range 0-255999 -H "Accept: application/vnd.github.raw+json" -H "User-Agent: BharatSimNetworkProbe/1.0" --output /dev/null --write-out '%{http_code} %{size_download}' "https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/smoke-android/probe-256k.bin?ref=${{ github.event.pull_request.head.sha || github.sha }}")"
+          probe_result="$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 --range 0-255999 -H "Accept: application/vnd.github.raw+json" -H "User-Agent: BharatSimNetworkProbe/1.0" -H "X-GitHub-Api-Version: 2026-03-10" --output /dev/null --write-out '%{http_code} %{size_download}' "https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/smoke-android/probe-256k.bin?ref=${{ github.event.pull_request.head.sha || github.sha }}")"
           read -r probe_status probe_bytes <<< "$probe_result"
           if [[ "$probe_status" != "200" && "$probe_status" != "206" ]] || [[ "$probe_bytes" != "256000" ]]; then
             echo "GitHub API probe fixture returned HTTP $probe_status with $probe_bytes bytes; expected HTTP 200/206 and exactly 256000 raw bytes" >&2
