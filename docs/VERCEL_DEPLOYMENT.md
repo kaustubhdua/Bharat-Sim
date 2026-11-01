@@ -58,7 +58,7 @@ Vercel functions are short-lived/serverless. Supabase recommends the shared Tran
 ## Supabase prerequisites
 
 1. Confirm the `bharatsim` schema and the `bharatsim-private` bucket exist in common1. The bucket must remain private.
-2. Confirm the core and foreign-key-index migrations are present in remote migration history.
+2. Confirm the core, foreign-key-index, and signed-upload size migrations are present in remote migration history.
 3. Enable the email/password Auth provider if password sign-in is the selected onboarding method.
 4. Set the allowed redirect URLs for the dashboard's production and preview origins.
 5. Never grant browser roles direct access to the private `bharatsim` schema or any server-side Supabase secret key.
