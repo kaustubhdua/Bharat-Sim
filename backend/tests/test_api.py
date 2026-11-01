@@ -24,6 +24,13 @@ def test_health_and_capabilities_are_honest():
     assert network["packet_loss"] is False
     assert network["outage_and_recovery"] is False
     assert network["arbitrary_app_traffic_verified"] is False
+    persona_controls = caps["persona_condition_simulation"]
+    assert persona_controls["supported"] == [
+        "network_latency", "download_bandwidth", "battery_saver", "storage_pressure"
+    ]
+    assert persona_controls["control_plane_verifiable"] == ["upload_bandwidth"]
+    assert persona_controls["report_only"] == ["ram_constraint"]
+    assert persona_controls["unsupported"] == ["packet_loss", "cpu_constraint"]
 
 
 def test_personas_and_plan():
