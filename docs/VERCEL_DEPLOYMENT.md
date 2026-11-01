@@ -47,7 +47,7 @@ Configure these on the \`bharat-sim\` Vercel project. Keep every value server-si
 | \`BHARATSIM_WORKER_TOKEN\` | Strong random value of at least 32 characters, only after the isolated worker is provisioned |
 | \`SARVAM_API_KEY\` | Optional server-only key; required to enable the Sarvam capability |
 
-The API's production startup requires PostgreSQL, verified Supabase Auth, and the server-side Storage credential. The optional shared \`BHARATSIM_API_KEY\` is not required for a Supabase-authenticated browser application and must not be placed in frontend code. Leave \`BHARATSIM_REQUIRE_API_KEY=false\` unless a private server-side gateway is deliberately configured to inject it.
+The API's production startup requires PostgreSQL, verified Supabase Auth, and the server-side Storage credential. When Storage is enabled, the dashboard requests a short-lived signed upload URL and transfers APK bytes directly to the private bucket; this bypasses Vercel Functions' 4.5 MB request-body cap. The API checks the stored object size before queueing, and the worker independently checks the SHA-256. Without Storage configured, the production UI blocks files larger than 4 MB rather than letting Vercel return a 413. The API uses `/tmp/bharatsim` as writable scratch space on Vercel. The optional shared \`BHARATSIM_API_KEY\` is not required for a Supabase-authenticated browser application and must not be placed in frontend code. Leave \`BHARATSIM_REQUIRE_API_KEY=false\` unless a private server-side gateway is deliberately configured to inject it.
 
 ### Why transaction pooler mode
 
