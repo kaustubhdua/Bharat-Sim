@@ -17,6 +17,7 @@ import java.net.URL;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.Proxy;
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.InputStream;
@@ -108,8 +109,8 @@ public final class MainActivity extends Activity {
                     throw new IOException("No active Android network for the HTTPS probe");
                 }
                 transport = transportForNetwork(activeNetwork);
-                if (!"CELLULAR".equals(transport) && !"ETHERNET".equals(transport)) {
-                    throw new IllegalStateException("Unsupported transport for emulator-console shaping: " + transport);
+                if (!"CELLULAR".equals(transport) && !"ETHERNET".equals(transport) && !"WIFI".equals(transport)) {
+                    throw new IllegalStateException("No supported Android network transport for the HTTPS proxy probe: " + transport);
                 }
                 // Bound each attempt independently so a stalled first read can still
                 // retry within the overall probe deadline and record the retry count.
@@ -117,12 +118,13 @@ public final class MainActivity extends Activity {
                         probeDeadline,
                         SystemClock.elapsedRealtime() + PROBE_ATTEMPT_TIMEOUT_MS
                 );
-                ProbeResult result = performPinnedHttpsProbe(activeNetwork, PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started, attemptDeadline);
+                ProbeResult result = performProxiedHttpsProbe(activeNetwork, PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started, attemptDeadline);
                 long duration = SystemClock.elapsedRealtime() - started;
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + result.statusCode + " duration_ms=" + duration
                         + " transport=" + transport + " probe=" + sequence
                         + " bytes_read=" + result.bytesRead + " attempts=" + attempt
-                        + " endpoint_host=" + new URL(PROBE_URL).getHost() + " endpoint_ip=" + BuildConfig.PROBE_IP);
+                        + " endpoint_host=" + new URL(PROBE_URL).getHost() + " endpoint_ip=" + BuildConfig.PROBE_IP
+                        + " proxy_host=" + BuildConfig.PROBE_PROXY_HOST + " proxy_port=" + BuildConfig.PROBE_PROXY_PORT);
                 final String message = "HTTP " + result.statusCode + " · " + duration + " ms · " + transport
                         + " · probe " + sequence + " · bytes " + result.bytesRead + " · attempts " + attempt;
                 runOnUiThread(() -> target.setText(message));
@@ -151,22 +153,29 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private static ProbeResult performPinnedHttpsProbe(Network activeNetwork, String urlText, String pinnedIp, int expectedBytes, long startedAt, long deadlineAt) throws IOException {
+    private static ProbeResult performProxiedHttpsProbe(Network activeNetwork, String urlText, String expectedUpstreamIp, int expectedBytes, long startedAt, long deadlineAt) throws IOException {
         URL url = new URL(urlText);
-        if (!"https".equalsIgnoreCase(url.getProtocol()) || pinnedIp.equals("0.0.0.0")) {
-            throw new IOException("HTTPS probe URL and pinned IPv4 address are required");
+        if (!"https".equalsIgnoreCase(url.getProtocol()) || expectedUpstreamIp.equals("0.0.0.0")) {
+            throw new IOException("HTTPS probe URL and expected upstream IPv4 address are required");
         }
         String host = url.getHost();
         int port = url.getPort() > 0 ? url.getPort() : 443;
         String requestPath = url.getFile().isEmpty() ? "/" : url.getFile();
 
-        // Connect to the CI-resolved numeric IP directly. Layer TLS using the
-        // hostname so SNI and the normal certificate hostname verifier remain active.
-        Log.i(TAG, "BHARATSIM_NETWORK_PROBE request_started endpoint_host=" + host + " endpoint_ip=" + pinnedIp);
-        // Bind the socket to the Network whose transport is reported below. A generic
-        // Socket() can bypass Android's per-network policy-routing table in emulators.
-        try (Socket raw = activeNetwork.getSocketFactory().createSocket()) {
-            raw.connect(new InetSocketAddress(InetAddress.getByName(pinnedIp), port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
+        // Tunnel HTTPS through the allowlisted CI proxy. The proxy pins the upstream
+        // address; TLS still terminates in this Android app with normal hostname checks.
+        // Bind the proxy socket to the active Android Network so the reported transport
+        // and the actual route to the proxy are the same.
+        Log.i(TAG, "BHARATSIM_NETWORK_PROBE request_started endpoint_host=" + host
+                + " expected_upstream_ip=" + expectedUpstreamIp
+                + " proxy_host=" + BuildConfig.PROBE_PROXY_HOST + " proxy_port=" + BuildConfig.PROBE_PROXY_PORT);
+        Proxy httpProxy = new Proxy(
+                Proxy.Type.HTTP,
+                new InetSocketAddress(BuildConfig.PROBE_PROXY_HOST, BuildConfig.PROBE_PROXY_PORT)
+        );
+        try (Socket raw = new Socket(httpProxy)) {
+            activeNetwork.bindSocket(raw);
+            raw.connect(new InetSocketAddress(host, port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
             try (SSLSocket tls = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault())
                     .createSocket(raw, host, port, true)) {
                 // A 64 KB fixture transfer is measured under the selected emulator profile with a bounded overall deadline.
