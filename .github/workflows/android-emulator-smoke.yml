@@ -109,11 +109,32 @@ jobs:
           # Fail early if the public test endpoint is unavailable from the CI host.
           curl --fail --silent --show-error --location --connect-timeout 5 --max-time 15 --range 0-0 --output /dev/null https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
           echo "ip=$ip" >> "$GITHUB_OUTPUT"
+      - name: Start allowlisted HTTPS shaping proxy
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP"
+          python3 scripts/ci/https_shaping_proxy.py \
+            --proxy-host 0.0.0.0 --proxy-port 8888 \
+            --control-host 127.0.0.1 --control-port 8889 \
+            --target-ip raw.githubusercontent.com=${{ steps.probe-address.outputs.ip }} \
+            > "$RUNNER_TEMP/bharatsim-https-proxy.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/bharatsim-https-proxy.pid"
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8889/health >/dev/null; then
+              echo "Allowlisted HTTPS shaping proxy is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/bharatsim-https-proxy.log"
+          exit 1
       - name: Build known-good test APK
         working-directory: smoke-android
         env:
           BHARATSIM_PROBE_URL: https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
           BHARATSIM_PROBE_IP: ${{ steps.probe-address.outputs.ip }}
+          BHARATSIM_PROXY_HOST: 10.0.2.2
+          BHARATSIM_PROXY_PORT: "8888"
         run: gradle --no-daemon assembleDebug
       - name: Add Android build-tools to PATH
         shell: bash
@@ -133,15 +154,25 @@ jobs:
         env:
           BHARATSIM_PROBE_URL: https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/${{ github.event.pull_request.head.sha || github.sha }}/smoke-android/probe-256k.bin
           BHARATSIM_PROBE_IP: ${{ steps.probe-address.outputs.ip }}
+          BHARATSIM_PROXY_HOST: 10.0.2.2
+          BHARATSIM_PROXY_PORT: "8888"
         with:
           api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          # The fixture pins the resolved endpoint IP while validating TLS against the URL hostname; it records the active emulator transport.
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -feature -WiFiPacketStream -netdelay none -netspeed full
+          # The fixture binds to the active Android Network and uses an allowlisted host CONNECT proxy for measurable delay/rate shaping.
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -netdelay none -netspeed full
           script: bash scripts/ci/android-emulator-e2e.sh
+      - name: Preserve host proxy logs
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          if [ -f "$RUNNER_TEMP/bharatsim-https-proxy.log" ]; then
+            cp "$RUNNER_TEMP/bharatsim-https-proxy.log" artifacts/https-shaping-proxy.log
+          fi
       - name: Generate evidence artifact manifest
         if: always()
         env:
