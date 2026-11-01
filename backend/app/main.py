@@ -28,7 +28,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 APP_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.getenv("BHARATSIM_DATA_DIR", str(APP_DIR.parent / "data")))
+
+
+def default_data_dir() -> Path:
+    # Vercel's deployment filesystem is read-only; /tmp is the writable scratch area.
+    if os.getenv("VERCEL") == "1" or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return Path("/tmp/bharatsim")
+    return APP_DIR.parent / "data"
+
+
+DATA_DIR = Path(os.getenv("BHARATSIM_DATA_DIR", str(default_data_dir())))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "bharatsim.sqlite3"
 DATABASE_URL = os.getenv("BHARATSIM_DATABASE_URL", "").strip()
