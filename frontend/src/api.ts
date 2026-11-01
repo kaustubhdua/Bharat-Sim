@@ -61,6 +61,7 @@ export type Analysis = {
     high: number;
     medium: number;
     clean: boolean;
+    occurrence_count?: number;
   };
   bharat_score: {
     value: number;
