@@ -48,9 +48,9 @@ This document is the release checklist for turning BharatSim from a credible loc
 ## P0 — Honest constraint support
 
 - [x] Complete repeatable latency-only and bandwidth-only traffic-path experiments on the CI emulator's active Wi-Fi transport using the allowlisted CONNECT proxy. Run 41327852971 verified three samples per profile, pinned upstream IP, 64,000-byte responses, 150 ms injected RTT, 384 kbps bandwidth shaping and reset-to-baseline readback. This is fixture-only evidence, not proof for arbitrary uploaded APKs.
-- [ ] Implement and verify packet loss, outage/recovery and any advertised jitter controls; until then, mark them unsupported in both API capabilities and UI.
-- [ ] Implement resource pressure controls (CPU/RAM/storage/battery) with observed state and cleanup, or keep them clearly unsupported. Do not infer low-storage or low-memory behavior from a persona label alone.
-- [ ] Validate the declared profile on at least one physical low-cost Android device before claiming physical-device fidelity. Keep emulator and physical-device evidence separate.
+- [x] Packet loss and outage/recovery are explicitly marked unsupported in the API capability contract and dashboard. No jitter control is advertised; do not imply that these conditions are simulated.
+- [x] Resource support is explicit in the API and dashboard: battery saver and bounded storage pressure are supported; upload bandwidth is control-plane-verifiable only; RAM is report-only; CPU pressure is unsupported. Do not infer low-storage or low-memory behavior from a persona label alone.
+- [x] Physical-device fidelity is explicitly not claimed; the README and capability contract limit current evidence to disposable Android emulators. A physical low-cost device validation is still required before making any physical-device fidelity claim.
 - [ ] Add app-specific journey authoring with selectors, assertions, waits, screenshots, error-state checks and deterministic teardown. Document unsupported apps and Appium/UiAutomator2 limitations.
 
 **Acceptance evidence:** profile-by-profile tests and reports with requested-versus-observed values; all claimed controls have automated regression tests; reset is verified in a cleanup path.
