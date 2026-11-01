@@ -137,10 +137,14 @@ jobs:
       - name: Build frontend container
         run: docker build -f frontend/Dockerfile -t bharatsim-web:ci .
       - name: Validate Compose configuration
-        run: docker compose config --quiet
+        run: |
+          set -euo pipefail
+          export BHARATSIM_LOCAL_POSTGRES_PASSWORD="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+          docker compose config --quiet
       - name: Smoke-test hardened Compose stack
         run: |
           set -euo pipefail
+          export BHARATSIM_LOCAL_POSTGRES_PASSWORD="$(python -c 'import secrets; print(secrets.token_hex(32))')"
           trap 'docker compose down -v' EXIT
           docker compose up --build -d
           for attempt in $(seq 1 60); do
