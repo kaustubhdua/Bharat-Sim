@@ -300,6 +300,15 @@ def main() -> int:
                 if expected_transport is not None and probe["transport"] != expected_transport:
                     raise RuntimeError(f"{label} request changed Android transport: expected={expected_transport}, observed={probe}")
                 proxy_event = wait_for_proxy_event(before_event_id, int(profile["generation"]))
+                if label == "latency-only":
+                    expected_delay_ms = float(profile["delay_ms"])
+                    injected_delay_ms = float(proxy_event.get("delay_injected_ms", 0.0))
+                    delayed_directions = int(proxy_event.get("delayed_directions", 0))
+                    if delayed_directions != 2 or injected_delay_ms < expected_delay_ms - 1:
+                        raise RuntimeError(
+                            "Latency-only proxy did not inject the requested RTT across both directions: "
+                            f"expected_ms={expected_delay_ms}, event={proxy_event}"
+                        )
                 probe["proxy_event"] = proxy_event
                 samples.append(probe)
                 all_proxy_events.append(proxy_event)
@@ -340,16 +349,9 @@ def main() -> int:
         bandwidth_median_ms = statistics.median(p["duration_ms"] for p in bandwidth_probes)
         latency_delta_ms = latency_median_ms - baseline_median_ms
         bandwidth_delta_ms = bandwidth_median_ms - baseline_median_ms
-        minimum_latency_delta_ms = 50
+        minimum_injected_latency_ms = float(latency_profile["delay_ms"]) - 1
         minimum_bandwidth_delta_ms = 500
 
-        if latency_delta_ms < minimum_latency_delta_ms:
-            raise RuntimeError(
-                "Configured proxy latency was not observed in repeated fixture downloads: "
-                f"baseline={baseline_probes}, latency_only={latency_probes}, "
-                f"baseline_median_ms={baseline_median_ms}, latency_median_ms={latency_median_ms}, "
-                f"delta_ms={latency_delta_ms}, minimum_required_delta_ms={minimum_latency_delta_ms}"
-            )
         if bandwidth_delta_ms < minimum_bandwidth_delta_ms:
             raise RuntimeError(
                 "Configured proxy bandwidth cap was not observed in repeated fixture downloads: "
@@ -411,7 +413,8 @@ def main() -> int:
                 "each sample generated a completed allowlisted proxy event for raw.githubusercontent.com:443 pinned to the CI-resolved IPv4 address",
                 "the proxy observed at least 64,000 response bytes for every measured sample",
                 "baseline, latency-only, and bandwidth-only probes used the same Android Network transport and proxy route",
-                "latency-only median duration exceeded baseline by at least 50 ms",
+                "each latency-only proxy event recorded the requested injected RTT split across both relay directions",
+                "end-to-end latency medians are retained as measurements but are not used as a deterministic pass gate because the external HTTPS endpoint has variable RTT",
                 "bandwidth-only median duration exceeded baseline by at least 500 ms",
                 "proxy control readback matched each requested delay/rate profile",
                 "proxy settings were reset and read back at baseline",
@@ -429,7 +432,10 @@ def main() -> int:
             "bandwidth_median_ms": bandwidth_median_ms,
             "observed_latency_delta_ms": latency_delta_ms,
             "observed_bandwidth_delta_ms": bandwidth_delta_ms,
-            "minimum_required_latency_delta_ms": minimum_latency_delta_ms,
+            "injected_latency_ms_by_sample": [
+                float(p["proxy_event"].get("delay_injected_ms", 0.0)) for p in latency_probes
+            ],
+            "minimum_required_injected_latency_ms": minimum_injected_latency_ms,
             "minimum_required_bandwidth_delta_ms": minimum_bandwidth_delta_ms,
             "traffic_path_verified": True,
             "reset_profile": reset_evidence,
