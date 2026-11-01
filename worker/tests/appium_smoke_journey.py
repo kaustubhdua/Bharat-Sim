@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 BASE = "http://127.0.0.1:4723"
 ADB_SERIAL = "emulator-5554"
-BANDWIDTH_PROFILE = "1920:1920"
+BANDWIDTH_PROFILE = "umts"
 PROBE_BYTES = 256_000
 ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
 PROBE_RE = re.compile(r"HTTP (200|206) · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER) · probe (\d+) · bytes (\d+) · attempts (\d+)")
@@ -64,7 +64,7 @@ def prepare_supported_transport() -> None:
     """Establish a real route that Android Emulator console shaping supports.
 
     Android may install routes in per-network policy tables. Inspect all IPv4
-    tables before failing the preflight; the controlled HTTP fixture transfer remains the
+    tables before failing the preflight; the actual HTTPS probe remains the
     final data-plane check. Wi-Fi is excluded because emulator-console shaping
     does not cover modern Wi-Fi traffic. A single radio re-registration is
     attempted when a cold-booted emulator reports no active cellular route.
@@ -367,8 +367,8 @@ def main() -> int:
         baseline_probes, last_sequence = take_samples("baseline", last_sequence)
         evidence["baseline_probes"] = baseline_probes
 
-        # Test bandwidth immediately after baseline with a 1.92 Mbps custom uplink/downlink cap.
-        # The 1.92 Mbps cap makes a 256 KB transfer take about 1.1 seconds, leaving enough margin for the bounded probe deadline.
+        # Test bandwidth immediately after baseline with the runtime-console UMTS preset.
+        # Its 1.92 Mbps download cap makes a 256 KB transfer take about 1.1 seconds.
         phase = "configure_bandwidth_profile"
         bandwidth_profile = set_network_profile(None, BANDWIDTH_PROFILE)
         evidence["bandwidth_profile"] = bandwidth_profile
@@ -445,7 +445,7 @@ def main() -> int:
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
             "probe_endpoint": os.getenv("BHARATSIM_PROBE_URL", "not-configured"),
-            "probe_endpoint_scope": f"Local HTTP fixture transfer from {expected_host} via the emulator host gateway. The socket is created from the active Android Network, and the complete 256 KB payload traverses the Android emulator virtual network under the selected console profile. This verifies the fixture path only, not arbitrary uploaded-app traffic.",
+            "probe_endpoint_scope": f"Public HTTPS transfer from {expected_host}; the fixture pins the CI-resolved IP while retaining the URL hostname for TLS SNI and certificate verification. The transfer traverses the actual Android emulator Ethernet/cellular route, identified by Android NetworkCapabilities. This verifies the fixture path only, not arbitrary uploaded-app traffic.",
             "probe_payload_bytes": PROBE_BYTES,
             "probe_endpoint_ip": expected_ip,
             "observed_transport": expected_transport,
@@ -453,7 +453,7 @@ def main() -> int:
             "assertions": [
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe downloaded exactly 256,000 bytes from the runner-host HTTP fixture through the Android Emulator network stack",
+                "each probe downloaded exactly 256,000 bytes from the controlled raw.githubusercontent.com HTTPS fixture asset through the Android Emulator network stack",
                 "per-request retry counts are captured in probe evidence",
                 "baseline, latency-only, and bandwidth-only probes used the same observed Ethernet/cellular transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
