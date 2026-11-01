@@ -8,6 +8,10 @@ def test_postgres_connection_disables_prepared_statements_for_transaction_pooler
     captured = {}
 
     class FakeConnection:
+        def execute(self, query, parameters=()):
+            captured.setdefault("executed_sql", []).append(query)
+            return self
+
         def commit(self):
             pass
 
@@ -37,4 +41,5 @@ def test_postgres_connection_disables_prepared_statements_for_transaction_pooler
 
     assert captured["prepare_threshold"] is None
     assert captured["row_factory"] is fake_rows.dict_row
-    assert captured["options"] == "-c search_path=bharatsim,public"
+    assert "options" not in captured
+    assert captured["executed_sql"] == ["SET LOCAL search_path TO bharatsim, public"]
