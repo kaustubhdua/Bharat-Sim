@@ -102,6 +102,7 @@ def test_development_config_remains_available_without_shared_key():
 def test_readiness_reports_supabase_auth_not_optional_shared_key(monkeypatch, tmp_path):
     monkeypatch.setattr(main_module, "DB_PATH", tmp_path / "readiness.sqlite3")
     monkeypatch.setattr(main_module, "AUTH_REQUIRED", True)
+    monkeypatch.setattr(main_module, "SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("BHARATSIM_REQUIRE_API_KEY", "false")
     monkeypatch.delenv("BHARATSIM_WORKER_TOKEN", raising=False)
 
