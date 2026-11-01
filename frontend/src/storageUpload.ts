@@ -114,7 +114,7 @@ async function createTusUpload(file: File, sha256: string, ticket: SignedApkUplo
   return uploadUrl;
 }
 
-async function getUploadOffset(uploadUrl: string, token: string): Promise<number> {
+async function getUploadOffset(uploadUrl: string): Promise<number> {
   const response = await fetch(uploadUrl, {
     method: "HEAD",
     headers: {
@@ -143,7 +143,7 @@ export async function uploadApkResumable(
 
   if (uploadUrl) {
     try {
-      offset = await getUploadOffset(uploadUrl, ticket.upload_token);
+      offset = await getUploadOffset(uploadUrl);
     } catch {
       uploadUrl = undefined;
     }
