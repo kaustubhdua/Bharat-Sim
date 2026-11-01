@@ -107,14 +107,9 @@ def validate_runtime_security_config(environment: dict[str, str] | None = None) 
     mode = values.get("BHARATSIM_ENV", "development").strip().lower()
     if mode not in {"production", "prod"}:
         return
-    if values.get("BHARATSIM_REQUIRE_API_KEY", "false").strip().lower() != "true":
-        raise RuntimeError(
-            "Production startup blocked: set BHARATSIM_REQUIRE_API_KEY=true and configure a strong server-side key"
-        )
-    if len(values.get("BHARATSIM_API_KEY", "")) < 32:
-        raise RuntimeError(
-            "Production startup blocked: BHARATSIM_API_KEY must contain at least 32 characters"
-        )
+    # Verified Supabase user JWTs are the public-user authentication boundary.
+    # The optional shared API key is intended for private single-tenant deployments
+    # and must never be exposed to browser code.
     if values.get("BHARATSIM_AUTH_REQUIRED", "false").strip().lower() != "true":
         raise RuntimeError("Production startup blocked: enable BHARATSIM_AUTH_REQUIRED=true")
     if not values.get("SUPABASE_URL", "").strip().startswith("https://"):
