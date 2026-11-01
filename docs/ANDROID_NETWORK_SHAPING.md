@@ -1,30 +1,39 @@
-# Android Emulator network shaping: verified path only
+# Android Emulator network shaping: fixture proxy evidence
 
-BharatSim does not treat a requested emulator profile or a successful console command as proof that application traffic was shaped. A network experiment is valid only when the Android device reports an active supported transport, the emulator console reports the requested control values, the fixture request traverses the Android Network selected for the probe, measured latency/bandwidth changes, and the emulator is reset and read back afterward.
+BharatSim does not treat a requested profile or a successful control command as proof that application traffic was shaped. The CI fixture experiment routes its HTTPS request through a local, allowlisted HTTP CONNECT proxy running on the GitHub Actions host. The proxy does not terminate TLS or inspect payloads. It pins the upstream IP, records tunnel byte counts and timings, and applies deterministic delay/rate limits.
 
-## Emulator transport choice
+## Why CI uses a proxy
 
-The Android Emulator command-line documentation states that network-speed and network-delay emulation applies to **Ethernet and Cellular**. The emulator console's network-status, network-speed, and network-delay commands are likewise documented for Ethernet and Cellular. Wi-Fi is not accepted as a shaped transport by this test.
-
-Android Emulator 36.5 and later route Wi-Fi traffic through the newer netsim networking stack. The emulator networking documentation describes the -feature -WiFiPacketStream flag as the compatibility switch to return to the previous networking model. The CI workflow uses that flag, disables Wi-Fi after boot, and requires an active Cellular or Ethernet network before starting the data-plane measurement.
+Android Emulator's documented console network-speed and network-delay controls apply to Ethernet and Cellular. Wi-Fi is not accepted as emulator-console shaping evidence. The CI emulator image repeatedly exposed no active Cellular or Ethernet network after Wi-Fi was disabled, so the Appium data-plane experiment failed before measuring traffic. The workflow now keeps the emulator's real network active and routes the source-built fixture's HTTPS socket through an explicit CONNECT proxy bound to the active Android Network.
 
 References:
-- [Android Emulator command-line options](https://developer.android.com/studio/run/emulator-commandline) — network-speed and network-delay emulation applies to Ethernet and Cellular.
+- [Android Emulator command-line options](https://developer.android.com/studio/run/emulator-commandline) — network-speed and network-delay controls for Ethernet and Cellular.
 - [Android Emulator console commands](https://developer.android.com/studio/run/emulator-console) — network status and shaping controls.
-- [Interconnecting Emulator instances](https://developer.android.com/studio/run/emulator-networking-interconnect) — legacy network model compatibility flag -feature -WiFiPacketStream.
-- [Advanced Emulator networking](https://developer.android.com/studio/run/emulator-networking-advanced) — modern netsim networking and Wi-Fi behavior.
+- [Advanced Emulator networking](https://developer.android.com/studio/run/emulator-networking-advanced) — modern Wi-Fi/netsim behavior.
+- [Interconnecting Emulator instances](https://developer.android.com/studio/run/emulator-networking-interconnect) — compatibility networking model options.
+
+## Proxy design
+
+- The host proxy listens on TCP 8888; its control API listens on host loopback TCP 8889.
+- Only raw.githubusercontent.com:443 is allowlisted. The proxy connects to the CI-resolved IPv4 address, while the Android app retains the HTTPS hostname for SNI and normal certificate hostname verification.
+- The Android fixture creates an HTTP CONNECT socket and binds it to the active Android Network. TLS terminates in the fixture app, not in the proxy.
+- The proxy applies a 384 kbps per-direction rate cap for the bandwidth-only profile.
+- The latency-only profile inserts 75 ms before the first forwarded bytes in each direction (a measured initial 150 ms round-trip setup delay). It is a bounded fixture experiment, not a full packet-level mobile-network emulator.
+- Every sample must create a completed proxy event with the expected hostname, upstream IP, configuration generation and at least 64,000 response bytes.
+- The Appium journey measures repeated baseline, bandwidth-only and latency-only samples on the same Android transport, then resets the proxy to baseline and verifies the control readback.
+- The proxy records only connection metadata, bytes and durations. It does not log URLs, headers, request bodies or TLS plaintext.
 
 ## Current fixture experiment
 
-- Fixture asset: 256,000 bytes hosted on raw.githubusercontent.com; each sample requests a bounded 64,000-byte range.
-- Transport: Cellular or Ethernet only; the CI journey fails closed if neither is active.
-- Profiles: baseline, UMTS bandwidth (384 kbps), and 150 ms latency.
+- Fixture asset: 256,000 bytes hosted in this repository; each sample requests a bounded 64,000-byte HTTPS range.
+- Transport: the active Android Network may be Wi-Fi, Cellular or Ethernet; the fixture explicitly binds its proxy socket to that Network.
+- Bandwidth profile: 384 kbps in both tunnel directions.
+- Latency profile: 150 ms initial round-trip setup delay (75 ms each direction).
 - Per-attempt timeout: 20 seconds; overall Android probe deadline: 45 seconds; Appium wait: 60 seconds.
-- Data-plane evidence: multiple real HTTPS requests, exact byte counts, per-sample durations, Android Network transport, and console readback.
-- Reset: restore full speed/no delay and verify console readback.
+- Data-plane evidence: Android probe logcat, proxy event ID/generation, exact upstream IP, response byte count, per-sample duration and reset readback.
 
-The previous run completed the local API → queue → worker → ADB → callback → report path and passed APK install/launch/logcat. Its Appium network journey failed before measurements because the Android image exposed no active Cellular or Ethernet network after Wi-Fi was disabled. The workflow now switches to the legacy Ethernet/Cellular networking model before disabling Wi-Fi. This change is under CI revalidation; no current data-plane pass is claimed until repeated measurements and reset checks succeed.
+The previous emulator-console experiment passed the local API/worker lifecycle, APK install/launch/logcat, and control-plane checks but failed before Appium measurements because the image had no active Cellular or Ethernet network after Wi-Fi was disabled. The proxy-based experiment is the current candidate and must pass repeated latency/bandwidth assertions and reset verification before it is marked verified. No current data-plane pass is claimed until that run completes.
 
 ## Claim boundaries
 
-A successful fixture experiment proves only that the source-built fixture APK traversed the measured emulator transport. It does not prove that arbitrary customer APK traffic follows the same path. The worker report keeps traffic_path_verified=false unless a separate, repeatable data-plane experiment has established the path. Control-plane readback alone is not enough.
+A successful proxy experiment proves only that the source-built fixture APK routed its HTTPS probe through the allowlisted, shaped CONNECT proxy. It does not prove arbitrary customer APK traffic follows the system proxy or uses the same route. The worker's general report keeps traffic_path_verified=false unless a separate repeatable experiment establishes the uploaded app's traffic path. Proxy control readback alone is not enough.
