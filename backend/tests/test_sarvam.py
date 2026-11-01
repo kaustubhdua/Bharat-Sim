@@ -21,12 +21,21 @@ def test_translation_calls_sarvam_with_server_key_and_supported_language(monkeyp
     monkeypatch.setenv("SARVAM_API_KEY", "test-server-key-123456789")
     captured = {}
 
+    class FakeResponse(io.BytesIO):
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.close()
+
     def fake_urlopen(request, timeout):
         captured["url"] = request.full_url
         captured["headers"] = dict(request.header_items())
         captured["payload"] = json.loads(request.data.decode("utf-8"))
         captured["timeout"] = timeout
-        return io.BytesIO(json.dumps({"translated_text": "Translated report"}).encode("utf-8"))
+        return FakeResponse(json.dumps({"translated_text": "Translated report"}).encode("utf-8"))
 
     monkeypatch.setattr(sarvam, "urlopen", fake_urlopen)
     response = TestClient(main.app).post(
