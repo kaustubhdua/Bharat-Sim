@@ -18,6 +18,7 @@ from typing import Any, Literal
 from urllib.parse import parse_qs, quote, urlsplit
 
 import jwt
+from .sarvam import SarvamProviderError, SarvamRateLimited, translate_report_text
 from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError
 
@@ -235,7 +236,7 @@ async def enforce_api_authentication(request: Request, call_next):
     protected = (
         request.url.path == "/api/v1/runs"
         or request.url.path.startswith("/api/v1/runs/")
-        or request.url.path in {"/api/v1/analyze/logs", "/api/v1/analyses", "/api/v1/workers"}
+        or request.url.path in {"/api/v1/analyze/logs", "/api/v1/analyses", "/api/v1/workers", "/api/v1/translate/report"}
     )
     if AUTH_REQUIRED and protected:
         scheme, _, token = request.headers.get("Authorization", "").partition(" ")
@@ -311,6 +312,10 @@ class LogAnalysisRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1_000_000)
     persona_id: str = "budget-android"
     run_id: str | None = None
+
+class SarvamTranslationRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    target_language_code: Literal["hi-IN", "ta-IN", "mr-IN"]
 
 class WorkerClaimRequest(BaseModel):
     worker_id: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
@@ -1102,6 +1107,23 @@ def list_analyses(request: Request, limit: int = 20):
             rows = conn.execute("SELECT result_json FROM analyses ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
     return {"items": [json.loads(row["result_json"]) for row in rows]}
 
+@app.post("/api/v1/translate/report")
+def translate_report(payload: SarvamTranslationRequest):
+    """Translate a user-requested, condensed report summary via Sarvam AI."""
+    if not os.getenv("SARVAM_API_KEY", "").strip():
+        raise HTTPException(status_code=503, detail="Sarvam translation is not configured on this server.")
+    try:
+        return {
+            "translated_text": translate_report_text(payload.text, payload.target_language_code),
+            "target_language_code": payload.target_language_code,
+            "provider": "sarvam",
+        }
+    except SarvamRateLimited:
+        raise HTTPException(status_code=429, detail="Sarvam is rate limiting translation requests. Please try again later.")
+    except SarvamProviderError:
+        raise HTTPException(status_code=502, detail="Sarvam translation is temporarily unavailable. Your original report is unchanged.")
+
+
 @app.get("/api/v1/capabilities")
 def capabilities():
     worker = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
@@ -1127,11 +1149,11 @@ def capabilities():
             "unsupported": ["packet_loss", "cpu_constraint"],
             "scope": "Worker executes conditions on disposable Android Emulator targets only; active data-plane app traffic is unverified",
         },
-        "sarvam_translation": False,
+        "sarvam_translation": bool(os.getenv("SARVAM_API_KEY", "").strip()),
         "notes": [
             "Worker dispatch is configured only when BHARATSIM_WORKER_TOKEN is set; android_execution remains false here because this API cannot prove a live emulator has executed an APK. Check /api/v1/workers for recent worker heartbeats.",
             "The worker supports Android Emulator console latency and bandwidth controls plus reversible battery-saver and bounded storage-pressure simulation with readback/reset evidence. Full persona shaping remains false because packet loss, CPU throttling, RAM restriction, outage/recovery, and arbitrary-app traffic verification are not supported.",
-            "Sarvam translation is not wired into this application.",
+            "Sarvam translation is available only when SARVAM_API_KEY is configured; only the user-selected condensed report summary is sent.",
             "Worker result payloads are bounded and protected by lease tokens; inline artifact payloads are limited to 250 KB.",
         ],
     }
