@@ -373,10 +373,21 @@ PERSONAS: dict[str, dict[str, Any]] = {
     },
 }
 
+APP_CATEGORIES = {
+    "general": ("network", "retry", "payment", "login"),
+    "ecommerce": ("checkout", "cart", "order", "payment", "inventory", "product", "search"),
+    "fintech": ("payment", "transfer", "upi", "balance", "authentication", "login", "statement"),
+    "social": ("feed", "message", "chat", "upload", "image", "notification", "video"),
+    "education": ("course", "lesson", "video", "quiz", "download", "sync", "assignment"),
+    "delivery": ("location", "map", "tracking", "order", "payment", "address", "route"),
+    "media": ("playback", "stream", "video", "audio", "buffer", "download", "offline"),
+}
+
+
 class PlanRequest(BaseModel):
-    persona_ids: list[str] = Field(default_factory=lambda: ["budget-android", "edge-village"])
-    app_category: str = "general"
-    critical_flows: list[str] = Field(default_factory=lambda: ["cold start", "login", "primary action", "network retry"])
+    persona_ids: list[str] = Field(default_factory=lambda: ["budget-android", "edge-village"], max_length=8)
+    app_category: Literal["general", "ecommerce", "fintech", "social", "education", "delivery", "media"] = "general"
+    critical_flows: list[str] = Field(default_factory=lambda: ["cold start", "login", "primary action", "network retry"], max_length=10)
     max_scenarios: int = Field(default=6, ge=1, le=20)
 
 class LogAnalysisRequest(BaseModel):
@@ -855,7 +866,15 @@ def create_plan(request: PlanRequest):
     unknown = sorted(set(request.persona_ids) - set(PERSONAS))
     if unknown:
         raise HTTPException(status_code=422, detail=f"Unknown persona IDs: {', '.join(unknown)}")
-    flows = request.critical_flows or ["cold start", "login", "primary action", "network retry"]
+    flows = []
+    seen_flows = set()
+    for raw_flow in request.critical_flows:
+        flow = re.sub(r"\\s+", " ", raw_flow).strip()[:80]
+        if flow and flow.casefold() not in seen_flows:
+            flows.append(flow)
+            seen_flows.add(flow.casefold())
+    flows = flows or ["cold start", "login", "primary action", "network retry"]
+    category_keywords = APP_CATEGORIES[request.app_category]
     scenarios = []
     interaction_candidates = 0
     for pid in request.persona_ids:
@@ -906,7 +925,8 @@ def create_plan(request: PlanRequest):
         for flow in flows:
             score = 25
             score += 25 if persona["risk"] == "critical" else 15 if persona["risk"] == "high" else 0
-            score += 15 if any(k in flow.lower() for k in ("network", "retry", "payment", "login")) else 0
+            category_sensitive = any(keyword in flow.casefold() for keyword in category_keywords)
+            score += 15 if category_sensitive else 0
             score += 10 if persona["storage_free_mb"] < 300 else 0
             interaction_bonus = min(25, max((item["risk_bonus"] for item in interactions), default=0))
             score = min(100, score + interaction_bonus)
@@ -915,8 +935,10 @@ def create_plan(request: PlanRequest):
                 "persona_id": pid,
                 "persona_name": persona["name"],
                 "flow": flow,
+                "app_category": request.app_category,
+                "category_flow_sensitive": category_sensitive,
                 "risk_score": min(100, score),
-                "reason": "Deterministic test-ordering heuristic using persona risk, critical-flow sensitivity and pairwise condition interactions; not predicted failure probability.",
+                "reason": f"Deterministic test-ordering heuristic using persona risk, {request.app_category}-specific critical-flow keywords and pairwise condition interactions; not predicted failure probability.",
                 "requested_conditions": conditions,
                 "interaction_hypotheses": interactions,
                 "interaction_count": len(interactions),
@@ -927,13 +949,15 @@ def create_plan(request: PlanRequest):
     selected_interactions = sum(item["interaction_count"] for item in selected)
     return {
         "generated_at": utcnow(),
-        "strategy": "deterministic-risk-and-pairwise-interaction-v2",
+        "strategy": "deterministic-category-aware-risk-and-pairwise-interaction-v3",
+        "app_category": request.app_category,
+        "critical_flows": flows,
         "scenarios": selected,
         "total_candidates": len(scenarios),
         "interaction_hunter": {
             "candidate_pairwise_interactions": interaction_candidates,
             "selected_scenario_interactions": selected_interactions,
-            "method": "Enumerates pairs of authored persona conditions and ranks scenarios by the strongest pairwise risk bonus.",
+            "method": "Enumerates pairs of authored persona conditions and ranks scenarios by persona risk, category-specific critical-flow sensitivity, and the strongest pairwise risk bonus.",
             "warning": "These are test-selection hypotheses. They do not mean conditions were applied or that a failure was observed.",
         },
     }
