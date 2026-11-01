@@ -412,6 +412,8 @@ export type PlanScenario = {
   persona_id: string;
   persona_name: string;
   flow: string;
+  app_category: string;
+  category_flow_sensitive: boolean;
   risk_score: number;
   reason: string;
   requested_conditions: Array<{ id: string; label: string; target: string }>;
@@ -423,6 +425,8 @@ export type PlanScenario = {
 export type PlanResponse = {
   generated_at: string;
   strategy: string;
+  app_category: string;
+  critical_flows: string[];
   scenarios: PlanScenario[];
   total_candidates: number;
   interaction_hunter: {
