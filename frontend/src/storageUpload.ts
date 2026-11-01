@@ -61,7 +61,7 @@ function readPending(sha256: string): PendingUpload | null {
       !Number.isFinite(value.file_last_modified) ||
       !Number.isFinite(value.expires_at) ||
       value.expires_at <= Date.now() ||
-      !isTrustedStorageUrl(value.tus_endpoint, "/storage/v1/upload/resumable/sign") ||
+      !isTrustedStorageUrl(value.tus_endpoint, "/storage/v1/upload/resumable") ||
       (value.upload_url !== undefined && !isTrustedStorageUrl(value.upload_url, "/storage/v1/upload/resumable/"))
     ) {
       sessionStorage.removeItem(storageKey(sha256));
