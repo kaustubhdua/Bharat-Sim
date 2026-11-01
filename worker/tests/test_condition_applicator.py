@@ -122,6 +122,22 @@ MemAvailable:    2097152 kB
         self.assertEqual(reset_res["status"], "verified")
         self.assertTrue(reset_res["file_removed"])
 
+    def test_storage_cleanup_does_not_accept_adb_failure_as_file_absence(self):
+        def offline_runner(args, timeout=15):
+            command = " ".join(args)
+            if "rm -f" in command:
+                return CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+            if "ls" in command:
+                return CompletedProcess(args=args, returncode=1, stdout="", stderr="error: device offline")
+            if "df" in command:
+                return CompletedProcess(args=args, returncode=1, stdout="", stderr="error: device offline")
+            return CompletedProcess(args=args, returncode=1, stdout="", stderr="error: device offline")
+
+        result = reset_storage_pressure("emulator-5554", run_cmd_fn=offline_runner)
+        self.assertEqual(result["status"], "unverified")
+        self.assertFalse(result["file_removed"])
+        self.assertFalse(result["file_removed_verified"])
+
     def test_storage_pressure_already_satisfied(self):
         with unittest.mock.patch(
             "worker.condition_applicator.get_free_storage_mb", return_value=500
