@@ -121,6 +121,8 @@ def validate_runtime_security_config(environment: dict[str, str] | None = None) 
     # and must never be exposed to browser code.
     if values.get("BHARATSIM_AUTH_REQUIRED", "false").strip().lower() != "true":
         raise RuntimeError("Production startup blocked: enable BHARATSIM_AUTH_REQUIRED=true")
+    if values.get("BHARATSIM_REQUIRE_API_KEY", "false").strip().lower() == "true" and len(values.get("BHARATSIM_API_KEY", "")) < 32:
+        raise RuntimeError("Production startup blocked: BHARATSIM_API_KEY must contain at least 32 characters when the shared API-key gate is enabled")
     if not values.get("SUPABASE_URL", "").strip().startswith("https://"):
         raise RuntimeError("Production startup blocked: configure SUPABASE_URL for Supabase Auth and Storage")
     if len(values.get("SUPABASE_SERVICE_ROLE_KEY", "")) < 32:
