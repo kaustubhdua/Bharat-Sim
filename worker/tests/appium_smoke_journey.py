@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 BASE = "http://127.0.0.1:4723"
 ADB_SERIAL = "emulator-5554"
-BANDWIDTH_PROFILE = "1920:1920"
+BANDWIDTH_PROFILE = "edge"
 PROBE_BYTES = 256_000
 ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
 PROBE_RE = re.compile(r"HTTP (200|206) · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER) · probe (\d+) · bytes (\d+) · attempts (\d+)")
@@ -367,8 +367,8 @@ def main() -> int:
         baseline_probes, last_sequence = take_samples("baseline", last_sequence)
         evidence["baseline_probes"] = baseline_probes
 
-        # Test bandwidth immediately after baseline with the custom 1.92 Mbps runtime-console profile.
-        # Its 1.92 Mbps download cap makes a 256 KB transfer take about 1.1 seconds.
+        # Test bandwidth immediately after baseline with the built-in EDGE runtime-console profile.
+        # The current Android Emulator EDGE preset is 473.6 kbps in both directions; a 256 KB transfer should complete well inside the probe deadline.
         phase = "configure_bandwidth_profile"
         bandwidth_profile = set_network_profile(None, BANDWIDTH_PROFILE)
         evidence["bandwidth_profile"] = bandwidth_profile
