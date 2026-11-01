@@ -12,6 +12,7 @@ FastAPI's interactive schema is available at /docs when the backend is running.
 - POST /api/v1/runs — multipart form with persona_id and a required APK file.
 - GET /api/v1/runs — recent run metadata.
 - GET /api/v1/runs/{run_id} — owner-scoped run state and worker-submitted report, if present.
+- GET /api/v1/runs/{run_id}/events — owner-scoped append-only run timeline (creation, upload verification/rejection, worker claim/lease expiry, worker result and linked log analysis).
 - GET /api/v1/runs/{run_id}/report — owner-scoped JSON report export. Includes a SHA-256 digest of the canonical report and an ETag / X-Content-SHA256 digest of the downloaded export; responses are private and non-cacheable.
 - DELETE /api/v1/runs/{run_id} — owner-scoped deletion of a run and associated analysis evidence. Queued/awaiting runs are first marked cancelled so a worker cannot claim them during cleanup. Active leased/running jobs return 409 and must finish before deletion. If APK cleanup fails, the cancelled row is retained so deletion can be retried.
 - GET /api/v1/workers — authenticated worker heartbeat summary for the last 90 seconds. It exposes a busy indicator but never another user's current run ID.
