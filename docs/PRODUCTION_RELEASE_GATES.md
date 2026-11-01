@@ -52,7 +52,7 @@ This document is the release checklist for turning BharatSim from a credible loc
 - [ ] Deploy the API, frontend and isolated worker to a controlled environment; verify HTTPS, auth, persistence after restart, health/readiness, worker heartbeat, upload-to-report flow and deployed commit SHA from the public URL.
 - [ ] Add browser E2E for APK selection/upload, queued → running → report states, worker offline, API errors, narrow mobile widths, keyboard/focus/accessibility and empty/error/loading states.
 - [ ] Test install/build from a clean checkout and document pinned runtime versions, reproducible setup, upgrade/migration and rollback procedures.
-- [ ] Add translation only if it is actually implemented, consent-aware, server-side secret handling is safe, and the product has timeout/fallback tests. Otherwise advertise it as unavailable.
+- [x] Integrate opt-in Sarvam translation for condensed report summaries with server-side credentials, supported-language allowlisting, a 15-second timeout, sanitized provider errors, and mocked tests. A live provider call still requires a valid `SARVAM_API_KEY`; until configured and verified, the capability must remain disabled.
 
 ## Release checklist
 
