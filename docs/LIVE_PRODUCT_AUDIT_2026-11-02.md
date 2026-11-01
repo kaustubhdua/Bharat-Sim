@@ -5,8 +5,8 @@
 ## Repository and automated verification
 
 - Default branch: `main`.
-- Audited main SHA: `80634cc4356b12bd4fcfb2a48ae3ef41318a4da9`.
-- Dashboard design PR #104 is merged. It combines field-first visual clarity inspired by [Nihdhoom](https://github.com/kaustubhdua/nihdhoom) with a structured engineering-console hierarchy inspired by [Jai-hack](https://github.com/kaustubhdua/jai-hack).
+- Audited pre-follow-up main SHA: `80634cc4356b12bd4fcfb2a48ae3ef41318a4da9`. Follow-up product UI PR #105 merged as `fbe294b7fdfcd241d07b7f86e30ea9371c666043`.
+- Dashboard design PR #104 is merged. PR #105 is also merged and replaces the decorative hero with live readiness data and removes built-in synthetic log examples. It combines field-first visual clarity inspired by [Nihdhoom](https://github.com/kaustubhdua/nihdhoom) with a structured engineering-console hierarchy inspired by [Jai-hack](https://github.com/kaustubhdua/jai-hack).
 - Post-merge CI [41343948538](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/41343948538) passed: backend, worker safety, PostgreSQL integration, frontend build, frontend Playwright E2E, and container/Compose smoke.
 - Dependency audit [41343948568](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/41343948568) passed. A passing dependency audit is not a security certification.
 - CI uses a source-built fixture APK and a disposable emulator. This proves the controlled fixture journey, not arbitrary customer APK safety or production worker isolation.
@@ -54,9 +54,9 @@ Latest Supabase advisors returned 30 INFO `rls_enabled_no_policy` notices (7 Bha
 
 ## UI/product quality findings
 
-- The dashboard visual refresh is merged but not yet in the inspected frontend Production deployment.
-- The overview now needs to present live API/worker/capability state rather than decorative device mock metrics.
-- Built-in sample log content has been removed in the follow-up UI branch; log analysis should run only on user-submitted content. Predefined persona profiles are configuration templates, not measured physical-device data, and must remain labeled as profiles/targets.
+- Dashboard visual refresh PR #104 and product-honesty PR #105 are merged, but neither is in the inspected frontend Production deployment.
+- The overview now presents live API/worker/capability state rather than decorative device mock metrics.
+- Built-in sample log content and sample-loading actions have been removed; log analysis now runs only on user-submitted content. Predefined persona profiles are configuration templates, not measured physical-device data, and must remain labeled as profiles/targets.
 - A run planner is not an executed test. A worker smoke run is not proof of app quality. A heuristic log signal is not a confirmed root cause. The UI and report must preserve these distinctions.
 - The product should use precise labels for supported, read-back verified, traffic-path verified, report-only and unsupported controls. No packet-loss, CPU-pressure or physical-device support claims without corresponding evidence.
 
