@@ -1,98 +1,166 @@
 import unittest
-from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from worker.tests import appium_smoke_journey as journey
 
 
-class ProbeContractTests(unittest.TestCase):
-    def test_android_fixture_ci_url_and_harness_share_the_same_bounded_payload(self):
-        root = Path(__file__).resolve().parents[2]
-        java = (root / "smoke-android/app/src/main/java/org/bharatsim/smokeapp/MainActivity.java").read_text()
-        workflow = (root / ".github/workflows/android-emulator-smoke.yml").read_text()
-        gradle = (root / "smoke-android/app/build.gradle").read_text()
-        self.assertEqual(journey.PROBE_BYTES, 64_000)
-        self.assertEqual(journey.BANDWIDTH_PROFILE, "umts")
-        self.assertIn("timeout: int = 60", (root / "worker/tests/appium_smoke_journey.py").read_text())
-        self.assertIn('"appium:newCommandTimeout": 60', (root / "worker/tests/appium_smoke_journey.py").read_text())
-        self.assertEqual(journey.speed_limits_bps("umts"), (384_000, 384_000))
-        self.assertIn("PROBE_BYTES = 64_000", java)
-        self.assertIn("PROBE_TIMEOUT_MS = 45_000", java)
-        self.assertIn("PROBE_ATTEMPT_TIMEOUT_MS = 20_000", java)
-        self.assertEqual(workflow.count("https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/"), 3)
-        self.assertIn("/smoke-android/probe-256k.bin", workflow)
-        self.assertNotIn("speed.cloudflare.com", workflow)
-        self.assertIn("raw.githubusercontent.com", gradle)
-        self.assertIn("probe-256k.bin", gradle)
+class ProbeParsingTests(unittest.TestCase):
+    def test_parses_successful_probe_status(self):
+        parsed = journey.parse_probe_text(
+            "HTTP 206 · 347 ms · CELLULAR · probe 3 · bytes 64000 · attempts 2"
+        )
+        self.assertEqual(parsed, {
+            "http_status": 206,
+            "duration_ms": 347,
+            "transport": "CELLULAR",
+            "sequence": 3,
+            "bytes_read": 64000,
+            "attempts": 2,
+        })
+
+    def test_rejects_incomplete_or_failed_probe_status(self):
+        self.assertIsNone(journey.parse_probe_text("Network probe running"))
+        self.assertIsNone(journey.parse_probe_text("Network probe failed: SocketTimeoutException"))
 
 
-class SupportedRoutePreflightTests(unittest.TestCase):
-    def _fake_adb(self, connectivity):
-        def run(*args, **kwargs):
-            command = tuple(args)
-            if command == ("shell", "ip", "route", "show", "table", "all"):
-                return "default via 10.0.2.2 dev rmnet_data0"
-            if command == ("shell", "ip", "-6", "route", "show", "table", "all"):
-                return ""
-            if command == ("shell", "ip", "rule", "show"):
-                return "0: from all lookup local"
-            if command == ("shell", "dumpsys", "connectivity"):
-                return connectivity
-            if command == ("emu", "gsm", "status"):
-                return "gsm voice state: home\ngsm data state: home"
-            return ""
-        return run
-
-    def test_preflight_accepts_active_cellular_network(self):
-        with patch.object(
-            journey, "adb",
-            side_effect=self._fake_adb("Cellular active networks: {100}"),
-        ) as adb_call, patch.object(journey.time, "sleep"):
-            journey.prepare_supported_transport()
-        self.assertTrue(any(call.args[:3] == ("shell", "dumpsys", "connectivity") for call in adb_call.call_args_list))
-        self.assertTrue(any(call.args[:3] == ("shell", "cmd", "connectivity") for call in adb_call.call_args_list))
-        self.assertTrue(any(call.args[:4] == ("shell", "svc", "data", "enable") for call in adb_call.call_args_list))
-
-    def test_preflight_accepts_active_ethernet_network(self):
-        with patch.object(
-            journey, "adb",
-            side_effect=self._fake_adb("Ethernet active networks: {101}"),
-        ):
-            journey.prepare_supported_transport()
-
-    def test_preflight_rejects_wifi_only(self):
-        self.assertFalse(journey.has_supported_active_transport(
-            "WiFi active networks: {100}\nCellular active networks: {}\nEthernet active networks: {}"
-        ))
-
-    def test_preflight_retries_radio_registration_after_transient_no_route(self):
+class ProxyPathTests(unittest.TestCase):
+    def test_preflight_enables_network_and_requires_healthy_proxy(self):
         with (
-            patch.object(journey, "adb", side_effect=self._fake_adb("")) as adb_call,
-            patch.object(journey, "has_supported_active_transport", side_effect=[False, True]),
-            patch.object(journey.time, "sleep"),
-            patch.object(journey.time, "monotonic", side_effect=[0, 0, 46, 46, 46]),
+            patch.object(journey, "adb", return_value="Cellular active networks: {100}") as adb,
+            patch.object(journey, "proxy_request", return_value={"status": "ok"}) as proxy,
         ):
-            journey.prepare_supported_transport()
+            evidence = journey.prepare_proxy_path()
 
-        commands = [call.args for call in adb_call.call_args_list]
-        self.assertTrue(any(args[:4] == ("shell", "svc", "data", "disable") for args in commands))
-        self.assertGreaterEqual(sum(args[:4] == ("shell", "svc", "data", "enable") for args in commands), 2)
+        self.assertEqual(evidence["status"], "ready")
+        self.assertTrue(evidence["active_transport_network_present"])
+        self.assertEqual(evidence["proxy_health"], {"status": "ok"})
+        adb.assert_has_calls([
+            call("shell", "settings", "put", "global", "airplane_mode_on", "0"),
+            call("shell", "cmd", "connectivity", "airplane-mode", "disable"),
+            call("shell", "svc", "wifi", "enable"),
+            call("shell", "svc", "data", "enable"),
+            call("shell", "dumpsys", "connectivity", timeout=8),
+        ])
+        proxy.assert_called_once_with("GET", "/health")
 
-    def test_preflight_fails_with_diagnostics_when_no_supported_network_exists(self):
+    def test_preflight_fails_if_no_android_network_is_active(self):
         with (
-            patch.object(
-                journey, "adb",
-                side_effect=self._fake_adb(
-                    "WiFi active networks: {100}\nCellular active networks: {}\nEthernet active networks: {}"
-                ),
-            ),
+            patch.object(journey, "adb", return_value="WiFi active networks: {}"),
+            patch.object(journey, "proxy_request") as proxy,
+            patch.object(journey.time, "monotonic", side_effect=[0, 61]),
             patch.object(journey.time, "sleep"),
-            patch.object(journey.time, "monotonic", side_effect=[0, 0, 46, 46, 46, 92]),
         ):
-            with self.assertRaisesRegex(RuntimeError, "no active supported cellular/Ethernet network") as error:
-                journey.prepare_supported_transport()
-        self.assertIn("IPv4 routes=", str(error.exception))
-        self.assertIn("connectivity=", str(error.exception))
+            with self.assertRaisesRegex(RuntimeError, "no active network"):
+                journey.prepare_proxy_path()
+        proxy.assert_not_called()
+
+    def test_preflight_rejects_unhealthy_proxy(self):
+        with (
+            patch.object(journey, "adb", return_value="Ethernet active networks: {101}"),
+            patch.object(journey, "proxy_request", return_value={"status": "starting"}),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "not healthy"):
+                journey.prepare_proxy_path()
+
+    def test_profile_readback_must_match_requested_values(self):
+        config = {
+            "generation": 4,
+            "label": "latency-only",
+            "delay_ms": 150,
+            "rate_kbps": 0,
+        }
+        with patch.object(
+            journey, "proxy_request",
+            return_value={"status": "ok", "config": config},
+        ) as request:
+            self.assertEqual(journey.set_proxy_profile("latency-only", 150, 0), config)
+        request.assert_called_once_with("POST", "/config", {
+            "label": "latency-only",
+            "delay_ms": 150,
+            "rate_kbps": 0,
+        })
+
+    def test_profile_readback_mismatch_fails_closed(self):
+        with patch.object(
+            journey, "proxy_request",
+            return_value={"status": "ok", "config": {
+                "generation": 4, "label": "latency-only",
+                "delay_ms": 50, "rate_kbps": 0,
+            }},
+        ):
+            with self.assertRaisesRegex(RuntimeError, "readback mismatch"):
+                journey.set_proxy_profile("latency-only", 150, 0)
+
+    def test_wait_for_proxy_event_requires_allowlisted_host_ip_generation_and_bytes(self):
+        event = {
+            "id": 9,
+            "host": "raw.githubusercontent.com",
+            "port": 443,
+            "generation": 7,
+            "status": "completed",
+            "upstream_ip": "192.0.2.10",
+            "bytes_upstream_to_client": journey.PROBE_BYTES,
+        }
+        with (
+            patch.object(journey, "EXPECTED_HOST", "raw.githubusercontent.com"),
+            patch.object(journey, "EXPECTED_IP", "192.0.2.10"),
+            patch.object(journey, "proxy_metrics", return_value={
+                "last_event_id": 9, "events": [event],
+            }) as metrics,
+        ):
+            result = journey.wait_for_proxy_event(after_id=8, generation=7)
+        self.assertEqual(result, event)
+        metrics.assert_called_once_with(8)
+
+    def test_proxy_event_with_unexpected_upstream_ip_is_rejected(self):
+        event = {
+            "id": 9,
+            "host": "raw.githubusercontent.com",
+            "port": 443,
+            "generation": 7,
+            "status": "completed",
+            "upstream_ip": "198.51.100.20",
+            "bytes_upstream_to_client": journey.PROBE_BYTES,
+        }
+        with (
+            patch.object(journey, "EXPECTED_HOST", "raw.githubusercontent.com"),
+            patch.object(journey, "EXPECTED_IP", "192.0.2.10"),
+            patch.object(journey, "proxy_metrics", return_value={
+                "last_event_id": 9, "events": [event],
+            }),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "unexpected upstream IP"):
+                journey.wait_for_proxy_event(after_id=8, generation=7)
+
+    def test_reset_is_verified_only_after_baseline_readback(self):
+        with patch.object(
+            journey, "proxy_request",
+            side_effect=[
+                {"status": "ok"},
+                {"status": "ok", "config": {
+                    "label": "baseline", "delay_ms": 0, "rate_kbps": 0,
+                }},
+            ],
+        ) as request:
+            result = journey.reset_proxy()
+        self.assertEqual(result["status"], "verified")
+        self.assertEqual(request.call_args_list, [
+            call("POST", "/reset"),
+            call("GET", "/health"),
+        ])
+
+    def test_reset_readback_mismatch_is_unverified(self):
+        with patch.object(
+            journey, "proxy_request",
+            side_effect=[
+                {"status": "ok"},
+                {"status": "ok", "config": {
+                    "label": "latency-only", "delay_ms": 150, "rate_kbps": 0,
+                }},
+            ],
+        ):
+            result = journey.reset_proxy()
+        self.assertEqual(result["status"], "unverified")
 
 
 if __name__ == "__main__":
