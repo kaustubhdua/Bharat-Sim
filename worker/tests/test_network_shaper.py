@@ -52,6 +52,24 @@ class NetemParameterVerificationTests(unittest.TestCase):
         self.assertIsNone(observed["loss_pct"])
         self.assertIsNone(observed["rate_kbit"])
 
+    def test_converts_microseconds_and_jitter_units(self):
+        observed = parse_netem_parameters("qdisc netem 8001: root delay 250ms 5000us loss 0.5% rate 1.5Mbit")
+        self.assertEqual(observed["latency_ms"], 250.0)
+        self.assertEqual(observed["jitter_ms"], 5.0)
+        self.assertEqual(observed["loss_pct"], 0.5)
+        self.assertEqual(observed["rate_kbit"], 1500.0)
+
+    def test_missing_requested_rate_does_not_match(self):
+        observed = parse_netem_parameters("qdisc netem 8001: root delay 180ms 30ms loss 2%")
+        self.assertFalse(parameters_match(observed, {
+            "latency_ms": 180.0, "jitter_ms": 30.0, "loss_pct": 2.0, "rate_kbit": 1200.0,
+        }))
+
+    def test_rejects_overlong_or_invalid_test_veth_names(self):
+        for interface in ("veth-bs-THISISWAYTOOLONG", "veth-bs-run_01", "veth-bs-RUN01"):
+            with self.subTest(interface=interface):
+                self.assertFalse(IFACE_RE.fullmatch(interface))
+
 
 if __name__ == "__main__":
     unittest.main()
