@@ -174,7 +174,7 @@ public final class MainActivity extends Activity {
                 String request = "GET " + requestPath + " HTTP/1.1\r\n"
                         + "Host: " + host + "\r\n"
                         + "User-Agent: BharatSimNetworkProbe/1.0\r\n"
-                        + "Accept: application/octet-stream\r\n"
+                        + "Accept: application/vnd.github.raw+json\r\n"
                         + "Connection: close\r\n"
                         + "Accept-Encoding: identity\r\n"
                         + "\r\n";
