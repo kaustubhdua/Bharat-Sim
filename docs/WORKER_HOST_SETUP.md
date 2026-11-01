@@ -24,7 +24,7 @@ sdkmanager "platform-tools" "emulator" "build-tools;35.0.0" "platforms;android-3
 avdmanager create avd --force --name bharatsim-api35 --package "system-images;android-35;google_apis;x86_64" --device pixel_2
 ~~~~
 
-The worker agent now manages the emulator process itself. Do not enable the old standalone bharatsim-emulator.service alongside recycling; it can race the agent for emulator-5554.
+The worker agent now manages the emulator process itself. If an older host has the standalone bharatsim-emulator.service installed, disable it before enabling the new worker service; the agent must be the sole owner of emulator-5554.
 
 ## Worker environment
 
