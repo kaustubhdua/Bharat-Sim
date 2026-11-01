@@ -65,6 +65,10 @@ class NetemParameterVerificationTests(unittest.TestCase):
             "latency_ms": 180.0, "jitter_ms": 30.0, "loss_pct": 2.0, "rate_kbit": 1200.0,
         }))
 
+    def test_android_bandwidth_smoke_profile_matches_documented_1_92_mbps_cap(self):
+        self.assertEqual(BANDWIDTH_PROFILE, "1920:1920")
+        self.assertEqual(speed_limits_bps(BANDWIDTH_PROFILE), (1_920_000, 1_920_000))
+
     def test_rejects_overlong_or_invalid_test_veth_names(self):
         for interface in ("veth-bs-THISISWAYTOOLONG", "veth-bs-run_01", "veth-bs-RUN01"):
             with self.subTest(interface=interface):
