@@ -77,6 +77,11 @@ class ShapingProxyTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(received, b"bharatsm")
         self.assertGreaterEqual(elapsed, 0.08)
+        await asyncio.sleep(0.05)
+        event = self.proxy.metrics()["events"][-1]
+        self.assertEqual(event["label"], "latency-only")
+        self.assertEqual(event["delay_injected_ms"], 100.0)
+        self.assertEqual(event["delayed_directions"], 2)
 
     async def test_control_endpoint_changes_profile_and_reports_metrics(self):
         reader, writer = await asyncio.open_connection("127.0.0.1", self.control_port)
