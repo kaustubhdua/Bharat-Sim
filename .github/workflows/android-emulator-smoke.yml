@@ -1,4 +1,5 @@
 name: Android emulator smoke evidence
+# Keep the live Android network data-plane experiment attached to the current probe contract.
 on:
   workflow_dispatch:
   push:
