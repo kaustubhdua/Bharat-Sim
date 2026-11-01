@@ -107,10 +107,10 @@ def validate_database_configuration(database_url: str, app_env: str) -> None:
 validate_database_configuration(DATABASE_URL, APP_ENV)
 
 def validate_runtime_security_config(environment: dict[str, str] | None = None) -> None:
-    """Refuse accidental production startup without the documented single-tenant API gate.
+    """Refuse production startup without verified user auth and private server credentials.
 
-    This shared-key gate is a controlled-beta safeguard, not multi-tenant authentication.
-    Production multi-user deployment still requires identity and per-run ownership checks.
+    Supabase JWT verification and owner-scoped queries are the user-data boundary.
+    The optional shared API key is only for private single-tenant gateways.
     """
     values = os.environ if environment is None else environment
     mode = values.get("BHARATSIM_ENV", "development").strip().lower()
