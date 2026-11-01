@@ -867,6 +867,12 @@ def health_live():
 
 @app.get("/health/ready")
 def health_ready():
+    """Report API dependencies separately from worker execution availability.
+
+    In production, a reachable database alone is not enough: verified user
+    authentication and private artifact storage must also be configured.
+    Never expose credential values or infer worker readiness from API health.
+    """
     worker_token_configured = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32
     worker_configured = worker_token_configured and production_worker_execution_enabled()
     worker_online = False
@@ -890,6 +896,16 @@ def health_ready():
     except Exception:
         database_ok = False
         worker_online = False
+
+    production = APP_ENV in {"production", "prod"}
+    auth_configured = AUTH_REQUIRED and SUPABASE_URL.startswith("https://")
+    storage_configured = STORAGE_ENABLED and SUPABASE_URL.startswith("https://")
+    auth_required = production or AUTH_REQUIRED
+    storage_required = production
+    auth_ok = auth_configured if auth_required else True
+    storage_ok = storage_configured if storage_required else True
+    api_ready = database_ok and auth_ok and storage_ok
+
     worker_state = (
         "online" if worker_online
         else "safety_gate_closed" if worker_token_configured and not worker_configured
@@ -897,20 +913,22 @@ def health_ready():
         else "not_configured"
     )
     payload = {
-        # API readiness is deliberately separate from execution readiness:
-        # an available API must never imply that an Android worker is alive.
-        "status": "ready" if database_ok else "not_ready",
-        "api_readiness": "ready" if database_ok else "not_ready",
-        "execution_readiness": "ready" if database_ok and worker_online else "not_ready",
+        # API readiness is independent from Android execution readiness.
+        "status": "ready" if api_ready else "not_ready",
+        "api_readiness": "ready" if api_ready else "not_ready",
+        "execution_readiness": "ready" if api_ready and worker_online else "not_ready",
         "database": "available" if database_ok else "unavailable",
+        "authentication": "configured" if auth_configured else "unavailable",
+        "authentication_required": auth_required,
+        "private_storage": "configured" if storage_configured else "unavailable",
+        "private_storage_required": storage_required,
         "apk_execution_worker": worker_state,
         "worker_online": worker_online,
         "worker_execution_enabled": worker_configured,
         "execution_capability": "external-worker-required",
-        "authentication_required": AUTH_REQUIRED,
         "timestamp": utcnow(),
     }
-    return JSONResponse(status_code=200 if database_ok else 503, content=payload)
+    return JSONResponse(status_code=200 if api_ready else 503, content=payload)
 
 @app.get("/api/v1/personas")
 def list_personas():
