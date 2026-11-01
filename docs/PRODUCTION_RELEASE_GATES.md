@@ -34,7 +34,7 @@ This document is the release checklist for turning BharatSim from a credible loc
 
 **Recent implementation:** the run detail page now exports an owner-scoped JSON report with SHA-256 integrity metadata. This is a download/export capability, not yet private object-storage retention or a CI artifact manifest for every customer run.
 
-- [x] Maintain a real disposable-emulator CI journey: upload APK → validate/hash → queue → lease → install/launch → collect logcat → Appium assertions → authenticated callback → persisted report. Verified by GitHub Actions run 41327852971 using a source-built fixture APK; see the hashed CI evidence artifact. This does not validate arbitrary customer APKs.
+- [x] Maintain a real disposable-emulator CI journey: upload APK → validate/hash → queue → lease → install/launch → collect logcat → Appium assertions → authenticated callback → persisted report. Verified by GitHub Actions run 41328703086 using a source-built fixture APK; see the hashed CI evidence artifact. This does not validate arbitrary customer APKs.
 - [ ] Add negative real-worker journeys for invalid APK/manifest, install failure, launch failure, app crash, ANR/timeout, worker termination, expired lease, duplicate/stale callback and retry exhaustion.
 - [ ] Test persistence across API restart for run state, worker heartbeat state, report JSON, screenshots/logs and artifact metadata. Include crash/restart during an active lease.
 - [ ] Distinguish procedure status from app verdict. A smoke runner completing is not equivalent to an app journey passing. Show each authored assertion as pass/fail/not-run with evidence and timestamps.
@@ -47,7 +47,7 @@ This document is the release checklist for turning BharatSim from a credible loc
 
 ## P0 — Honest constraint support
 
-- [x] Complete repeatable latency-only and bandwidth-only traffic-path experiments on the CI emulator's active Wi-Fi transport using the allowlisted CONNECT proxy. Run 41327852971 verified three samples per profile, pinned upstream IP, 64,000-byte responses, 150 ms injected RTT, 384 kbps bandwidth shaping and reset-to-baseline readback. This is fixture-only evidence, not proof for arbitrary uploaded APKs.
+- [x] Complete repeatable latency-only and bandwidth-only traffic-path experiments on the CI emulator's active Wi-Fi transport using the allowlisted CONNECT proxy. Run 41328703086 verified three samples per profile, pinned upstream IP, 64,000-byte responses, 150.5 ms injected RTT, 384 kbps bandwidth shaping and reset-to-baseline readback. This is fixture-only evidence, not proof for arbitrary uploaded APKs.
 - [x] Packet loss and outage/recovery are explicitly marked unsupported in the API capability contract and dashboard. No jitter control is advertised; do not imply that these conditions are simulated.
 - [x] Resource support is explicit in the API and dashboard: battery saver and bounded storage pressure are supported; upload bandwidth is control-plane-verifiable only; RAM is report-only; CPU pressure is unsupported. Do not infer low-storage or low-memory behavior from a persona label alone.
 - [x] Physical-device fidelity is explicitly not claimed; the README and capability contract limit current evidence to disposable Android emulators. A physical low-cost device validation is still required before making any physical-device fidelity claim.
