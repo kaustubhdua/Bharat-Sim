@@ -24,6 +24,7 @@ class ProbeContractTests(unittest.TestCase):
         self.assertNotIn("--range", workflow)
         self.assertIn("256000 raw bytes", workflow)
         self.assertNotIn("--location", workflow)
+        self.assertIn("expected HTTP 200 and exactly 256000 raw bytes", workflow)
         self.assertNotIn("Range: bytes=0-", java)
         self.assertIn("content_length=", java)
         self.assertIn("transfer_encoding=", java)
