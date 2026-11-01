@@ -21,7 +21,7 @@ class ProbeContractTests(unittest.TestCase):
         self.assertEqual(workflow.count("https://api.github.com/repos/kaustubhdua/Bharat-Sim/contents/"), 3)
         self.assertIn("/smoke-android/probe-256k.bin?ref=", workflow)
         self.assertIn("Accept: application/vnd.github.raw+json", java)
-        self.assertIn("--range 0-255999", workflow)
+        self.assertNotIn("--range", workflow)
         self.assertIn("256000 raw bytes", workflow)
         self.assertNotIn("--location", workflow)
         self.assertNotIn("Range: bytes=0-", java)
