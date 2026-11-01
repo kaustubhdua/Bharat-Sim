@@ -307,3 +307,51 @@ def test_run_report_export_is_owner_scoped_and_integrity_tagged(monkeypatch, tmp
     assert response.headers["x-content-sha256"] == hashlib.sha256(response.content).hexdigest()
     assert response.headers["etag"].strip('"') == hashlib.sha256(response.content).hexdigest()
     assert client.get("/api/v1/runs/report-run/report", headers=user_b).status_code == 404
+
+
+def test_production_missing_database_keeps_liveness_and_fails_closed(monkeypatch, tmp_path):
+    from app import main
+
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setattr(main, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", False)
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "must-not-create.sqlite3")
+
+    live = client.get("/health/live")
+    assert live.status_code == 200
+    assert live.json()["status"] == "alive"
+
+    ready = client.get("/health/ready")
+    assert ready.status_code == 503
+    assert ready.json()["status"] == "not_ready"
+    assert ready.json()["database"] == "unavailable"
+
+    # Read-only discovery endpoints remain available to explain capabilities.
+    assert client.get("/api/v1/capabilities").status_code == 200
+    assert client.get("/api/v1/personas").status_code == 200
+
+    # Customer data endpoints cannot silently fall back to ephemeral SQLite.
+    blocked = client.get("/api/v1/runs")
+    assert blocked.status_code == 503
+    assert "persistence" in blocked.json()["detail"].lower()
+    assert not (tmp_path / "must-not-create.sqlite3").exists()
+
+
+def test_production_requires_private_storage_for_apk_upload(monkeypatch):
+    from app import main
+
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "DATABASE_URL", "postgresql://user:pass@db.example.com:5432/postgres?sslmode=require")
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setattr(main, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", False)
+
+    response = client.post(
+        "/api/v1/runs",
+        headers={"Authorization": "Bearer valid-token"},
+        data={"persona_id": "baseline"},
+    )
+    assert response.status_code == 503
+    assert "storage" in response.json()["detail"].lower()
