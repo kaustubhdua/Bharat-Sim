@@ -140,7 +140,7 @@ jobs:
           profile: pixel_2
           disable-animations: true
           # The fixture pins the resolved endpoint IP while validating TLS against the URL hostname; it records the active emulator transport.
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -feature -Wifi -netdelay none -netspeed full
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -feature -WiFiPacketStream -netdelay none -netspeed full
           script: bash scripts/ci/android-emulator-e2e.sh
       - name: Generate evidence artifact manifest
         if: always()
