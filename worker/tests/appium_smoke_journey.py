@@ -445,7 +445,7 @@ def main() -> int:
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
             "probe_endpoint": os.getenv("BHARATSIM_PROBE_URL", "not-configured"),
-            "probe_endpoint_scope": f"Public HTTPS transfer from the controlled cdn.jsdelivr.net fixture; the test pins the CI-resolved IPv4 address while retaining the URL hostname for TLS SNI and certificate verification. The transfer traverses the actual Android emulator cellular/Ethernet route, identified by Android NetworkCapabilities. This verifies the fixture path only, not arbitrary uploaded-app traffic.",
+            "probe_endpoint_scope": f"Public HTTPS transfer from the GitHub Contents API raw-file fixture; the test pins the CI-resolved IPv4 address while retaining the URL hostname for TLS SNI and certificate verification. The transfer traverses the actual Android emulator cellular/Ethernet route, identified by Android NetworkCapabilities. This verifies the fixture path only, not arbitrary uploaded-app traffic.",
             "probe_payload_bytes": PROBE_BYTES,
             "probe_endpoint_ip": expected_ip,
             "observed_transport": expected_transport,
@@ -453,7 +453,7 @@ def main() -> int:
             "assertions": [
                 "primary action is located by stable accessibility identifier",
                 "tap changes the status text to Primary action completed",
-                "each probe downloaded exactly 256,000 bytes from the controlled cdn.jsdelivr.net HTTPS fixture asset through the Android Emulator network stack",
+                "each probe downloaded exactly 256,000 bytes from the GitHub Contents API raw-file HTTPS fixture asset through the Android Emulator network stack",
                 "per-request retry counts are captured in probe evidence",
                 "baseline, latency-only, and bandwidth-only probes used the same observed Ethernet/cellular transport",
                 "latency-only median duration exceeded baseline by at least 50 ms",
