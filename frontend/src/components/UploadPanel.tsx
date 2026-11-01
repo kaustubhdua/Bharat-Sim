@@ -11,6 +11,7 @@ interface UploadPanelProps {
   workers: Worker[];
   busy: boolean;
   apiStatus: string;
+  directUploadAvailable: boolean;
   onSubmit: (e: FormEvent) => Promise<void>;
 }
 
@@ -25,6 +26,7 @@ export default function UploadPanel({
   workers,
   busy,
   apiStatus,
+  directUploadAvailable,
   onSubmit
 }: UploadPanelProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -121,6 +123,12 @@ export default function UploadPanel({
           <div className="alert error-alert upload-inline-error" role="alert">
             <CircleAlert size={16} />
             <span>API is down or unreachable. Run registration is disabled.</span>
+          </div>
+        )}
+        {import.meta.env.PROD && !directUploadAvailable && (
+          <div className="alert error-alert upload-inline-error" role="status">
+            <CircleAlert size={16} />
+            <span>Private Storage upload is not configured. This deployment accepts APKs up to 4 MB only; larger uploads are blocked before sending.</span>
           </div>
         )}
 
