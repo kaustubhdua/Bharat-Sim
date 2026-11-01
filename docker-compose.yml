@@ -1,11 +1,28 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: bharatsim
+      POSTGRES_USER: service_role
+      POSTGRES_PASSWORD: ${BHARATSIM_LOCAL_POSTGRES_PASSWORD:-local-only-change-me}
+    volumes:
+      - bharatsim-postgres:/var/lib/postgresql/data
+      - ./dev-postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U service_role -d bharatsim"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [bharatsim]
+
   api:
     build:
       context: .
       dockerfile: backend/Dockerfile
     environment:
       BHARATSIM_ENV: ${BHARATSIM_ENV:-development}
-      BHARATSIM_DATABASE_URL: ${BHARATSIM_DATABASE_URL:-}
+      BHARATSIM_DATABASE_URL: ${BHARATSIM_DATABASE_URL:-postgresql://service_role:local-only-change-me@postgres:5432/bharatsim?sslmode=disable}
       BHARATSIM_DATA_DIR: /app/backend/data
       BHARATSIM_MAX_UPLOAD_MB: ${BHARATSIM_MAX_UPLOAD_MB:-150}
       BHARATSIM_REQUIRE_API_KEY: ${BHARATSIM_REQUIRE_API_KEY:-false}
@@ -24,6 +41,9 @@ services:
     pids_limit: 128
     mem_limit: 768m
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3).read()"]
       interval: 30s
@@ -49,6 +69,7 @@ services:
 
 volumes:
   bharatsim-data:
+  bharatsim-postgres:
 
 networks:
   bharatsim:
