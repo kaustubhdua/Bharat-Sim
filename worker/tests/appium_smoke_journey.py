@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure real fixture HTTP transfers before/after Android Emulator network shaping."""
+"""Verify fixture HTTPS traffic through an allowlisted, shaped CONNECT proxy."""
 from __future__ import annotations
 
 import argparse
@@ -7,8 +7,8 @@ import base64
 import json
 import os
 import re
-import subprocess
 import statistics
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -16,11 +16,14 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 BASE = "http://127.0.0.1:4723"
+PROXY_CONTROL = "http://127.0.0.1:8889"
 ADB_SERIAL = "emulator-5554"
-BANDWIDTH_PROFILE = "umts"
 PROBE_BYTES = 64_000
 ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
 PROBE_RE = re.compile(r"HTTP (200|206) · (\d+) ms · (CELLULAR|ETHERNET|WIFI|UNKNOWN|OTHER) · probe (\d+) · bytes (\d+) · attempts (\d+)")
+EXPECTED_URL = os.getenv("BHARATSIM_PROBE_URL", "")
+EXPECTED_HOST = urlsplit(EXPECTED_URL).hostname or ""
+EXPECTED_IP = os.getenv("BHARATSIM_PROBE_IP", "")
 
 
 def request(method: str, path: str, payload: dict | None = None, timeout: int = 30) -> dict:
@@ -41,6 +44,25 @@ def request(method: str, path: str, payload: dict | None = None, timeout: int = 
     return result
 
 
+def proxy_request(method: str, path: str, payload: dict | None = None, timeout: int = 5) -> dict:
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        PROXY_CONTROL + path,
+        data=data,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Proxy control HTTP {exc.code} for {path}: {body}") from exc
+    if not isinstance(result, dict):
+        raise RuntimeError(f"Proxy control returned a non-object for {path}")
+    return result
+
+
 def adb(*args: str, timeout: int = 20) -> str:
     completed = subprocess.run(
         ["adb", "-s", ADB_SERIAL, *args],
@@ -52,169 +74,97 @@ def adb(*args: str, timeout: int = 20) -> str:
     return output
 
 
-def has_supported_active_transport(connectivity: str) -> bool:
-    """Recognize only active cellular/Ethernet networks in Android dumpsys output."""
-    return bool(
-        re.search(r"Cellular active networks:\s*\{[^}]+\}", connectivity, re.I)
-        or re.search(r"Ethernet active networks:\s*\{[^}]+\}", connectivity, re.I)
-    )
+def has_active_network(connectivity: str) -> bool:
+    return bool(re.search(r"(?:WiFi|Cellular|Ethernet) active networks:\s*\{[^}]+\}", connectivity, re.I))
 
 
-def prepare_supported_transport() -> None:
-    """Establish a real route that Android Emulator console shaping supports.
-
-    Android may install routes in per-network policy tables. Inspect all IPv4
-    tables before failing the preflight; the actual HTTPS probe remains the
-    final data-plane check. Wi-Fi is excluded because emulator-console shaping
-    does not cover modern Wi-Fi traffic. A single radio re-registration is
-    attempted when a cold-booted emulator reports no active cellular route.
-    """
-    last_route = ""
-    last_route6 = ""
-    last_rules = ""
+def prepare_proxy_path() -> dict:
+    """Keep a real Android network active and verify the host CONNECT proxy is ready."""
+    adb("shell", "settings", "put", "global", "airplane_mode_on", "0")
+    adb("shell", "cmd", "connectivity", "airplane-mode", "disable")
+    adb("shell", "svc", "wifi", "enable")
+    adb("shell", "svc", "data", "enable")
     last_connectivity = ""
-    last_gsm = ""
-    for attempt in range(2):
-        adb("shell", "settings", "put", "global", "airplane_mode_on", "0")
-        adb("shell", "cmd", "connectivity", "airplane-mode", "disable")
-        adb("shell", "settings", "put", "global", "mobile_data", "1")
-        adb("shell", "svc", "data", "enable")
-        adb("shell", "cmd", "phone", "data", "enable")
-        adb("emu", "gsm", "voice", "home")
-        adb("emu", "gsm", "data", "home")
-        adb("shell", "svc", "wifi", "disable")
-
-        deadline = time.monotonic() + 45
-        while time.monotonic() < deadline:
-            try:
-                last_route = adb("shell", "ip", "route", "show", "table", "all", timeout=5)
-                last_route6 = adb("shell", "ip", "-6", "route", "show", "table", "all", timeout=5)
-                last_rules = adb("shell", "ip", "rule", "show", timeout=5)
-                last_connectivity = adb("shell", "dumpsys", "connectivity", timeout=8)
-                last_gsm = adb("emu", "gsm", "status", timeout=5)
-                # Android's per-network policy routes are not always visible in the
-                # main route table. Require an active supported network here; the
-                # Network-bound HTTPS transfer below is the final route/data-plane proof.
-                if has_supported_active_transport(last_connectivity):
-                    return
-            except Exception as exc:
-                last_gsm = f"preflight command failed: {exc}"
-            time.sleep(1)
-
-        if attempt == 0:
-            # A cold-booted emulator can report GSM data=home before ConnectivityService
-            # has registered a default cellular Network. Re-register the radio once.
-            adb("shell", "svc", "data", "disable")
-            time.sleep(2)
-            adb("shell", "svc", "data", "enable")
-            adb("shell", "cmd", "phone", "data", "enable")
-            adb("emu", "gsm", "data", "home")
-            time.sleep(5)
-
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        last_connectivity = adb("shell", "dumpsys", "connectivity", timeout=8)
+        if has_active_network(last_connectivity):
+            health = proxy_request("GET", "/health")
+            if health.get("status") != "ok":
+                raise RuntimeError(f"HTTPS shaping proxy is not healthy: {health}")
+            return {
+                "status": "ready",
+                "active_transport_network_present": True,
+                "connectivity_tail": last_connectivity[-1800:],
+                "proxy_health": health,
+            }
+        time.sleep(1)
     raise RuntimeError(
-        "Android emulator has no active supported cellular/Ethernet network; "
-        "refusing to call a failed/no-route request a network-shaping measurement. "
-        f"gsm={last_gsm[-1200:]!r}; IPv4 routes={last_route[-2500:]!r}; "
-        f"IPv6 routes={last_route6[-2500:]!r}; rules={last_rules[-2500:]!r}; "
+        "Android emulator has no active network for the CONNECT proxy path; "
         f"connectivity={last_connectivity[-4000:]!r}"
     )
 
-def speed_limits_bps(speed: str) -> tuple[int, int]:
-    """Return expected (upload, download) bits/s for supported emulator speed profiles."""
-    presets = {
-        "full": (0, 0),
-        "umts": (384_000, 384_000),
-        "edge": (473_600, 473_600),
-    }
-    if speed in presets:
-        return presets[speed]
-    parts = speed.split(":")
-    if len(parts) != 2 or not all(part.isdigit() for part in parts):
-        raise ValueError(f"Invalid emulator speed profile: {speed}")
-    return int(parts[0]) * 1000, int(parts[1]) * 1000
+
+def set_proxy_profile(label: str, delay_ms: int, rate_kbps: int) -> dict:
+    result = proxy_request("POST", "/config", {
+        "label": label,
+        "delay_ms": delay_ms,
+        "rate_kbps": rate_kbps,
+    })
+    config = result.get("config")
+    if result.get("status") != "ok" or not isinstance(config, dict):
+        raise RuntimeError(f"Proxy profile configuration failed: {result}")
+    expected = {"label": label, "delay_ms": delay_ms, "rate_kbps": rate_kbps}
+    if any(config.get(key) != value for key, value in expected.items()):
+        raise RuntimeError(f"Proxy profile readback mismatch: expected={expected}, observed={config}")
+    return config
 
 
-def set_network_profile(latency_ms: int | None, speed: str = "full") -> dict:
-    """Change only emulator latency/throughput, then require exact console readback."""
-    latency = "none" if latency_ms is None else str(latency_ms)
-    adb("emu", "network", "delay", latency)
-    adb("emu", "network", "speed", speed)
-    # Let the emulator network simulator settle after applying a runtime profile.
-    # Do not toggle mobile data here: keep the same active transport across samples.
-    time.sleep(5)
-    upload_bps, download_bps = speed_limits_bps(speed)
-    expected = {
-        "latency_ms": 0 if latency_ms is None else latency_ms,
-        "download_bps": download_bps,
-        "upload_bps": upload_bps,
-    }
-    output = adb("emu", "network", "status")
+def proxy_metrics(after: int = 0) -> dict:
+    return proxy_request("GET", f"/metrics?after={after}")
 
-    def read(pattern: str) -> int:
-        match = re.search(pattern, output, re.I)
-        if not match:
-            raise RuntimeError(f"Could not parse emulator network status: {output}")
-        return int(match.group(1))
 
-    observed = {
-        "minimum_latency_ms": read(r"minimum latency:\s*(\d+)\s+ms"),
-        "maximum_latency_ms": read(r"maximum latency:\s*(\d+)\s+ms"),
-        "download_bps": read(r"download speed:\s*(\d+)\s+bits/s"),
-        "upload_bps": read(r"upload speed:\s*(\d+)\s+bits/s"),
-    }
-    expected_latency = 0 if latency_ms is None else latency_ms
-    matched = (
-        observed["minimum_latency_ms"] == expected_latency
-        and observed["maximum_latency_ms"] == expected_latency
-        and observed["download_bps"] == expected["download_bps"]
-        and observed["upload_bps"] == expected["upload_bps"]
+def wait_for_proxy_event(after_id: int, generation: int, timeout: int = 30) -> dict:
+    deadline = time.monotonic() + timeout
+    last_metrics: dict = {}
+    while time.monotonic() < deadline:
+        last_metrics = proxy_metrics(after_id)
+        events = last_metrics.get("events", [])
+        for event in events:
+            if (
+                event.get("host") == EXPECTED_HOST
+                and event.get("port") == 443
+                and event.get("generation") == generation
+                and event.get("status") == "completed"
+            ):
+                if event.get("upstream_ip") != EXPECTED_IP:
+                    raise RuntimeError(
+                        f"Proxy connected to unexpected upstream IP: expected={EXPECTED_IP}, event={event}"
+                    )
+                if int(event.get("bytes_upstream_to_client", 0)) < PROBE_BYTES:
+                    raise RuntimeError(f"Proxy did not observe the complete fixture response: {event}")
+                return event
+        time.sleep(0.25)
+    raise RuntimeError(
+        f"No completed allowlisted proxy event for generation={generation} after event_id={after_id}: "
+        f"{json.dumps(last_metrics, sort_keys=True)[:6000]}"
     )
-    if not matched:
-        raise RuntimeError(f"Network profile readback mismatch: expected={expected}, observed={observed}")
-    return {"requested": expected, "observed": observed, "status": "verified"}
 
 
-def reset_network() -> dict:
-    """Restore defaults and verify the emulator network control plane."""
-    commands = (
-        ("emu", "network", "delay", "none"),
-        ("emu", "network", "speed", "full"),
-        ("shell", "svc", "wifi", "enable"),
-        ("shell", "svc", "data", "enable"),
-    )
-    command_results = []
-    for args in commands:
-        completed = subprocess.run(
-            ["adb", "-s", ADB_SERIAL, *args],
-            capture_output=True, text=True, timeout=20, check=False,
-        )
-        command_results.append({
-            "command": " ".join(args),
-            "return_code": completed.returncode,
-            "output_tail": (completed.stdout + completed.stderr)[-500:],
-        })
+def reset_proxy() -> dict:
     try:
-        output = adb("emu", "network", "status")
-        def read(pattern: str) -> int | None:
-            match = re.search(pattern, output, re.I)
-            return int(match.group(1)) if match else None
-        observed = {
-            "minimum_latency_ms": read(r"minimum latency:\s*(\d+)\s+ms"),
-            "maximum_latency_ms": read(r"maximum latency:\s*(\d+)\s+ms"),
-            "download_bps": read(r"download speed:\s*(\d+)\s+bits/s"),
-            "upload_bps": read(r"upload speed:\s*(\d+)\s+bits/s"),
-        }
+        result = proxy_request("POST", "/reset")
+        health = proxy_request("GET", "/health")
+        config = health.get("config", {})
+        verified = (
+            result.get("status") == "ok"
+            and config.get("label") == "baseline"
+            and config.get("delay_ms") == 0
+            and config.get("rate_kbps") == 0
+        )
+        return {"status": "verified" if verified else "unverified", "observed": config, "response": result}
     except Exception as exc:
-        return {"status": "unverified", "command_results": command_results, "error": str(exc)}
-    verified = (
-        all(item["return_code"] == 0 and "KO:" not in item["output_tail"] for item in command_results)
-        and all(value == 0 for value in observed.values())
-    )
-    return {
-        "status": "verified" if verified else "unverified",
-        "observed": observed,
-        "command_results": command_results,
-    }
+        return {"status": "unverified", "error": str(exc)}
 
 
 def wait_for_server() -> None:
@@ -247,7 +197,6 @@ def find_element(session: str, using: str, value: str, timeout: int = 25) -> str
 
 
 def parse_probe_text(text: str) -> dict[str, object] | None:
-    """Parse a single fixture UI status line without relying on positional group use at call sites."""
     match = PROBE_RE.fullmatch(text)
     if not match:
         return None
@@ -261,9 +210,7 @@ def parse_probe_text(text: str) -> dict[str, object] | None:
     }
 
 
-# Each fixture probe transfers 64 KB. The Android Emulator UMTS profile is checked against this image's console readback.
 def network_probe_log_tail() -> str:
-    """Return real device-side probe diagnostics when a UI wait fails."""
     try:
         return adb(
             "logcat", "-d", "-t", "1000", "-s",
@@ -283,11 +230,13 @@ def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: 
         if probe and int(probe["sequence"]) > after_sequence:
             if int(probe["bytes_read"]) != PROBE_BYTES:
                 raise RuntimeError(f"Fixture downloaded unexpected payload size: {probe['bytes_read']}")
+            if probe["transport"] not in ("CELLULAR", "ETHERNET", "WIFI"):
+                raise RuntimeError(f"Fixture request did not use a supported active Android transport: {probe}")
             return probe
         if "probe failed" in last_text.lower() or "returned http" in last_text.lower():
-            raise RuntimeError(f"Fixture network probe failed: {last_text}\\nDevice probe logcat:\\n{network_probe_log_tail()}")
+            raise RuntimeError(f"Fixture network probe failed: {last_text}\nDevice probe logcat:\n{network_probe_log_tail()}")
         time.sleep(0.5)
-    raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}\\nDevice probe logcat:\\n{network_probe_log_tail()}")
+    raise RuntimeError(f"Fixture network probe did not complete within {timeout}s: {last_text!r}\nDevice probe logcat:\n{network_probe_log_tail()}")
 
 
 def main() -> int:
@@ -296,13 +245,15 @@ def main() -> int:
     args = parser.parse_args()
     args.artifacts.mkdir(parents=True, exist_ok=True)
     session_id = None
-    phase = "configure_baseline_profile"
+    phase = "prepare_proxy_path"
     evidence: dict[str, object] = {}
     try:
-        phase = "prepare_supported_transport"
-        prepare_supported_transport()
-        phase = "configure_baseline_profile"
-        baseline_profile = set_network_profile(None, "full")
+        if not EXPECTED_HOST or not EXPECTED_IP:
+            raise RuntimeError("BHARATSIM_PROBE_URL and BHARATSIM_PROBE_IP must be configured")
+        phase = "prepare_proxy_path"
+        evidence["network_preflight"] = prepare_proxy_path()
+        phase = "configure_baseline_proxy"
+        baseline_profile = set_proxy_profile("baseline", 0, 0)
         evidence["baseline_profile"] = baseline_profile
         wait_for_server()
         created = request("POST", "/session", {
@@ -333,55 +284,55 @@ def main() -> int:
             raise RuntimeError(f"Fixture did not start in the expected Ready state: {status_text!r}")
 
         expected_transport: str | None = None
+        all_proxy_events: list[dict] = []
 
-        def take_samples(label: str, previous_sequence: int) -> tuple[list[dict], int]:
+        def take_samples(label: str, profile: dict, previous_sequence: int) -> tuple[list[dict], int]:
             samples: list[dict] = []
             evidence["samples_" + label] = samples
             last_sequence = previous_sequence
             for _ in range(3):
+                before_event_id = int(proxy_metrics()["last_event_id"])
                 request("POST", base + f"/element/{action_id}/click", {})
                 status = request("GET", base + f"/element/{status_id}/text").get("value")
                 if status != "Primary action completed":
                     raise RuntimeError(f"Primary action state assertion failed during {label}: {status!r}")
                 probe = wait_for_probe(session_id, probe_id, after_sequence=last_sequence)
-                if probe["transport"] not in ("CELLULAR", "ETHERNET"):
-                    raise RuntimeError(f"{label} request did not use a transport supported by emulator-console shaping (CELLULAR/ETHERNET): {probe}")
                 if expected_transport is not None and probe["transport"] != expected_transport:
-                    raise RuntimeError(
-                        f"{label} request changed transport from {expected_transport} to {probe['transport']}: {probe}"
-                    )
+                    raise RuntimeError(f"{label} request changed Android transport: expected={expected_transport}, observed={probe}")
+                proxy_event = wait_for_proxy_event(before_event_id, int(profile["generation"]))
+                probe["proxy_event"] = proxy_event
                 samples.append(probe)
-                last_sequence = probe["sequence"]
+                all_proxy_events.append(proxy_event)
+                last_sequence = int(probe["sequence"])
             return samples, last_sequence
 
         # Exclude one cold-start download from all timing comparisons.
+        before_warmup_event = int(proxy_metrics()["last_event_id"])
         request("POST", base + f"/element/{action_id}/click", {})
         warmup_probe = wait_for_probe(session_id, probe_id, after_sequence=0)
-        if warmup_probe["transport"] not in ("CELLULAR", "ETHERNET"):
-            raise RuntimeError(f"Warm-up request did not use a transport supported by emulator-console shaping (CELLULAR/ETHERNET): {warmup_probe}")
         expected_transport = str(warmup_probe["transport"])
+        warmup_event = wait_for_proxy_event(before_warmup_event, int(baseline_profile["generation"]))
+        warmup_probe["proxy_event"] = warmup_event
+        all_proxy_events.append(warmup_event)
         evidence["observed_transport"] = expected_transport
-        last_sequence = warmup_probe["sequence"]
+        evidence["warmup_probe"] = warmup_probe
 
         phase = "baseline_samples"
-        baseline_probes, last_sequence = take_samples("baseline", last_sequence)
+        baseline_probes, last_sequence = take_samples("baseline", baseline_profile, int(warmup_probe["sequence"]))
         evidence["baseline_probes"] = baseline_probes
 
-        # Test bandwidth immediately after baseline with the runtime-console UMTS preset.
-        # The UMTS preset is 384 kbps; a 64 KB transfer should take roughly 1.3 seconds before latency overhead.
-        phase = "configure_bandwidth_profile"
-        bandwidth_profile = set_network_profile(None, BANDWIDTH_PROFILE)
+        phase = "configure_bandwidth_proxy"
+        bandwidth_profile = set_proxy_profile("bandwidth-only", 0, 384)
         evidence["bandwidth_profile"] = bandwidth_profile
         phase = "bandwidth_samples"
-        bandwidth_probes, last_sequence = take_samples("bandwidth-only", last_sequence)
+        bandwidth_probes, last_sequence = take_samples("bandwidth-only", bandwidth_profile, last_sequence)
         evidence["bandwidth_probes"] = bandwidth_probes
 
-        # Isolate latency from throughput: full bandwidth, fixed 150 ms delay.
-        phase = "configure_latency_profile"
-        latency_profile = set_network_profile(150, "full")
+        phase = "configure_latency_proxy"
+        latency_profile = set_proxy_profile("latency-only", 150, 0)
         evidence["latency_profile"] = latency_profile
         phase = "latency_samples"
-        latency_probes, last_sequence = take_samples("latency-only", last_sequence)
+        latency_probes, last_sequence = take_samples("latency-only", latency_profile, last_sequence)
         evidence["latency_probes"] = latency_probes
 
         baseline_median_ms = statistics.median(p["duration_ms"] for p in baseline_probes)
@@ -394,24 +345,24 @@ def main() -> int:
 
         if latency_delta_ms < minimum_latency_delta_ms:
             raise RuntimeError(
-                "Configured latency was not observed in repeated fixture downloads: "
+                "Configured proxy latency was not observed in repeated fixture downloads: "
                 f"baseline={baseline_probes}, latency_only={latency_probes}, "
                 f"baseline_median_ms={baseline_median_ms}, latency_median_ms={latency_median_ms}, "
                 f"delta_ms={latency_delta_ms}, minimum_required_delta_ms={minimum_latency_delta_ms}"
             )
         if bandwidth_delta_ms < minimum_bandwidth_delta_ms:
             raise RuntimeError(
-                "Configured bandwidth cap was not observed in repeated fixture downloads: "
+                "Configured proxy bandwidth cap was not observed in repeated fixture downloads: "
                 f"baseline={baseline_probes}, bandwidth_only={bandwidth_probes}, "
                 f"baseline_median_ms={baseline_median_ms}, bandwidth_median_ms={bandwidth_median_ms}, "
                 f"delta_ms={bandwidth_delta_ms}, minimum_required_delta_ms={minimum_bandwidth_delta_ms}"
             )
 
-        phase = "verify_network_reset"
-        reset_evidence = reset_network()
+        phase = "verify_proxy_reset"
+        reset_evidence = reset_proxy()
         evidence["reset_profile"] = reset_evidence
         if reset_evidence.get("status") != "verified":
-            raise RuntimeError(f"Could not verify network profile reset: {reset_evidence}")
+            raise RuntimeError(f"Could not verify CONNECT proxy reset: {reset_evidence}")
 
         screenshot = request("GET", base + "/screenshot")
         image_data = screenshot.get("value")
@@ -432,34 +383,38 @@ def main() -> int:
         probe_log_text = "\n".join(probe_lines)
         observed_ips = set(re.findall(r"endpoint_ip=([0-9.]+)", probe_log_text))
         observed_hosts = set(re.findall(r"endpoint_host=([A-Za-z0-9.-]+)", probe_log_text))
-        expected_ip = os.getenv("BHARATSIM_PROBE_IP", "")
-        expected_host = urlsplit(os.getenv("BHARATSIM_PROBE_URL", "")).hostname or ""
-        if not expected_ip or observed_ips != {expected_ip}:
-            raise RuntimeError(f"Probe endpoint IP evidence mismatch: expected={expected_ip!r}, observed={sorted(observed_ips)}")
-        if not expected_host or observed_hosts != {expected_host}:
-            raise RuntimeError(f"Probe endpoint host evidence mismatch: expected={expected_host!r}, observed={sorted(observed_hosts)}")
+        observed_proxies = set(re.findall(r"proxy_host=([0-9.]+) proxy_port=(\d+)", probe_log_text))
+        expected_proxy = (os.getenv("BHARATSIM_PROXY_HOST", "10.0.2.2"), os.getenv("BHARATSIM_PROXY_PORT", "8888"))
+        if not observed_ips or observed_ips != {EXPECTED_IP}:
+            raise RuntimeError(f"Expected upstream IP evidence mismatch: expected={EXPECTED_IP!r}, observed={sorted(observed_ips)}")
+        if not observed_hosts or observed_hosts != {EXPECTED_HOST}:
+            raise RuntimeError(f"Probe endpoint host evidence mismatch: expected={EXPECTED_HOST!r}, observed={sorted(observed_hosts)}")
+        if not observed_proxies or observed_proxies != {expected_proxy}:
+            raise RuntimeError(f"Proxy endpoint evidence mismatch: expected={expected_proxy!r}, observed={sorted(observed_proxies)}")
         probe_logcat_path = args.artifacts / "appium-network-probe.logcat.txt"
         probe_logcat_path.write_text("\n".join(probe_lines) + "\n", encoding="utf-8")
 
         report = {
             "status": "passed",
             "package_name": "org.bharatsim.smokeapp",
-            "probe_endpoint": os.getenv("BHARATSIM_PROBE_URL", "not-configured"),
-            "probe_endpoint_scope": f"Public HTTPS transfer from {expected_host}; the fixture pins the CI-resolved IP while retaining the URL hostname for TLS SNI and certificate verification. The transfer traverses the actual Android emulator Ethernet/cellular route, identified by Android NetworkCapabilities. This verifies the fixture path only, not arbitrary uploaded-app traffic.",
+            "probe_endpoint": EXPECTED_URL,
+            "probe_endpoint_scope": f"Fixture-only HTTPS range request to {EXPECTED_HOST}, tunneled through an allowlisted HTTP CONNECT proxy that pins upstream IP {EXPECTED_IP}. The proxy records byte counts and applies delay/rate shaping without terminating TLS. This proves the fixture path only, not arbitrary uploaded-app traffic.",
             "probe_payload_bytes": PROBE_BYTES,
-            "probe_endpoint_ip": expected_ip,
+            "probe_endpoint_ip": EXPECTED_IP,
+            "proxy_endpoint": f"{expected_proxy[0]}:{expected_proxy[1]}",
+            "proxy_control_endpoint": PROXY_CONTROL,
+            "network_shaping_mode": "allowlisted HTTP CONNECT proxy",
             "observed_transport": expected_transport,
             "probe_logcat": str(probe_logcat_path),
             "assertions": [
-                "primary action is located by stable accessibility identifier",
-                "tap changes the status text to Primary action completed",
-                "each probe downloaded exactly 64,000 bytes from the controlled raw.githubusercontent.com HTTPS fixture asset through the Android Emulator network stack",
-                "per-request retry counts are captured in probe evidence",
-                "baseline, latency-only, and bandwidth-only probes used the same observed Ethernet/cellular transport",
+                "the Android fixture binds its HTTPS socket to the observed Android Network and opens an explicit CONNECT tunnel to the host proxy",
+                "each sample generated a completed allowlisted proxy event for raw.githubusercontent.com:443 pinned to the CI-resolved IPv4 address",
+                "the proxy observed at least 64,000 response bytes for every measured sample",
+                "baseline, latency-only, and bandwidth-only probes used the same Android Network transport and proxy route",
                 "latency-only median duration exceeded baseline by at least 50 ms",
                 "bandwidth-only median duration exceeded baseline by at least 500 ms",
-                "emulator network console readback matched each requested profile",
-                "emulator network settings were reset and read back at defaults",
+                "proxy control readback matched each requested delay/rate profile",
+                "proxy settings were reset and read back at baseline",
             ],
             "baseline_profile": baseline_profile,
             "latency_profile": latency_profile,
@@ -468,6 +423,7 @@ def main() -> int:
             "baseline_probes": baseline_probes,
             "latency_probes": latency_probes,
             "bandwidth_probes": bandwidth_probes,
+            "proxy_events": all_proxy_events,
             "baseline_median_ms": baseline_median_ms,
             "latency_median_ms": latency_median_ms,
             "bandwidth_median_ms": bandwidth_median_ms,
@@ -515,10 +471,7 @@ def main() -> int:
                 request("DELETE", f"/session/{session_id}", timeout=15)
             except Exception as exc:
                 print(f"warning: could not close Appium session cleanly: {exc}")
-        try:
-            reset_after_run = reset_network()
-        except Exception as reset_error:
-            reset_after_run = {"status": "unverified", "error": str(reset_error)}
+        reset_after_run = reset_proxy()
         failure_report = args.artifacts / "appium-journey.failure.json"
         if failure_report.exists():
             try:
