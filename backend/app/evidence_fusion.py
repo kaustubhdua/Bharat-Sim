@@ -141,7 +141,6 @@ def fuse_worker_report(report: Any) -> dict[str, Any]:
     network_control_verified = control_plane.get("status") == "verified"
     traffic_path_verified = network.get("traffic_path_verified") is True
     storage_verified = condition_states.get("storage_pressure") in {"verified", "preexisting_verified"}
-    battery_verified = condition_states.get("battery_saver") in {"verified", "preexisting_verified"}
     ram_state = condition_states.get("ram_constraint", "not_requested")
 
     hypotheses: list[dict[str, Any]] = []
