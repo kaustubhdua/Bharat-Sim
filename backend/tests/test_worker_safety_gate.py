@@ -11,6 +11,7 @@ def worker_headers(token):
 def test_production_worker_claim_fails_closed_without_explicit_isolation_approval(monkeypatch):
     token = "w" * 48
     monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "AUTH_REQUIRED", False)
     monkeypatch.setenv("BHARATSIM_WORKER_TOKEN", token)
     monkeypatch.setenv("BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED", "true")
     monkeypatch.setenv("BHARATSIM_WORKER_ISOLATION_ATTESTED", "true")
@@ -85,3 +86,22 @@ def test_capabilities_hide_production_worker_dispatch_until_gate_is_open(monkeyp
 
     assert response.status_code == 200
     assert response.json()["worker_dispatch"] is False
+
+
+def test_readiness_names_closed_worker_safety_gate(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "readiness.sqlite3")
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setenv("BHARATSIM_WORKER_TOKEN", "w" * 48)
+    monkeypatch.setenv("BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED", "false")
+    monkeypatch.setenv("BHARATSIM_WORKER_ISOLATION_ATTESTED", "false")
+    monkeypatch.setenv("BHARATSIM_WORKER_EGRESS_RESTRICTED", "false")
+    main.init_db()
+
+    response = TestClient(main.app).get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["apk_execution_worker"] == "safety_gate_closed"
+    assert response.json()["worker_execution_enabled"] is False
+    assert response.json()["execution_readiness"] == "not_ready"
