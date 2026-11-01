@@ -130,10 +130,12 @@ class ShapingProxy:
             if first_chunk and delay_ms:
                 # Split the configured RTT evenly across the two relay directions.
                 half_delay_ms = delay_ms / 2
+                delay_started = loop.time()
                 await asyncio.sleep(half_delay_ms / 1000)
+                actual_delay_ms = (loop.time() - delay_started) * 1000
                 if event is not None:
                     event["delay_injected_ms"] = round(
-                        float(event.get("delay_injected_ms", 0.0)) + half_delay_ms, 2
+                        float(event.get("delay_injected_ms", 0.0)) + actual_delay_ms, 2
                     )
                     event["delayed_directions"] = int(event.get("delayed_directions", 0)) + 1
                 first_chunk = False
