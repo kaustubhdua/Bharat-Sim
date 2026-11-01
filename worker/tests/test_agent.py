@@ -5,7 +5,41 @@ import unittest
 import urllib.request
 from pathlib import Path
 
-from worker.agent import NoRedirectHandler, WorkerError, annotate_execution_scope, persona_network_cli_args, redact_report_text, redact_sensitive_text, resolve_api_url
+from worker.agent import NoRedirectHandler, WorkerError, annotate_execution_scope, persona_network_cli_args, redact_report_text, redact_sensitive_text, resolve_api_url, validate_emulator_recycling_config
+
+
+class EmulatorRecyclingConfigTests(unittest.TestCase):
+    def test_development_defaults_to_existing_worker_behavior(self):
+        enabled, avd = validate_emulator_recycling_config({"BHARATSIM_ENV": "development"})
+        self.assertFalse(enabled)
+        self.assertEqual(avd, "")
+
+    def test_production_requires_recycling(self):
+        with self.assertRaisesRegex(WorkerError, "BHARATSIM_RECYCLE_EMULATOR=true"):
+            validate_emulator_recycling_config({"BHARATSIM_ENV": "production"})
+
+    def test_recycling_requires_an_avd_name(self):
+        with self.assertRaisesRegex(WorkerError, "ANDROID_AVD_NAME"):
+            validate_emulator_recycling_config({"BHARATSIM_RECYCLE_EMULATOR": "true"})
+
+    def test_production_requires_hardware_acceleration(self):
+        with self.assertRaisesRegex(WorkerError, "BHARATSIM_EMULATOR_ACCEL=on"):
+            validate_emulator_recycling_config({
+                "BHARATSIM_ENV": "production",
+                "BHARATSIM_RECYCLE_EMULATOR": "true",
+                "ANDROID_AVD_NAME": "bharatsim-api35",
+                "BHARATSIM_EMULATOR_ACCEL": "off",
+            })
+
+    def test_valid_production_configuration(self):
+        enabled, avd = validate_emulator_recycling_config({
+            "BHARATSIM_ENV": "production",
+            "BHARATSIM_RECYCLE_EMULATOR": "true",
+            "ANDROID_AVD_NAME": "bharatsim-api35",
+            "BHARATSIM_EMULATOR_ACCEL": "on",
+        })
+        self.assertTrue(enabled)
+        self.assertEqual(avd, "bharatsim-api35")
 
 
 class AgentEntrypointTests(unittest.TestCase):
