@@ -25,7 +25,10 @@ function storageKey(sha256: string): string {
 function isTrustedStorageUrl(value: string, expectedPathPrefix: string): boolean {
   try {
     const parsed = new URL(value);
-    if (parsed.protocol !== "https:" || !parsed.pathname.startsWith(expectedPathPrefix)) return false;
+    const pathMatches = expectedPathPrefix.endsWith("/")
+      ? parsed.pathname.startsWith(expectedPathPrefix)
+      : parsed.pathname === expectedPathPrefix;
+    if (parsed.protocol !== "https:" || !pathMatches) return false;
     const configuredUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
     const configuredHost = configuredUrl ? new URL(configuredUrl).hostname : "";
     if (!configuredHost) return parsed.hostname.endsWith(".storage.supabase.co");
