@@ -104,21 +104,13 @@ public final class MainActivity extends Activity {
                 ConnectivityManager manager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
                 Network activeNetwork = manager == null ? null : manager.getActiveNetwork();
                 if (activeNetwork == null) {
-                    throw new IOException("No active Android network for the fixture probe");
+                    throw new IOException("No active Android network for the HTTPS probe");
                 }
                 transport = transportForNetwork(activeNetwork);
                 if (!"CELLULAR".equals(transport) && !"ETHERNET".equals(transport)) {
                     throw new IllegalStateException("Unsupported transport for emulator-console shaping: " + transport);
                 }
-                URL probeUrl = new URL(PROBE_URL);
-                ProbeResult result;
-                if ("https".equalsIgnoreCase(probeUrl.getProtocol())) {
-                    result = performPinnedHttpsProbe(activeNetwork, PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started, probeDeadline);
-                } else if ("http".equalsIgnoreCase(probeUrl.getProtocol())) {
-                    result = performHttpProbe(activeNetwork, PROBE_URL, PROBE_BYTES, started, probeDeadline);
-                } else {
-                    throw new IOException("Probe URL must use HTTP or HTTPS");
-                }
+                ProbeResult result = performPinnedHttpsProbe(activeNetwork, PROBE_URL, BuildConfig.PROBE_IP, PROBE_BYTES, started, probeDeadline);
                 long duration = SystemClock.elapsedRealtime() - started;
                 Log.i(TAG, "BHARATSIM_NETWORK_PROBE status=HTTP_" + result.statusCode + " duration_ms=" + duration
                         + " transport=" + transport + " probe=" + sequence
@@ -144,88 +136,11 @@ public final class MainActivity extends Activity {
                 }
                 Log.e(TAG, "BHARATSIM_NETWORK_PROBE status=ERROR transport=" + transport
                         + " probe=" + sequence + " attempts=" + attempt, exception);
-                final String detail = exception.getMessage() == null ? "" : exception.getMessage().replaceAll("[\r\n]+", " ").substring(0, Math.min(180, exception.getMessage().replaceAll("[\r\n]+", " ").length()));
+                final String detail = exception.getMessage() == null ? "" : exception.getMessage().replaceAll("[\\r\\n]+", " ").substring(0, Math.min(180, exception.getMessage().replaceAll("[\\r\\n]+", " ").length()));
                 final String message = "Network probe failed: " + exception.getClass().getSimpleName() + (detail.isEmpty() ? "" : " · " + detail);
                 runOnUiThread(() -> target.setText(message));
                 return;
             }
-        }
-    }
-
-    private static ProbeResult performHttpProbe(Network activeNetwork, String urlText, int expectedBytes, long startedAt, long deadlineAt) throws IOException {
-        URL url = new URL(urlText);
-        if (!"http".equalsIgnoreCase(url.getProtocol())) {
-            throw new IOException("Local fixture probe must use HTTP");
-        }
-        String host = url.getHost();
-        int port = url.getPort() > 0 ? url.getPort() : 80;
-        String requestPath = url.getFile().isEmpty() ? "/" : url.getFile();
-
-        // Bind the socket to Android's selected Network. In CI the fixture is served
-        // by the runner host through the emulator's 10.0.2.2 gateway, so the complete
-        // payload still traverses the Android virtual network and its throttling.
-        try (Socket socket = activeNetwork.getSocketFactory().createSocket()) {
-            socket.connect(new InetSocketAddress(host, port), Math.min(8000, remainingTimeoutMs(deadlineAt)));
-            socket.setSoTimeout(remainingTimeoutMs(deadlineAt));
-            OutputStream output = socket.getOutputStream();
-            String request = "GET " + requestPath + " HTTP/1.1\r\n"
-                    + "Host: " + host + ":" + port + "\r\n"
-                    + "Connection: close\r\n"
-                    + "Accept-Encoding: identity\r\n"
-                    + "Cache-Control: no-cache\r\n"
-                    + "Range: bytes=0-" + (expectedBytes - 1) + "\r\n\r\n";
-            output.write(request.getBytes(StandardCharsets.US_ASCII));
-            output.flush();
-
-            InputStream input = socket.getInputStream();
-            String statusLine = readHttpLine(socket, input, deadlineAt);
-            String[] statusParts = statusLine.split(" ", 3);
-            if (statusParts.length < 2 || !statusParts[0].startsWith("HTTP/")) {
-                throw new IOException("Malformed HTTP status line: " + statusLine);
-            }
-            final int statusCode;
-            try {
-                statusCode = Integer.parseInt(statusParts[1]);
-            } catch (NumberFormatException badStatus) {
-                throw new IOException("Malformed HTTP status code: " + statusLine, badStatus);
-            }
-            if (statusCode != 200 && statusCode != 206) {
-                throw new IOException("Unexpected HTTP status " + statusCode);
-            }
-
-            Map<String, String> headers = new HashMap<>();
-            String headerLine;
-            int headerCount = 0;
-            int headerBytes = 0;
-            while (true) {
-                headerLine = readHttpLine(socket, input, deadlineAt);
-                if (headerLine.isEmpty()) break;
-                headerCount++;
-                headerBytes += headerLine.length();
-                if (headerCount > MAX_HTTP_HEADER_COUNT || headerBytes > MAX_HTTP_HEADER_BYTES) {
-                    throw new IOException("HTTP response headers exceed configured limits");
-                }
-                int colon = headerLine.indexOf(':');
-                if (colon > 0) {
-                    headers.put(headerLine.substring(0, colon).trim().toLowerCase(Locale.ROOT),
-                            headerLine.substring(colon + 1).trim());
-                }
-            }
-            String contentLength = headers.get("content-length");
-            if (contentLength != null) {
-                try {
-                    if (Long.parseLong(contentLength) < expectedBytes) {
-                        throw new IOException("HTTP fixture advertised fewer bytes than requested");
-                    }
-                } catch (NumberFormatException badLength) {
-                    throw new IOException("Malformed Content-Length header", badLength);
-                }
-            }
-            int bytesRead = readFixedBody(socket, input, expectedBytes, startedAt, deadlineAt);
-            if (bytesRead != expectedBytes) {
-                throw new IOException("Expected " + expectedBytes + " fixture bytes, received " + bytesRead);
-            }
-            return new ProbeResult(statusCode, bytesRead);
         }
     }
 
@@ -322,7 +237,7 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private static int readFixedBody(Socket socket, InputStream input, int expectedBytes, long startedAt, long deadlineAt) throws IOException {
+    private static int readFixedBody(SSLSocket socket, InputStream input, int expectedBytes, long startedAt, long deadlineAt) throws IOException {
         byte[] buffer = new byte[8192];
         int total = 0;
         while (total < expectedBytes) {
@@ -335,7 +250,7 @@ public final class MainActivity extends Activity {
         return total;
     }
 
-    private static int readChunkedBody(Socket socket, InputStream input, int expectedBytes, long startedAt, long deadlineAt) throws IOException {
+    private static int readChunkedBody(SSLSocket socket, InputStream input, int expectedBytes, long startedAt, long deadlineAt) throws IOException {
         int total = 0;
         byte[] buffer = new byte[8192];
         while (total < expectedBytes) {
@@ -396,7 +311,7 @@ public final class MainActivity extends Activity {
         return (int) Math.max(1, Math.min(Integer.MAX_VALUE, remaining));
     }
 
-    private static String readHttpLine(Socket socket, InputStream input, long deadlineAt) throws IOException {
+    private static String readHttpLine(SSLSocket socket, InputStream input, long deadlineAt) throws IOException {
         ByteArrayOutputStream line = new ByteArrayOutputStream();
         int previous = -1;
         while (true) {
