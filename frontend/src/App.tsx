@@ -43,6 +43,7 @@ import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
 import RunDetailView from "./components/RunDetailView";
 import CapabilityPanel from "./components/CapabilityPanel";
+import SarvamTranslation from "./components/SarvamTranslation";
 
 const API_DOCS_URL = API || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
 
@@ -799,6 +800,13 @@ export default function App() {
                           <p key={l}>• {l}</p>
                         ))}
                       </div>
+                      <SarvamTranslation
+                        enabled={Boolean(capabilities?.sarvam_translation)}
+                        text={[
+                          "BharatScore: " + analysis.bharat_score.value + "/100 — " + analysis.bharat_score.label + ".",
+                          ...analysis.findings.slice(0, 5).map((finding) => finding.severity + ": " + finding.title + ". " + finding.explanation + " Recommendation: " + finding.recommendation)
+                        ].join("\n").slice(0, 2000)}
+                      />
                     </>
                   )}
                 </section>
