@@ -619,6 +619,14 @@ export default function App() {
                         <CircleAlert size={16} />
                         <span>API is down or unreachable. Unable to load recent runs.</span>
                       </div>
+                    ) : capabilities?.database_persistence === false ? (
+                      <div className="empty-state">
+                        <div className="empty-icon">
+                          <Clock3 size={22} />
+                        </div>
+                        <b>Run history unavailable</b>
+                        <p>Persistent PostgreSQL is not configured for this deployment. No saved run history is being reported.</p>
+                      </div>
                     ) : runs.length === 0 ? (
                       <div className="empty-state">
                         <div className="empty-icon">
@@ -701,6 +709,14 @@ export default function App() {
                     <div className="alert error-alert" role="alert">
                       <CircleAlert size={18} />
                       <span>API is down or unreachable. Unable to load test runs.</span>
+                    </div>
+                  ) : capabilities?.database_persistence === false ? (
+                    <div className="empty-state">
+                      <div className="empty-icon">
+                        <FlaskConical size={22} />
+                      </div>
+                      <b>Run history unavailable</b>
+                      <p>Persistent PostgreSQL is not configured for this deployment. No saved run history is being reported.</p>
                     </div>
                   ) : runs.length === 0 ? (
                     <div className="empty-state">
