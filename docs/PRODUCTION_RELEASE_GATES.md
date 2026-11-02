@@ -1,5 +1,21 @@
 # Production release gates
 
+## Live follow-up — 2026-11-02, 04:02 UTC
+
+This supersedes older deployment-state observations below where they conflict with the live checks in this section.
+
+- GitHub `main` is `cbfb700f95973e0dd272f569cb02a0ffe4a35bb0`. PR [#114](https://github.com/kaustubhdua/Bharat-Sim/pull/114) contains the current serverless startup, persistence gating, and dashboard fallback fixes. Its latest head at this note is `b15058fc1755bbedc48760420aa0b7e14e9c7530`.
+- Stable frontend `https://bharat-sim-81g2.vercel.app` responds HTTP 200 and serves the login page. The stable backend `https://bharat-sim-bay.vercel.app` still returns HTTP 500 `FUNCTION_INVOCATION_FAILED` on `/health/live`, `/health/ready`, and `/openapi.json` because Production is still on the pre-fix backend deployment.
+- A backend PR preview at commit `adb12b537bf1fe97ef9c0cccfd189682c31bdb08` reached Vercel READY but still failed at runtime: its code still bootstrapped local SQLite on a Vercel preview. PR #114 now skips both import-time cleanup and SQLite bootstrap on every Vercel/AWS serverless runtime. The end-to-end regression test imports the app in a clean Vercel-like subprocess, verifies liveness, readiness, personas, capability gating, database-backed 503s, and stateless planning without creating a SQLite file.
+- The latest PR backend tests, frontend build, worker-guard tests, and dependency audit passed on the prior run. The latest head's PostgreSQL integration, frontend E2E, container smoke and Android emulator traffic-path checks were still running at this note. Vercel preview deployment attempts for both projects were rejected by the free-plan `api-deployments-free-per-day` limit (>100 deployments in 24 hours); do not repeatedly retry. A new deployment event is required after the limit resets.
+- A fresh non-decrypted Backend Production environment inventory still does **not** contain `BHARATSIM_DATABASE_URL`, `SUPABASE_SECRET_KEY`, or `SUPABASE_SERVICE_ROLE_KEY`. It does contain the expected Supabase URL, auth-required flag, private bucket name, CORS origins, and disabled worker-safety flags. Do not place credentials in GitHub, frontend `VITE_*` variables, or chat.
+- Supabase `common 1` remains ACTIVE_HEALTHY on PostgreSQL 17.11. The seven `bharatsim` tables have RLS enabled and no grants to `anon` or `authenticated`. The `bharatsim-private` bucket is private, permits APK/ZIP/octet-stream MIME types, and has a 157,286,400-byte (150 MiB) limit matching the backend upload limit. No BharatSim Storage objects or application runs were present in the live checks.
+- No BharatSim worker service is provisioned in the connected Render workspace; the only listed Render service is GenomeGuard. The repository worker remains an execution prototype. Keep `BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED=false`, `BHARATSIM_WORKER_ISOLATION_ATTESTED=false`, and `BHARATSIM_WORKER_EGRESS_RESTRICTED=false` until a dedicated KVM/Firecracker host and default-deny egress are independently verified.
+
+**Current release decision: NO-GO for production APK testing.** Merge only after the latest GitHub checks pass. After Vercel's limit resets, deploy the merged backend first and verify live/readiness/OpenAPI, then deploy the frontend and run the production smoke suite. The two missing backend credentials and the isolated worker host remain external provisioning gates; a green CI run or READY Vercel build does not satisfy them.
+
+---
+
 ## Re-verified status — 2026-11-02
 
 This is a fresh infrastructure inspection, not a production acceptance sign-off.
