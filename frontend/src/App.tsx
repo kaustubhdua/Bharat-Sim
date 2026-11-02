@@ -56,7 +56,7 @@ export default function App() {
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");
   const [runs, setRuns] = useState<Run[]>([]);
-  const [analysis, setAnalysis] = useState<Analysis | null>(() => loadSavedAnalysis(readSession()?.user?.id));
+  const [analysis, setAnalysis] = useState<Analysis | null>(() => previewMode ? null : loadSavedAnalysis(readSession()?.user?.id));
   const [logText, setLogText] = useState("");
   const [apk, setApk] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -71,7 +71,7 @@ export default function App() {
   // Keep the latest report across refreshes in this tab only. Reports are
   // scoped to the authenticated user and are never sent to another service.
   useEffect(() => {
-    if (analysis) saveAnalysisForSession(readSession()?.user?.id, analysis);
+    if (analysis && !previewMode) saveAnalysisForSession(readSession()?.user?.id, analysis);
   }, [analysis]);
 
 
