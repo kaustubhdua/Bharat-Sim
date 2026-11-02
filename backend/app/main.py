@@ -1815,9 +1815,13 @@ def translate_report(payload: SarvamTranslationRequest):
 
 @app.get("/api/v1/capabilities")
 def capabilities():
+    production = APP_ENV in {"production", "prod"}
+    database_configured = bool(DATABASE_URL) if production else True
+    upload_available = database_configured and (STORAGE_ENABLED if production else True)
+    direct_upload_available = database_configured and STORAGE_ENABLED
     worker = len(os.getenv("BHARATSIM_WORKER_TOKEN", "")) >= 32 and production_worker_execution_enabled()
     return {
-        "apk_upload": True, "direct_apk_upload": STORAGE_ENABLED, "log_analysis": True, "risk_planner": True,
+        "apk_upload": upload_available, "direct_apk_upload": direct_upload_available, "log_analysis": True, "risk_planner": True,
         "failure_fingerprinting": True, "bharat_score": True,
         "android_execution": False,
         "worker_dispatch": worker,
