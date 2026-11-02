@@ -124,6 +124,9 @@ export default function App() {
     setNotice("");
     setBusy(true);
     try {
+      if (!capabilities?.apk_upload) {
+        throw new Error("Run registration is unavailable until production PostgreSQL and private APK storage are configured.");
+      }
       if (!apk) throw new Error("Choose an APK file first.");
       let run: Run & { message: string };
       if (capabilities?.direct_apk_upload) {
@@ -529,6 +532,7 @@ export default function App() {
                     busy={busy}
                     apiStatus={apiStatus}
                     directUploadAvailable={Boolean(capabilities?.direct_apk_upload)}
+                    uploadAvailable={Boolean(capabilities?.apk_upload)}
                     onSubmit={submitApk}
                   />
 
