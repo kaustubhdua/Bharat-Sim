@@ -12,6 +12,7 @@ interface UploadPanelProps {
   busy: boolean;
   apiStatus: string;
   directUploadAvailable: boolean;
+  uploadAvailable: boolean;
   onSubmit: (e: FormEvent) => Promise<void>;
 }
 
@@ -27,12 +28,18 @@ export default function UploadPanel({
   busy,
   apiStatus,
   directUploadAvailable,
+  uploadAvailable,
   onSubmit
 }: UploadPanelProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState("");
 
   function validateAndSetFile(file: File | null) {
+    if (!uploadAvailable) {
+      setApk(null);
+      setFileError("Run registration is unavailable until production PostgreSQL and private APK storage are configured.");
+      return;
+    }
     if (!file) {
       setApk(null);
       setFileError("");
@@ -106,6 +113,7 @@ export default function UploadPanel({
             type="file"
             accept=".apk,application/vnd.android.package-archive"
             onChange={handleFileChange}
+            disabled={!uploadAvailable}
           />
           <span className="upload-icon">
             <UploadCloud size={22} />
@@ -116,7 +124,7 @@ export default function UploadPanel({
               ? `${(apk.size / 1024 / 1024).toFixed(1)} MB · Ready to upload`
               : "Choose an APK to enable run registration"}
           </small>
-          <span className="file-limit">APK · Max 150 MB</span>
+          <span className="file-limit">{!uploadAvailable ? "APK registration unavailable" : directUploadAvailable ? "APK · Max 150 MB" : "APK · Max 4 MB"}</span>
         </label>
 
         {apiStatus === "offline" && (
@@ -125,10 +133,10 @@ export default function UploadPanel({
             <span>API is down or unreachable. Run registration is disabled.</span>
           </div>
         )}
-        {import.meta.env.PROD && !directUploadAvailable && (
+        {import.meta.env.PROD && !uploadAvailable && (
           <div className="alert error-alert upload-inline-error" role="status">
             <CircleAlert size={16} />
-            <span>Private Storage upload is not configured. This deployment accepts APKs up to 4 MB only; larger uploads are blocked before sending.</span>
+            <span>Run registration is unavailable until persistent PostgreSQL and private Supabase Storage are configured. Log analysis and risk planning remain available.</span>
           </div>
         )}
 
@@ -162,16 +170,18 @@ export default function UploadPanel({
         <div className="run-warning">
           <CircleAlert size={16} />
           <span>
-            {workers.some((w) => w.online)
-              ? "A worker is online. The run will only count as executed after it submits a report with evidence."
-              : "No worker heartbeat detected. This registers the APK; execution will wait for a worker and no test pass/failure is implied."}
+            {!uploadAvailable
+              ? "APK run registration is currently unavailable. No upload or test run will be attempted."
+              : workers.some((w) => w.online)
+                ? "A worker is online. The run will only count as executed after it submits a report with evidence."
+                : "No worker heartbeat detected. This registers the APK; execution will wait for a worker and no test pass/failure is implied."}
           </span>
         </div>
 
         <button
           type="submit"
           className="primary-button full-button"
-          disabled={busy || apiStatus === "offline" || !apk}
+          disabled={busy || apiStatus === "offline" || !uploadAvailable || !apk}
         >
           {busy ? <LoaderCircle className="spin" size={16} /> : <FlaskConical size={16} />}
           {" "}
