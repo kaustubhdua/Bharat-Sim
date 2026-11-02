@@ -52,7 +52,13 @@ def test_stateless_log_analysis_remains_available_without_production_postgres(mo
     assert capabilities["bharat_score"] is True
 
     unauthenticated = client.post("/api/v1/analyze/logs", json=payload)
-    assert unauthenticated.status_code == 401
+    assert unauthenticated.status_code == 200
+    guest_report = unauthenticated.json()
+    assert guest_report["persistence"]["saved"] is False
+    assert "public preview" in guest_report["persistence"]["reason"].lower()
+
+    private_run = client.post("/api/v1/analyze/logs", json={**payload, "run_id": "private-run"})
+    assert private_run.status_code == 401
 
     monkeypatch.setattr(main, "verify_supabase_access_token", lambda token: "11111111-1111-4111-8111-111111111111")
     response = client.post("/api/v1/analyze/logs", json=payload, headers={"Authorization": "Bearer test-access-token"})
