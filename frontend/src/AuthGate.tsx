@@ -33,7 +33,10 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!session) return;
-    const delay = Math.max(5_000, session.expires_at * 1000 - Date.now() - 60_000);
+    // Browser timers use a signed 32-bit millisecond delay. Clamp long-lived
+    // sessions so a far-future expiry cannot overflow to an immediate refresh.
+    const untilRefresh = session.expires_at * 1000 - Date.now() - 60_000;
+    const delay = Math.min(2_147_000_000, Math.max(5_000, Number.isFinite(untilRefresh) ? untilRefresh : 5_000));
     const timer = window.setTimeout(async () => {
       try { setSession(await refreshSession()); }
       catch { setSession(null); setError("Your session expired. Please sign in again."); }
