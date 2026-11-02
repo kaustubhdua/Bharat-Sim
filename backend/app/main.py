@@ -1241,6 +1241,11 @@ async def create_run(
 ):
     if not apk.filename:
         raise HTTPException(status_code=422, detail="An APK file is required to register a test run")
+    if requires_persistent_database() and not STORAGE_ENABLED:
+        raise HTTPException(
+            status_code=503,
+            detail="Private Supabase Storage is required for APK uploads on serverless deployments.",
+        )
     cleanup_expired_uploads()
     if persona_id not in PERSONAS:
         raise HTTPException(status_code=422, detail="Unknown persona_id")
