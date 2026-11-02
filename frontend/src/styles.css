@@ -755,3 +755,32 @@ svg { flex-shrink: 0; }
   .detail-grid { grid-template-columns: minmax(0, 1fr); }
   .detail-actions > * { flex: 1 1 100%; }
 }
+
+
+/* Public, non-authenticated planner preview. Private customer operations stay locked. */
+.auth-demo-button{
+  display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+  margin-top:12px;padding:11px 12px;border:1px solid #426047;border-radius:8px;
+  background:#17251a;color:#d6efc5;font-size:11px;font-weight:700;
+  transition:background .18s,border-color .18s,transform .18s;
+}
+.auth-demo-button:hover{background:#203525;border-color:#8dbb72;transform:translateY(-1px)}
+.public-preview-bar{
+  position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;min-width:0;padding:10px clamp(14px,3vw,34px);
+  border-bottom:1px solid #3b5b3e;background:#12231a;color:#d6e7d6;
+  box-shadow:0 8px 22px rgba(0,0,0,.16);font-size:11px;
+}
+.public-preview-bar>span{display:flex;align-items:center;gap:8px;min-width:0;line-height:1.5}
+.public-preview-bar>span svg{color:#b5f36d}
+.public-preview-bar button{
+  flex:0 0 auto;padding:7px 11px;border:1px solid #5a794e;border-radius:7px;
+  background:#b5f36d;color:#172318;font-size:10px;font-weight:800;
+}
+.public-preview-bar button:hover{background:#c9ff8d}
+.preview-info{background:#edf4e8;border:1px solid #cfdfc7;color:#365c3d}
+.preview-info svg{flex:0 0 auto;color:#397547}
+@media(max-width:620px){
+  .public-preview-bar{align-items:flex-start;flex-direction:column;gap:8px;padding:10px 14px}
+  .public-preview-bar button{width:100%}
+}
