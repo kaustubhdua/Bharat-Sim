@@ -1853,7 +1853,7 @@ def capabilities():
         "database_persistence": database_configured,
         "apk_upload": upload_available, "direct_apk_upload": direct_upload_available,
         "log_analysis": database_configured, "risk_planner": True,
-        "failure_fingerprinting": True, "bharat_score": True,
+        "failure_fingerprinting": database_configured, "bharat_score": database_configured,
         "android_execution": False,
         "worker_dispatch": worker,
         "network_shaping": False,
