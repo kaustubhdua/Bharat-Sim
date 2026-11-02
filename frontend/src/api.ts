@@ -2,6 +2,7 @@ export const API = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 export type Capabilities = {
   database_persistence?: boolean;
+  analysis_persistence?: boolean;
   apk_upload: boolean; direct_apk_upload: boolean; log_analysis: boolean; risk_planner: boolean;
   failure_fingerprinting: boolean; bharat_score: boolean; android_execution: boolean;
   worker_dispatch: boolean; network_shaping: boolean; sarvam_translation: boolean;
@@ -71,6 +72,7 @@ export type Analysis = {
     warning: string;
   };
   limitations: string[];
+  persistence?: { saved: boolean; reason?: string };
   persona: Persona;
   analysis_mode?: string;
   failure_dna?: { groups: Array<{ fingerprint: string; kind: string; severity: string; occurrence_count: number; line_numbers: number[]; first_line: number; last_line: number }>; group_count: number; total_occurrences: number; method: string };
