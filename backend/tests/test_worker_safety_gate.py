@@ -51,6 +51,9 @@ def test_production_worker_claim_requires_all_three_safety_flags(monkeypatch, tm
     monkeypatch.setattr(main, "APP_ENV", "production")
     monkeypatch.setattr(main, "DATABASE_URL", "")
     monkeypatch.setattr(main, "DB_PATH", tmp_path / "worker-gate-test.sqlite3")
+    # This test deliberately uses a local SQLite fixture while exercising the
+    # production worker safety flags; production runtime itself stays fail-closed.
+    monkeypatch.setattr(main, "requires_persistent_database", lambda: False)
     monkeypatch.setattr(main, "AUTH_REQUIRED", False)
     monkeypatch.setenv("BHARATSIM_WORKER_TOKEN", token)
     monkeypatch.setenv("BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED", "true")
