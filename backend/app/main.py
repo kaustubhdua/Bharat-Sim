@@ -912,8 +912,16 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
         ],
     }
 
+_FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+
 @app.get("/")
 def root():
+    # Keep the legacy API root useful in local backend-only development, while
+    # serving the dashboard at the single public origin in the unified build.
+    index = _FRONTEND_DIST / "index.html"
+    if index.is_file():
+        return FileResponse(index, media_type="text/html")
     return {"name": "BharatSim API", "version": "0.1.0", "docs": "/docs", "status": APP_ENV}
 
 @app.get("/health/live")
