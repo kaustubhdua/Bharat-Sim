@@ -93,7 +93,7 @@ export default function App() {
       setRuns(runResult.status === "fulfilled" ? runResult.value.items : []);
       setWorkers(workerResult.status === "fulfilled" ? workerResult.value.items : []);
       if (capabilityContract.database_persistence !== true) {
-        setNotice("Persistent PostgreSQL is not configured. Run history, APK registration, and saved log analysis are unavailable; risk planning remains available.");
+        setNotice("Persistent PostgreSQL is not configured. Risk planning and pasted-log analysis work, but run history, APK registration, and saved reports are unavailable.");
       } else if (runResult.status === "rejected" || workerResult.status === "rejected") {
         setNotice("Some operational data is temporarily unavailable. Refresh to retry.");
       }
@@ -217,7 +217,9 @@ export default function App() {
         body: JSON.stringify({ text, persona_id: selected })
       });
       setAnalysis(a);
-      setNotice("Log analysis complete. Findings reference source lines.");
+      setNotice(a.persistence?.saved === false
+        ? "Log analysis complete. Findings reference source lines. This report is only in this browser session and was not saved."
+        : "Log analysis complete. Findings reference source lines.");
       navigate("/analysis");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
@@ -567,16 +569,16 @@ export default function App() {
                       placeholder="Paste Android logcat output here…"
                       rows={5}
                     />
-                    {apiStatus === "online" && (capabilities?.database_persistence !== true || capabilities?.log_analysis !== true) && (
+                    {apiStatus === "online" && capabilities?.analysis_persistence !== true && (
                       <div className="alert error-alert" role="status">
                         <CircleAlert size={16} />
-                        <span>Saved log analysis requires persistent PostgreSQL. Risk planning remains available.</span>
+                        <span>Logcat analysis is available, but reports remain in this browser session until persistent PostgreSQL is configured.</span>
                       </div>
                     )}
                     <div className="log-actions">
                       <button
                         className="primary-button"
-                        disabled={busy || apiStatus !== "online" || capabilities?.database_persistence !== true || capabilities?.log_analysis !== true}
+                        disabled={busy || apiStatus !== "online" || capabilities?.log_analysis !== true}
                         onClick={() => void analyzeLogs()}
                       >
                         {busy ? (
