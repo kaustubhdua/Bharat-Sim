@@ -4,6 +4,7 @@ import zipfile
 import pytest
 
 from fastapi.testclient import TestClient
+from app import main
 from app.main import app
 
 client = TestClient(app)
@@ -32,6 +33,37 @@ def test_health_and_capabilities_are_honest():
     assert persona_controls["report_only"] == ["ram_constraint"]
     assert persona_controls["unsupported"] == ["packet_loss", "cpu_constraint"]
 
+
+def test_stateless_log_analysis_remains_available_without_production_postgres(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setattr(main, "SUPABASE_URL", "https://example.supabase.co")
+
+    payload = {
+        "text": "FATAL EXCEPTION: main\njava.lang.OutOfMemoryError: Failed allocation",
+        "persona_id": "budget-android",
+    }
+    capabilities = client.get("/api/v1/capabilities").json()
+    assert capabilities["database_persistence"] is False
+    assert capabilities["analysis_persistence"] is False
+    assert capabilities["log_analysis"] is True
+    assert capabilities["failure_fingerprinting"] is True
+    assert capabilities["bharat_score"] is True
+
+    unauthenticated = client.post("/api/v1/analyze/logs", json=payload)
+    assert unauthenticated.status_code == 401
+
+    monkeypatch.setattr(main, "verify_supabase_access_token", lambda token: "11111111-1111-4111-8111-111111111111")
+    response = client.post("/api/v1/analyze/logs", json=payload, headers={"Authorization": "Bearer test-access-token"})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["summary"]["finding_count"] >= 1
+    assert result["persistence"]["saved"] is False
+    assert "not configured" in result["persistence"]["reason"]
+
+    run_linked = client.post("/api/v1/analyze/logs", json={**payload, "run_id": "existing-run"}, headers={"Authorization": "Bearer test-access-token"})
+    assert run_linked.status_code == 503
 
 def test_personas_and_plan():
     personas = client.get("/api/v1/personas").json()["items"]
