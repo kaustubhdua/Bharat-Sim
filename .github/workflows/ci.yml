@@ -8,6 +8,38 @@ on:
 permissions:
   contents: read
 jobs:
+  unified-vercel-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install unified Python dependencies
+        run: pip install -r requirements.txt -r backend/requirements-dev.txt
+      - name: Build dashboard for the FastAPI deployment
+        run: python build_frontend.py
+      - name: Smoke-test SPA, deep links and API on one ASGI app
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from backend.app.main import app
+
+          client = TestClient(app)
+          for path in ("/", "/runs", "/analyses"):
+              response = client.get(path, headers={"accept": "text/html"})
+              assert response.status_code == 200, (path, response.status_code, response.text[:300])
+              assert '<div id="root"></div>' in response.text, path
+          health = client.get("/health/live")
+          assert health.status_code == 200, health.text
+          personas = client.get("/api/v1/personas")
+          assert personas.status_code == 200, personas.text
+          assert len(personas.json()["items"]) >= 4
+          print("Unified frontend deep links and API smoke checks passed")
+          PY
   backend:
     runs-on: ubuntu-latest
     steps:
