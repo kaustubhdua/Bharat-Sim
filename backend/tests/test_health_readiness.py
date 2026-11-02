@@ -139,3 +139,16 @@ def test_serverless_capabilities_hide_database_dependent_actions_without_postgre
     assert capabilities["direct_apk_upload"] is False
     assert capabilities["log_analysis"] is False
     assert capabilities["risk_planner"] is True
+
+
+def test_serverless_runtime_never_initializes_local_sqlite(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "development")
+    monkeypatch.setenv("VERCEL", "1")
+    assert main.should_initialize_local_database() is False
+
+
+def test_local_development_can_initialize_sqlite(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "development")
+    monkeypatch.delenv("VERCEL", raising=False)
+    monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+    assert main.should_initialize_local_database() is True
