@@ -328,9 +328,18 @@ async def enforce_api_authentication(request: Request, call_next):
     )
     # Pasted-log analysis is stateless when no run_id is supplied. It still
     # requires a verified user identity in production, but not PostgreSQL.
-    auth_protected = database_protected or request.url.path in {
-        "/api/v1/analyze/logs", "/api/v1/translate/report"
-    }
+    # Production guests may use only the stateless log-analysis preview. A
+    # supplied bearer token still triggers full JWT verification; private run
+    # analysis and every other customer-data route remain authenticated.
+    public_stateless_analysis = (
+        APP_ENV in {"production", "prod"}
+        and request.method == "POST"
+        and request.url.path == "/api/v1/analyze/logs"
+        and not request.headers.get("Authorization", "").strip()
+    )
+    auth_protected = database_protected or request.url.path == "/api/v1/translate/report" or (
+        request.url.path == "/api/v1/analyze/logs" and not public_stateless_analysis
+    )
     if APP_ENV in {"production", "prod"} and auth_protected:
         if not AUTH_REQUIRED or not SUPABASE_URL.startswith("https://"):
             return JSONResponse(status_code=503, content={"detail": "Production authentication is not configured"})
@@ -1807,22 +1816,28 @@ def list_run_events(run_id: str, request: Request, limit: int = 100):
 def analyze_logs(payload: LogAnalysisRequest, request: Request):
     if payload.persona_id not in PERSONAS:
         raise HTTPException(status_code=422, detail="Unknown persona_id")
+    owner_id = getattr(request.state, "owner_id", None)
     if payload.run_id:
+        if owner_id is None and (APP_ENV in {"production", "prod"} or AUTH_REQUIRED):
+            raise HTTPException(status_code=401, detail="A verified user session is required to analyze a private run.")
         with db() as conn:
             if AUTH_REQUIRED:
-                owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (payload.run_id, request.state.owner_id)).fetchone()
+                owned = conn.execute("SELECT id FROM runs WHERE id=? AND owner_id=?", (payload.run_id, owner_id)).fetchone()
             else:
                 owned = conn.execute("SELECT id FROM runs WHERE id=?", (payload.run_id,)).fetchone()
         if not owned:
             raise HTTPException(status_code=404, detail="Run not found")
+    # Bound anonymous preview work and never persist guest-supplied logs.
+    if APP_ENV in {"production", "prod"} and owner_id is None and len(payload.text.encode("utf-8")) > 64 * 1024:
+        raise HTTPException(status_code=413, detail="Public preview log input is limited to 64 KiB. Sign in for the full analysis workflow.")
     result = analyze_log_text(payload.text, payload.persona_id)
     database_available = bool(DATABASE_URL) if requires_persistent_database() else True
-    if database_available:
+    should_persist = database_available and (not requires_persistent_database() or owner_id is not None)
+    if should_persist:
         result["persistence"] = {"saved": True}
         with db() as conn:
             conn.execute("INSERT INTO analyses(id,created_at,run_id,persona_id,result_json,owner_id) VALUES(?,?,?,?,?,?)",
-                         (result["id"], result["created_at"], payload.run_id, payload.persona_id, json.dumps(result), getattr(request.state, "owner_id", None)))
-            owner_id = getattr(request.state, "owner_id", None)
+                         (result["id"], result["created_at"], payload.run_id, payload.persona_id, json.dumps(result), owner_id))
             actor_type = "user" if owner_id else "system"
             record_audit_event(conn, owner_id, actor_type, owner_id, "analysis.created", "analysis", result["id"], {
                 "persona_id": payload.persona_id, "run_id": payload.run_id,
@@ -1838,7 +1853,11 @@ def analyze_logs(payload: LogAnalysisRequest, request: Request):
         # not configured. Never imply that the report was saved or recoverable.
         result["persistence"] = {
             "saved": False,
-            "reason": "Persistent PostgreSQL is not configured; this report is available only in the current browser session.",
+            "reason": (
+                "Public preview analyses are stateless and are not saved. This report is available only in the current browser session."
+                if requires_persistent_database() and owner_id is None
+                else "Persistent PostgreSQL is not configured; this report is available only in the current browser session."
+            ),
         }
     return result
 
