@@ -81,3 +81,15 @@ assert not DB_PATH.exists(), 'serverless import must not create ephemeral SQLite
         timeout=30,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_serverless_preview_cannot_dispatch_apks_even_with_worker_flags(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "development")
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("BHARATSIM_WORKER_TOKEN", "w" * 48)
+    monkeypatch.setenv("BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED", "true")
+    monkeypatch.setenv("BHARATSIM_WORKER_ISOLATION_ATTESTED", "true")
+    monkeypatch.setenv("BHARATSIM_WORKER_EGRESS_RESTRICTED", "true")
+
+    assert main.production_worker_execution_enabled() is False
+    assert main.capabilities()["worker_dispatch"] is False
