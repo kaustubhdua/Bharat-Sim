@@ -217,6 +217,7 @@ export default function App() {
       return;
     }
     const startedAt = Date.now();
+    let analysisSucceeded = false;
     setBusy(true);
     setAnalysisBusy(true);
     setError("");
@@ -231,7 +232,7 @@ export default function App() {
       setNotice(a.persistence?.saved === false
         ? "Log analysis complete. Findings reference source lines. This report is only in this browser session and was not saved."
         : "Log analysis complete. Findings reference source lines.");
-      navigate("/analysis");
+      analysisSucceeded = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
@@ -243,6 +244,7 @@ export default function App() {
       }
       setAnalysisBusy(false);
       setBusy(false);
+      if (analysisSucceeded) navigate("/analysis");
     }
   }
 
