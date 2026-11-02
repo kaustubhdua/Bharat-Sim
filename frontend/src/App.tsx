@@ -59,6 +59,7 @@ export default function App() {
   const [logText, setLogText] = useState("");
   const [apk, setApk] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [analysisBusy, setAnalysisBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [apiStatus, setApiStatus] = useState("checking");
@@ -215,7 +216,9 @@ export default function App() {
       setError("Paste logcat output first.");
       return;
     }
+    const startedAt = Date.now();
     setBusy(true);
+    setAnalysisBusy(true);
     setError("");
     setNotice("");
     try {
@@ -232,6 +235,13 @@ export default function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
+      // Keep the progress indicator visible long enough to communicate the
+      // analysis step, without delaying slow requests beyond their real time.
+      const remaining = Math.max(0, 700 - (Date.now() - startedAt));
+      if (remaining > 0) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, remaining));
+      }
+      setAnalysisBusy(false);
       setBusy(false);
     }
   }
@@ -583,19 +593,29 @@ export default function App() {
                         <span>Logcat analysis is available, but reports remain in this browser session until persistent PostgreSQL is configured.</span>
                       </div>
                     )}
+                    {analysisBusy && (
+                      <div className="analysis-progress" role="status" aria-live="polite">
+                        <LoaderCircle className="analysis-progress-icon spin" size={19} />
+                        <div className="analysis-progress-copy">
+                          <b>Analyzing submitted logcat</b>
+                          <span>Extracting source-line evidence, grouping repeated failure signals, and preparing your report.</span>
+                        </div>
+                        <div className="analysis-progress-track" aria-hidden="true"><i /></div>
+                      </div>
+                    )}
                     <div className="log-actions">
                       <button
                         className="primary-button"
                         disabled={busy || apiStatus !== "online" || capabilities?.log_analysis !== true}
                         onClick={() => void analyzeLogs()}
                       >
-                        {busy ? (
+                        {analysisBusy ? (
                           <LoaderCircle className="spin" size={15} />
                         ) : (
                           <Activity size={15} />
                         )}
                         {" "}
-                        Analyze evidence
+                        {analysisBusy ? "Analyzing evidence…" : "Analyze evidence"}
                       </button>
                     </div>
                     <div className="evidence-note">
