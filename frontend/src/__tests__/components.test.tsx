@@ -646,9 +646,9 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("Sarvam translation");
   });
 
-  it("CapabilityPanel fails closed when an older API omits database persistence", async () => {
+  it("CapabilityPanel keeps stateless analysis available when database persistence is missing", async () => {
     const legacyCapabilities = {
-      apk_upload: true, direct_apk_upload: true, log_analysis: true, risk_planner: true,
+      apk_upload: true, direct_apk_upload: true, log_analysis: true, analysis_persistence: false, risk_planner: true,
       failure_fingerprinting: true, bharat_score: true, android_execution: false,
       worker_dispatch: false, network_shaping: false, sarvam_translation: false,
       emulator_network_controls: {
@@ -670,9 +670,10 @@ describe("Components tests with jsdom", () => {
     const rows = Array.from(container.querySelectorAll(".capability-row")).map(row => row.textContent ?? "");
     expect(rows.find(row => row.includes("Persistent PostgreSQL"))).toContain("Not configured");
     expect(rows.find(row => row.includes("APK upload and validation"))).toContain("Unavailable");
-    expect(rows.find(row => row.includes("Logcat signal analysis"))).toContain("Unavailable");
-    expect(rows.find(row => row.includes("Failure fingerprinting"))).toContain("Unavailable");
-    expect(rows.find(row => row.includes("BharatScore heuristic"))).toContain("Unavailable");
+    expect(rows.find(row => row.includes("Logcat signal analysis"))).toContain("Available");
+    expect(rows.find(row => row.includes("Saved analysis reports"))).toContain("Unavailable");
+    expect(rows.find(row => row.includes("Failure fingerprinting"))).toContain("Available");
+    expect(rows.find(row => row.includes("BharatScore heuristic"))).toContain("Available");
     expect(rows.find(row => row.includes("Risk prioritization"))).toContain("Available");
   });
 
