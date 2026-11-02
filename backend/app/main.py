@@ -1805,6 +1805,7 @@ def analyze_logs(payload: LogAnalysisRequest, request: Request):
     result = analyze_log_text(payload.text, payload.persona_id)
     database_available = bool(DATABASE_URL) if requires_persistent_database() else True
     if database_available:
+        result["persistence"] = {"saved": True}
         with db() as conn:
             conn.execute("INSERT INTO analyses(id,created_at,run_id,persona_id,result_json,owner_id) VALUES(?,?,?,?,?,?)",
                          (result["id"], result["created_at"], payload.run_id, payload.persona_id, json.dumps(result), getattr(request.state, "owner_id", None)))
@@ -1819,7 +1820,6 @@ def analyze_logs(payload: LogAnalysisRequest, request: Request):
                 record_run_event(conn, payload.run_id, "log_analysis_created", actor_type, owner_id, {
                     "analysis_id": result["id"], "finding_count": result["summary"]["finding_count"],
                 })
-        result["persistence"] = {"saved": True}
     else:
         # Stateless log analysis remains useful when production persistence is
         # not configured. Never imply that the report was saved or recoverable.
