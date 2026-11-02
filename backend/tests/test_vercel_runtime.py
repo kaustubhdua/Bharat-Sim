@@ -62,6 +62,14 @@ assert capabilities['apk_upload'] is False
 assert capabilities['log_analysis'] is False
 assert capabilities['risk_planner'] is True
 assert client.get('/api/v1/runs').status_code == 503
+plan = client.post('/api/v1/plan', json={
+    'persona_ids': ['budget-android'],
+    'app_category': 'general',
+    'critical_flows': ['login', 'payment retry'],
+    'max_scenarios': 4,
+})
+assert plan.status_code == 200, plan.text
+assert plan.json()['scenarios']
 assert not DB_PATH.exists(), 'serverless import must not create ephemeral SQLite'
 """
     result = subprocess.run(
