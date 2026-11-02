@@ -158,3 +158,40 @@ Attach one dated record per acceptance item:
 - physical device model/build and test report.
 
 **Completion is achieved only when every P0 and P1 item has evidence, the security review signs off, and the release owner explicitly approves production launch.**
+
+
+## Live infrastructure verification — 2026-11-02
+
+This section records a read-only inspection of the connected Supabase project and the unified Vercel project. It is evidence of configuration state at the inspection time, not a production acceptance sign-off.
+
+### Supabase project
+
+- Project ref: `hkyieaovolkethovyenb`; region: `ap-south-1`; database engine: PostgreSQL 17; project status: `ACTIVE_HEALTHY`.
+- The live `bharatsim` schema contains the seven expected tables: `runs`, `analyses`, `workers`, `run_events`, `artifacts`, `quotas`, and `audit_events`. All seven have RLS enabled.
+- Live migration history includes the four BharatSim migrations: `20261027054905`, `20261027061609`, `20261030181640`, and `20261101042942`.
+- Direct privilege checks confirmed `anon` and `authenticated` have neither schema USAGE nor SELECT on BharatSim tables; `service_role` has SELECT. Keep this schema private and do not add client policies simply to silence the advisor.
+- Private bucket `bharatsim-private` exists with a 157,286,400-byte maximum object size and APK/ZIP/octet-stream MIME allowlist.
+- At inspection: zero Supabase Auth users, zero BharatSim runs, analyses, artifacts, and quotas. No real user-auth lifecycle or persisted customer workload has yet been proven.
+- The Supabase project is shared with GenomeGuard. Do not run an isolated BharatSim-wide migration push, reset the project, or alter GenomeGuard objects. Use a coordinated migration owner or a separate project for future isolation.
+
+### Unified Vercel environment
+
+The linked unified project has the expected public Supabase URL/publishable key and BharatSim mode/auth/storage settings, but the following server-only settings were absent in the inspected environment inventory: `BHARATSIM_DATABASE_URL`, `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`), and `BHARATSIM_WORKER_TOKEN`. Do not infer a usable PostgreSQL connection from the Supabase MCP connection: the application needs a separately configured, SSL-protected connection string and server-only secret. Secret values were not read or printed.
+
+The worker feature flags were false at inspection:
+
+- `BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED=false`
+- `BHARATSIM_WORKER_ISOLATION_ATTESTED=false`
+- `BHARATSIM_WORKER_EGRESS_RESTRICTED=false`
+
+This is the correct fail-closed state until a dedicated per-job Firecracker host and its cleanup/network negative tests are independently accepted. No BharatSim worker service was present in the connected Render workspace at inspection; do not substitute a generic web service or shared VM and call it isolated execution.
+
+### Remaining external acceptance gates
+
+1. Configure the missing Vercel Production secrets from Supabase/Vercel secure dashboards; verify names and targets without exposing values.
+2. Run real email signup/confirmation/login/refresh/logout and two-account isolation tests in the deployed app.
+3. Provision and independently attest a dedicated KVM/Firecracker worker host; then set worker flags only after its negative egress and teardown tests pass.
+4. Complete artifact object lifecycle integration and scheduled retention/reconciliation, then verify object metadata, signed download, expiry, deletion, and orphan cleanup against the private bucket.
+5. Complete cancellation/recovery, full Appium journey, physical-device/network, accessibility, monitoring, backup/restore, and load-test acceptance as described above.
+
+Do not treat INFO-only advisor notices or unused indexes on currently empty tables as release blockers by themselves. Revisit them after representative traffic. Do not change GenomeGuard-owned findings from this project-level audit.
