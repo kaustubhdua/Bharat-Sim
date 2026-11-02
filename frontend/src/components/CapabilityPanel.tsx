@@ -45,10 +45,11 @@ export default function CapabilityPanel({ capabilities, loading }: CapabilityPan
   const databaseReady = capabilities.database_persistence === true;
   const productFeatures = [
     ["APK upload and validation", databaseReady && capabilities.apk_upload],
-    ["Logcat signal analysis", databaseReady && capabilities.log_analysis],
+    ["Logcat signal analysis", capabilities.log_analysis],
+    ["Saved analysis reports", capabilities.analysis_persistence === true],
     ["Risk prioritization", capabilities.risk_planner],
-    ["Failure fingerprinting", databaseReady && capabilities.failure_fingerprinting],
-    ["BharatScore heuristic", databaseReady && capabilities.bharat_score],
+    ["Failure fingerprinting", capabilities.failure_fingerprinting],
+    ["BharatScore heuristic", capabilities.bharat_score],
   ] as const;
   const network = capabilities.emulator_network_controls;
   const conditions = capabilities.persona_condition_simulation;
