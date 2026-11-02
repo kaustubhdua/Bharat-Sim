@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _requirement_name(requirement: str) -> str:
-    return re.split(r"[\\s<=>!~;\\[]", requirement.strip(), maxsplit=1)[0].lower().replace("_", "-")
+    return re.split(r"[\s<=>!~;\[]", requirement.strip(), maxsplit=1)[0].lower().replace("_", "-")
 
 
 def test_vercel_project_dependencies_cover_backend_runtime_requirements() -> None:
