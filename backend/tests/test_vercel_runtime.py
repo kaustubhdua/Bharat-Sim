@@ -1,4 +1,7 @@
 from pathlib import Path
+import os
+import subprocess
+import sys
 
 from app import main
 
@@ -32,3 +35,41 @@ def test_startup_cleanup_remains_enabled_for_local_development(monkeypatch):
     monkeypatch.delenv("VERCEL", raising=False)
     monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
     assert main.should_run_startup_cleanup() is True
+
+
+def test_vercel_preview_import_and_health_are_safe_without_persistent_secrets(tmp_path):
+    env = os.environ.copy()
+    env.update({
+        "VERCEL": "1",
+        "BHARATSIM_ENV": "development",
+        "BHARATSIM_DATA_DIR": str(tmp_path),
+        "BHARATSIM_AUTH_REQUIRED": "false",
+        "BHARATSIM_REQUIRE_API_KEY": "false",
+    })
+    for key in ("BHARATSIM_DATABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"):
+        env.pop(key, None)
+
+    code = """
+from fastapi.testclient import TestClient
+from app.main import app, DB_PATH
+client = TestClient(app)
+assert client.get('/health/live').status_code == 200
+assert client.get('/health/ready').status_code == 503
+assert client.get('/api/v1/personas').status_code == 200
+capabilities = client.get('/api/v1/capabilities').json()
+assert capabilities['database_persistence'] is False
+assert capabilities['apk_upload'] is False
+assert capabilities['log_analysis'] is False
+assert capabilities['risk_planner'] is True
+assert client.get('/api/v1/runs').status_code == 503
+assert not DB_PATH.exists(), 'serverless import must not create ephemeral SQLite'
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
