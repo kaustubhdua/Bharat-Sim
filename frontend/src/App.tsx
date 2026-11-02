@@ -43,7 +43,7 @@ import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
-import { readSession } from "./auth";
+import { isDemoMode, readSession } from "./auth";
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
 const API_DOCS_URL = API || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
@@ -51,6 +51,7 @@ const API_DOCS_URL = API || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "")
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const previewMode = isDemoMode();
 
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");
@@ -141,6 +142,10 @@ export default function App() {
 
   async function submitApk(e: FormEvent) {
     e.preventDefault();
+    if (previewMode) {
+      setError("APK registration is available only after signing in. The public preview is limited to personas and risk planning.");
+      return;
+    }
     setError("");
     setNotice("");
     setBusy(true);
@@ -212,6 +217,10 @@ export default function App() {
   }
 
   async function analyzeLogs(text = logText) {
+    if (previewMode) {
+      setError("Log analysis uses private report services. Sign in or create an account to submit logcat.");
+      return;
+    }
     if (!text.trim()) {
       setError("Paste logcat output first.");
       return;
@@ -565,8 +574,11 @@ export default function App() {
                     workers={workers}
                     busy={busy}
                     apiStatus={apiStatus}
-                    directUploadAvailable={capabilities?.database_persistence === true && capabilities?.direct_apk_upload === true}
-                    uploadAvailable={capabilities?.database_persistence === true && capabilities?.apk_upload === true}
+                    directUploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.direct_apk_upload === true}
+                    uploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.apk_upload === true}
+                    lockedReason={previewMode
+                      ? "Public preview is read-only for private APK operations. Sign in to register APK runs."
+                      : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
                     onSubmit={submitApk}
                   />
 
@@ -583,7 +595,14 @@ export default function App() {
                         <FileSearch size={19} />
                       </div>
                     </div>
+                    {previewMode && (
+                      <div className="alert preview-info" role="status">
+                        <ShieldCheck size={16} />
+                        <span>Public preview: explore live personas and the risk planner. Log analysis and report export require a signed-in account.</span>
+                      </div>
+                    )}
                     <textarea
+                      disabled={previewMode}
                       value={logText}
                       onChange={(e) => setLogText(e.target.value)}
                       placeholder="Paste Android logcat output here…"
@@ -608,7 +627,7 @@ export default function App() {
                     <div className="log-actions">
                       <button
                         className="primary-button"
-                        disabled={busy || apiStatus !== "online" || capabilities?.log_analysis !== true}
+                        disabled={previewMode || busy || apiStatus !== "online" || capabilities?.log_analysis !== true}
                         onClick={() => void analyzeLogs()}
                       >
                         {analysisBusy ? (
