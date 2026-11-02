@@ -703,7 +703,23 @@ def cleanup_expired_uploads() -> None:
                 conn.execute("UPDATE runs SET apk_path=NULL,apk_storage_path=NULL WHERE id=?", (row["id"],))
 
 
-cleanup_expired_uploads()
+def should_run_startup_cleanup() -> bool:
+    """Run filesystem/database cleanup only in local development processes.
+
+    Vercel functions are short-lived and may be imported before production
+    persistence is configured. Import-time cleanup can otherwise open the
+    ephemeral SQLite fallback and crash the entire ASGI function. Production
+    cleanup belongs in a separately scheduled job with explicit DB credentials.
+    """
+    return (
+        APP_ENV not in {"production", "prod"}
+        and os.getenv("VERCEL") != "1"
+        and not os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+    )
+
+
+if should_run_startup_cleanup():
+    cleanup_expired_uploads()
 
 
 def failure_fingerprint(line: str) -> str:
