@@ -139,9 +139,10 @@ def test_serverless_capabilities_hide_database_dependent_actions_without_postgre
     assert capabilities["database_persistence"] is False
     assert capabilities["apk_upload"] is False
     assert capabilities["direct_apk_upload"] is False
-    assert capabilities["log_analysis"] is False
-    assert capabilities["failure_fingerprinting"] is False
-    assert capabilities["bharat_score"] is False
+    assert capabilities["log_analysis"] is True
+    assert capabilities["analysis_persistence"] is False
+    assert capabilities["failure_fingerprinting"] is True
+    assert capabilities["bharat_score"] is True
     assert capabilities["risk_planner"] is True
 
 
