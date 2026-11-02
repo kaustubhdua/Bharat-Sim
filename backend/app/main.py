@@ -1899,3 +1899,11 @@ def capabilities():
             "Worker result payloads are bounded and protected by lease tokens; inline artifact payloads are limited to 250 KB.",
         ],
     }
+
+
+# The Vercel customer-facing project builds the Vite dashboard and serves it
+# from this same FastAPI deployment. During backend-only unit tests the build
+# output is absent, so the API remains independently importable.
+_FRONTEND_BUILD = Path("frontend/dist")
+if _FRONTEND_BUILD.is_dir():
+    app.frontend("/", directory="frontend/dist", fallback="index.html")
