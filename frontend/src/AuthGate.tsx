@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Activity, ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
-import { authConfigured, readSession, refreshSession, signIn, signOut, signUp, type UserSession } from "./auth";
+import { authConfigured, enterDemoMode, exitDemoMode, isDemoMode, readSession, refreshSession, signIn, signOut, signUp, type UserSession } from "./auth";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<UserSession | null>(() => authConfigured ? readSession() : null);
+  const [demoMode, setDemoMode] = useState(() => isDemoMode());
   const [checking, setChecking] = useState(authConfigured);
   const [signupMode, setSignupMode] = useState(false);
   const [email, setEmail] = useState("");
@@ -53,10 +54,13 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     try {
       if (signupMode) {
         const created = await signUp(email.trim(), password);
-        if (created) setSession(readSession());
+        if (created) { exitDemoMode(); setDemoMode(false); setSession(readSession()); }
         else { setNotice("Account created. Check your email to confirm it, then sign in."); setSignupMode(false); }
       } else {
-        setSession(await signIn(email.trim(), password));
+        const next = await signIn(email.trim(), password);
+        exitDemoMode();
+        setDemoMode(false);
+        setSession(next);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed.");
@@ -65,9 +69,21 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
   async function logout() {
     await signOut();
+    exitDemoMode();
+    setDemoMode(false);
     setSession(null);
     setPassword("");
   }
+
+  if (!session && demoMode) return (
+    <>
+      <div className="public-preview-bar" role="status">
+        <span><ShieldCheck size={15} /> Public preview · live persona and risk planner · private operations remain locked</span>
+        <button onClick={() => { exitDemoMode(); setDemoMode(false); }}>Sign in / Create account</button>
+      </div>
+      {children}
+    </>
+  );
 
   if (!session) return (
     <main className="auth-screen">
@@ -86,6 +102,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
           <button className="auth-submit" disabled={busy}>{busy ? <LoaderCircle className="auth-spin" size={17} /> : <>{signupMode ? "Create account" : "Sign in"} <ArrowRight size={16} /></>}</button>
         </form>
         <button className="auth-switch" onClick={() => { setSignupMode(!signupMode); setError(""); setNotice(""); }}>{signupMode ? "Already have an account? Sign in" : "New to BharatSim? Create an account"}</button>
+        {!signupMode && <button className="auth-demo-button" onClick={() => { enterDemoMode(); setDemoMode(true); setError(""); }}>Explore public planner preview <ArrowRight size={15} /></button>}
         <small className="auth-foot">Your session is kept in this browser tab and refreshed before expiry. Never share your password or access token.</small>
       </section>
     </main>
