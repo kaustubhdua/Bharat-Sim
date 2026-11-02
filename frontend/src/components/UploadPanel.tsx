@@ -13,6 +13,7 @@ interface UploadPanelProps {
   apiStatus: string;
   directUploadAvailable: boolean;
   uploadAvailable: boolean;
+  lockedReason?: string;
   onSubmit: (e: FormEvent) => Promise<void>;
 }
 
@@ -29,6 +30,7 @@ export default function UploadPanel({
   apiStatus,
   directUploadAvailable,
   uploadAvailable,
+  lockedReason = "Run registration is unavailable until production PostgreSQL and private APK storage are configured.",
   onSubmit
 }: UploadPanelProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -37,7 +39,7 @@ export default function UploadPanel({
   function validateAndSetFile(file: File | null) {
     if (!uploadAvailable) {
       setApk(null);
-      setFileError("Run registration is unavailable until production PostgreSQL and private APK storage are configured.");
+      setFileError(lockedReason);
       return;
     }
     if (!file) {
@@ -136,7 +138,7 @@ export default function UploadPanel({
         {apiStatus !== "offline" && !uploadAvailable && (
           <div className="alert error-alert upload-inline-error" role="status">
             <CircleAlert size={16} />
-            <span>Run registration is unavailable until persistent PostgreSQL and private Supabase Storage are configured. Risk planning remains available; saved log analysis requires PostgreSQL.</span>
+            <span>{lockedReason}</span>
           </div>
         )}
 
@@ -171,7 +173,7 @@ export default function UploadPanel({
           <CircleAlert size={16} />
           <span>
             {!uploadAvailable
-              ? "APK run registration is currently unavailable. No upload or test run will be attempted."
+              ? lockedReason + " No upload or test run will be attempted."
               : workers.some((w) => w.online)
                 ? "A worker is online. The run will only count as executed after it submits a report with evidence."
                 : "No worker heartbeat detected. This registers the APK; execution will wait for a worker and no test pass/failure is implied."}
