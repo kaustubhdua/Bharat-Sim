@@ -225,10 +225,6 @@ export default function App() {
   }
 
   async function analyzeLogs(text = logText) {
-    if (previewMode) {
-      setError("Log analysis uses private report services. Sign in or create an account to submit logcat.");
-      return;
-    }
     if (!text.trim()) {
       setError("Paste logcat output first.");
       return;
