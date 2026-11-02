@@ -86,6 +86,7 @@ def test_log_analysis_persists_report():
     })
     assert response.status_code == 200
     assert response.json()["summary"]["finding_count"] == 2
+    assert response.json()["persistence"]["saved"] is True
     assert client.get("/api/v1/analyses").status_code == 200
 
 
