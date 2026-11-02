@@ -32,6 +32,19 @@ describe("Supabase browser authentication", () => {
     vi.resetModules();
   });
 
+  it("enters and exits public preview without creating an authenticated session", async () => {
+    const auth = await loadAuth();
+
+    expect(auth.isDemoMode()).toBe(false);
+    auth.enterDemoMode();
+    expect(auth.isDemoMode()).toBe(true);
+    expect(auth.readSession()).toBeNull();
+
+    auth.exitDemoMode();
+    expect(auth.isDemoMode()).toBe(false);
+    expect(auth.readSession()).toBeNull();
+  });
+
   it("signs in with the publishable key and stores the returned session", async () => {
     const auth = await loadAuth();
     const payload = sessionPayload();
