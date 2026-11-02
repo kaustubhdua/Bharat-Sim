@@ -4,6 +4,9 @@ This guide is for recording a truthful, repeatable local demo of the current con
 
 ## What the demo proves
 
+The deployed sign-in screen also offers **Explore public planner preview**. This guest view calls the live persona and risk-planning API; it is not a fake account. APK registration, log submission, report export and private run history remain locked until a visitor signs in. For a full local recording, use the no-auth local development setup below.
+
+
 The strongest locally reproducible story is:
 
 1. Start the FastAPI API and React dashboard locally.
