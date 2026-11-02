@@ -2,6 +2,8 @@
 
 This guide prepares a dedicated Linux VM to run the existing authenticated Android worker. It is not a substitute for provisioning the VM, verifying KVM, or running a real APK end-to-end.
 
+> **Important isolation boundary:** the current `worker/agent.py` and `worker/runner.py` execute against an ADB device supplied by the host; they do not create a fresh Firecracker microVM per customer job. This systemd setup is therefore only a private, restricted-host pilot recipe. A single shared VM, Docker container, or emulator is **not** sufficient to attest the per-job isolation decision in [ISOLATED_WORKER_DESIGN.md](./ISOLATED_WORKER_DESIGN.md). Keep all three production worker flags false until the Firecracker/jailer supervisor, per-job guest lifecycle, host firewall/default-deny egress, resource limits, cleanup, and real end-to-end acceptance are implemented and independently verified.
+
 ## 1. Host requirements
 
 Use a disposable Ubuntu 24.04 x86_64 VM with:
