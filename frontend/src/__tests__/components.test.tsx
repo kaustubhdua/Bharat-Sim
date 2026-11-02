@@ -325,6 +325,7 @@ describe("Components tests with jsdom", () => {
           busy={false}
           apiStatus="online"
           directUploadAvailable={false}
+          uploadAvailable={true}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -348,6 +349,7 @@ describe("Components tests with jsdom", () => {
           busy={false}
           apiStatus="online"
           directUploadAvailable={false}
+          uploadAvailable={true}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -355,6 +357,34 @@ describe("Components tests with jsdom", () => {
 
     const button = container.querySelector("button[type='submit']") as HTMLButtonElement;
     expect(button.disabled).toBe(false);
+  });
+
+  it("UploadPanel blocks APK registration when production persistence is unavailable", async () => {
+    const mockFile = new File(["content"], "app.apk", { type: "application/vnd.android.package-archive" });
+    await act(async () => {
+      root.render(
+        <UploadPanel
+          apk={mockFile}
+          setApk={vi.fn()}
+          selected="budget-android"
+          setSelected={vi.fn()}
+          personas={fallbackPersonas}
+          workers={[]}
+          busy={false}
+          apiStatus="online"
+          directUploadAvailable={false}
+          uploadAvailable={false}
+          onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
+        />
+      );
+    });
+
+    const button = container.querySelector("button[type='submit']") as HTMLButtonElement;
+    const input = container.querySelector("input[type='file']") as HTMLInputElement;
+    expect(button.disabled).toBe(true);
+    expect(input.disabled).toBe(true);
+    expect(container.textContent).toContain("Run registration is unavailable until persistent PostgreSQL and private Supabase Storage are configured.");
+    expect(container.textContent).not.toContain("This deployment accepts APKs up to 4 MB only");
   });
 
   it("UploadPanel rejects non-apk files with inline error message", async () => {
@@ -371,6 +401,7 @@ describe("Components tests with jsdom", () => {
           busy={false}
           apiStatus="online"
           directUploadAvailable={false}
+          uploadAvailable={true}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -402,6 +433,7 @@ describe("Components tests with jsdom", () => {
           busy={false}
           apiStatus="online"
           directUploadAvailable={false}
+          uploadAvailable={true}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -433,6 +465,7 @@ describe("Components tests with jsdom", () => {
           busy={false}
           apiStatus="online"
           directUploadAvailable={false}
+          uploadAvailable={true}
           onSubmit={vi.fn().mockImplementation((e) => e.preventDefault())}
         />
       );
@@ -511,6 +544,7 @@ describe("Components tests with jsdom", () => {
           busy={false}
           apiStatus="offline"
           directUploadAvailable={false}
+          uploadAvailable={true}
           onSubmit={vi.fn()}
         />
       );
