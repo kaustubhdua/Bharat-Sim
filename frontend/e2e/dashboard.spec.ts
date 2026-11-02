@@ -16,6 +16,25 @@ test.beforeEach(async ({ page }) => {
   await page.reload();
 });
 
+
+test("public preview exposes the live planner but keeps private actions gated", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+
+  await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
+  await page.getByRole("button", { name: /Explore public planner preview/ }).click();
+
+  await expect(page.getByText(/Public preview · live persona and risk planner/)).toBeVisible();
+  await expect(page.getByText("API connected")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Risk-first test plan" })).toBeVisible();
+  await expect(page.getByPlaceholder("Paste Android logcat output here…")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Analyze evidence" })).toBeDisabled();
+  await expect(page.locator('input[type="file"]')).toBeDisabled();
+  await expect(page.getByText(/Log analysis and report export require a signed-in account/)).toBeVisible();
+});
+
 test("dashboard connects to the real API and renders authored profiles", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
