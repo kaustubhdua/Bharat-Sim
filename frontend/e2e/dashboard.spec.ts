@@ -1,5 +1,21 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  // The local API deliberately does not enforce JWTs, but production builds
+  // still exercise the same authenticated dashboard gate.
+  await page.goto("/");
+  await page.evaluate(() => {
+    sessionStorage.setItem("bharatsim.supabase.session", JSON.stringify({
+      access_token: "playwright-local-test-token",
+      refresh_token: "playwright-local-refresh-token",
+      expires_at: 4102444800,
+      token_type: "bearer",
+      user: { id: "11111111-1111-4111-8111-111111111111", email: "playwright@example.test" },
+    }));
+  });
+  await page.reload();
+});
+
 test("dashboard connects to the real API and renders authored profiles", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
@@ -83,4 +99,13 @@ test("overview uses live readiness instead of a synthetic device demo", async ({
   await expect(page.getByText("Try illustrative sample")).toHaveCount(0);
   await expect(page.getByText("Load illustrative sample")).toHaveCount(0);
   await expect(page.getByText("No sample execution metrics are shown.")).toHaveCount(0);
+});
+
+test("secure workspace requires sign-in when no session exists", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => sessionStorage.removeItem("bharatsim.supabase.session"));
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
+  await expect(page.getByLabel("Email address")).toBeVisible();
+  await expect(page.getByLabel("Password")).toBeVisible();
 });
