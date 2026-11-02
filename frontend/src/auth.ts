@@ -11,6 +11,21 @@ export type UserSession = {
 };
 
 export const authConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
+const DEMO_MODE_KEY = "bharatsim.public.demo";
+
+/** Public preview is a UI-only guest session; it never creates an API identity. */
+export function isDemoMode(): boolean {
+  return sessionStorage.getItem(DEMO_MODE_KEY) === "1";
+}
+
+export function enterDemoMode(): void {
+  sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.setItem(DEMO_MODE_KEY, "1");
+}
+
+export function exitDemoMode(): void {
+  sessionStorage.removeItem(DEMO_MODE_KEY);
+}
 
 export function readSession(): UserSession | null {
   try {
