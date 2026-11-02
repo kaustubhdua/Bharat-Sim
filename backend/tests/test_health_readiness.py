@@ -1,4 +1,6 @@
 from contextlib import contextmanager
+import asyncio
+from io import BytesIO
 
 import pytest
 
@@ -152,3 +154,16 @@ def test_local_development_can_initialize_sqlite(monkeypatch):
     monkeypatch.delenv("VERCEL", raising=False)
     monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
     assert main.should_initialize_local_database() is True
+
+
+def test_serverless_multipart_apk_upload_requires_private_storage(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "development")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", False)
+    monkeypatch.setenv("VERCEL", "1")
+    upload = main.UploadFile(filename="sample.apk", file=BytesIO(b"PK\\x03\\x04"))
+
+    with pytest.raises(main.HTTPException) as error:
+        asyncio.run(main.create_run(None, "budget-android", upload))
+
+    assert error.value.status_code == 503
+    assert "Private Supabase Storage" in error.value.detail
