@@ -646,6 +646,36 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("Sarvam translation");
   });
 
+  it("CapabilityPanel fails closed when an older API omits database persistence", async () => {
+    const legacyCapabilities = {
+      apk_upload: true, direct_apk_upload: true, log_analysis: true, risk_planner: true,
+      failure_fingerprinting: true, bharat_score: true, android_execution: false,
+      worker_dispatch: false, network_shaping: false, sarvam_translation: false,
+      emulator_network_controls: {
+        latency: true, bandwidth: true, configuration_readback: true,
+        packet_loss: false, outage_and_recovery: false,
+        arbitrary_app_traffic_verified: false, scope: "Emulator console controls."
+      },
+      persona_condition_simulation: {
+        supported: ["network_latency"], control_plane_verifiable: [],
+        report_only: [], unsupported: [], scope: "Worker required."
+      },
+      notes: []
+    };
+
+    await act(async () => {
+      root.render(<CapabilityPanel capabilities={legacyCapabilities} loading={false} />);
+    });
+
+    const rows = Array.from(container.querySelectorAll(".capability-row")).map(row => row.textContent ?? "");
+    expect(rows.find(row => row.includes("Persistent PostgreSQL"))).toContain("Not configured");
+    expect(rows.find(row => row.includes("APK upload and validation"))).toContain("Unavailable");
+    expect(rows.find(row => row.includes("Logcat signal analysis"))).toContain("Unavailable");
+    expect(rows.find(row => row.includes("Failure fingerprinting"))).toContain("Unavailable");
+    expect(rows.find(row => row.includes("BharatScore heuristic"))).toContain("Unavailable");
+    expect(rows.find(row => row.includes("Risk prioritization"))).toContain("Available");
+  });
+
   it("CapabilityPanel does not infer availability when API capability data is missing", async () => {
     await act(async () => {
       root.render(<CapabilityPanel capabilities={null} loading={false} />);
