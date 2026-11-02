@@ -136,7 +136,7 @@ export default function UploadPanel({
         {apiStatus !== "offline" && !uploadAvailable && (
           <div className="alert error-alert upload-inline-error" role="status">
             <CircleAlert size={16} />
-            <span>Run registration is unavailable until persistent PostgreSQL and private Supabase Storage are configured. Log analysis and risk planning remain available.</span>
+            <span>Run registration is unavailable until persistent PostgreSQL and private Supabase Storage are configured. Risk planning remains available; saved log analysis requires PostgreSQL.</span>
           </div>
         )}
 
