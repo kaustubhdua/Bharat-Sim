@@ -39,7 +39,7 @@ Wait until adb -s emulator-5554 shell getprop sys.boot_completed returns 1. Veri
 
 Create /etc/bharatsim/worker.env with root-only permissions (mode 0600):
 
-    BHARATSIM_API_URL=https://bharat-sim-bay.vercel.app
+    BHARATSIM_API_URL=https://bharat-sim-81g2.vercel.app
     BHARATSIM_WORKER_TOKEN=<same strong random token configured on the API>
     BHARATSIM_WORKER_ID=android-worker-01
     ANDROID_SERIAL=emulator-5554
@@ -47,7 +47,7 @@ Create /etc/bharatsim/worker.env with root-only permissions (mode 0600):
     BHARATSIM_POLL_SECONDS=5
     BHARATSIM_SMOKE_DURATION_SECONDS=20
 
-The API's production alias currently has Vercel SSO protection and production database/Storage credentials are not yet configured. Do not start this service against that alias until those blockers are resolved and the API is reachable from the worker.
+The canonical unified Vercel project is `bharat-sim-81g2` and serves the frontend and FastAPI API from one origin. Before starting this worker, verify that the canonical production deployment is healthy, that `/health/ready` is ready, and that the worker can reach the API over HTTPS. The API's production environment must include a persistent PostgreSQL connection and server-only Supabase Storage credentials; never put these credentials in this worker's environment unless the worker genuinely requires them (it should use only its worker token).
 
 Production worker claims are also fail-closed until all three API flags are explicitly enabled: `BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED=true`, `BHARATSIM_WORKER_ISOLATION_ATTESTED=true`, and `BHARATSIM_WORKER_EGRESS_RESTRICTED=true`. Set them only after independently verifying a disposable VM/microVM boundary and default-deny egress from inside the worker environment. These are operator attestations, not cryptographic remote attestation; a worker token alone is never a sandbox. Keep all three false until that review is complete.
 
