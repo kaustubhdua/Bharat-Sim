@@ -71,3 +71,25 @@ def test_development_readiness_does_not_require_production_auth_or_storage(monke
     assert b'"status":"ready"' in response.body
     assert b'"authentication_required":false' in response.body
     assert b'"private_storage_required":false' in response.body
+
+
+def test_production_capabilities_disable_upload_without_persistent_storage(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", False)
+
+    capabilities = main.capabilities()
+
+    assert capabilities["apk_upload"] is False
+    assert capabilities["direct_apk_upload"] is False
+
+
+def test_production_capabilities_require_database_and_storage_for_upload(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "DATABASE_URL", "postgresql://user:pass@db.example.com:5432/postgres?sslmode=require")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", True)
+
+    capabilities = main.capabilities()
+
+    assert capabilities["apk_upload"] is True
+    assert capabilities["direct_apk_upload"] is True
