@@ -710,7 +710,7 @@ export default function App() {
                       <CircleAlert size={18} />
                       <span>API is down or unreachable. Unable to load test runs.</span>
                     </div>
-                  ) : capabilities?.database_persistence === false ? (
+                  ) : capabilities?.database_persistence !== true ? (
                     <div className="empty-state">
                       <div className="empty-icon">
                         <FlaskConical size={22} />
