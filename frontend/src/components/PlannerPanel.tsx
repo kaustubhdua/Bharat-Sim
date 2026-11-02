@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, FlaskConical, RefreshCw } from "lucide-react";
+import { Activity, Download, FlaskConical, RefreshCw } from "lucide-react";
 import { api, cls, type PlanResponse } from "../api";
 
 const FLOW_PRESETS = {
@@ -36,11 +36,23 @@ export default function PlannerPanel({ selected }: { selected: string }) {
     criticalFlows: [...FLOW_PRESETS.general],
   });
 
-  const draftFlows = draftFlowsText
+  const parsedDraftFlows = draftFlowsText
     .split(/[\n,]/)
     .map((flow) => flow.trim())
-    .filter(Boolean)
-    .slice(0, 10);
+    .filter(Boolean);
+  const draftFlows = parsedDraftFlows.slice(0, 10);
+  const hasTooManyFlows = parsedDraftFlows.length > 10;
+
+  function exportPlan() {
+    if (!plan) return;
+    const blob = new Blob([JSON.stringify(plan, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "bharatsim-risk-plan-" + plan.app_category + ".json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 
   function generatePlan() {
     if (draftFlows.length === 0) return;
@@ -55,6 +67,7 @@ export default function PlannerPanel({ selected }: { selected: string }) {
     let active = true;
     setLoading(true);
     setError("");
+    setPlan(null);
     api<PlanResponse>("/api/v1/plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,6 +97,7 @@ export default function PlannerPanel({ selected }: { selected: string }) {
           <h2>Risk-first test plan</h2>
           <p>Choose the app's critical journeys; the planner ranks them against persona constraints and paired conditions.</p>
         </div>
+        {plan && <button type="button" className="text-button" onClick={exportPlan}><Download size={14} /> Export plan JSON</button>}
       </div>
 
       <div className="planner-config">
@@ -108,8 +122,8 @@ export default function PlannerPanel({ selected }: { selected: string }) {
           </label>
         </div>
         <div className="planner-config-footer">
-          <span>{draftFlows.length} / 10 journeys · category-specific risk keywords{draftFlows.length === 0 ? " · add at least one journey to continue" : ""}</span>
-          <button type="button" className="planner-generate" onClick={generatePlan} disabled={loading || draftFlows.length === 0}>
+          <span>{draftFlows.length} / 10 journeys · category-specific risk keywords{draftFlows.length === 0 ? " · add at least one journey to continue" : ""}{hasTooManyFlows ? " · remove extra journeys to continue" : ""}</span>
+          <button type="button" className="planner-generate" onClick={generatePlan} disabled={loading || draftFlows.length === 0 || hasTooManyFlows}>
             <RefreshCw size={14} className={loading ? "spin" : ""} />
             Generate plan
           </button>
@@ -117,12 +131,13 @@ export default function PlannerPanel({ selected }: { selected: string }) {
       </div>
 
       {loading && !plan ? <div className="planner-empty">Generating ranked scenarios…</div> : null}
-      {error ? <div className="planner-empty">{error}</div> : null}
+      {error ? <div className="planner-empty" role="alert">{error}</div> : null}
       {plan ? <>
         <div className="planner-active-config">
           <span>{CATEGORY_LABELS[plan.app_category as AppCategory] || plan.app_category}</span>
           <span>{plan.critical_flows.length} critical journeys ranked</span>
           <span>Deterministic heuristic · not failure probability</span>
+          <span>Generated {new Date(plan.generated_at).toLocaleString()}</span>
         </div>
         <div className="planner-stats">
           <div><b>{plan.total_candidates}</b><span>candidate scenarios</span></div>
