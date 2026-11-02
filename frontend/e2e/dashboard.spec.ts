@@ -195,6 +195,7 @@ test("risk planner validates journeys and returns a real API-generated plan", as
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Risk-first test plan" })).toBeVisible();
 
+  await page.getByLabel("Application category").selectOption("fintech");
   const journeys = page.getByLabel("Critical user journeys");
   const generate = page.getByRole("button", { name: "Generate plan" });
   await journeys.fill("   \n  ");
