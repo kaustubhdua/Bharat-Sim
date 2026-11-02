@@ -320,21 +320,27 @@ async def enforce_api_authentication(request: Request, call_next):
         supplied = request.headers.get("X-BharatSim-API-Key", "")
         if not hmac.compare_digest(supplied, expected):
             return JSONResponse(status_code=401, content={"detail": "Missing or invalid API key"})
-    protected = (
+    database_protected = (
         request.url.path == "/api/v1/runs"
         or request.url.path.startswith("/api/v1/runs/")
-        or request.url.path in {"/api/v1/analyze/logs", "/api/v1/analyses", "/api/v1/workers", "/api/v1/translate/report"}
+        or request.url.path in {"/api/v1/analyses", "/api/v1/workers"}
         or request.url.path.startswith("/api/v1/uploads/")
     )
-    if APP_ENV in {"production", "prod"} and protected:
-        if not DATABASE_URL:
-            return JSONResponse(status_code=503, content={"detail": "Production persistence is not configured"})
+    # Pasted-log analysis is stateless when no run_id is supplied. It still
+    # requires a verified user identity in production, but not PostgreSQL.
+    auth_protected = database_protected or request.url.path in {
+        "/api/v1/analyze/logs", "/api/v1/translate/report"
+    }
+    if APP_ENV in {"production", "prod"} and auth_protected:
         if not AUTH_REQUIRED or not SUPABASE_URL.startswith("https://"):
             return JSONResponse(status_code=503, content={"detail": "Production authentication is not configured"})
+    if APP_ENV in {"production", "prod"} and database_protected:
+        if not DATABASE_URL:
+            return JSONResponse(status_code=503, content={"detail": "Production persistence is not configured"})
         if (request.url.path.startswith("/api/v1/uploads/") or
                 (request.method == "POST" and request.url.path == "/api/v1/runs")) and not STORAGE_ENABLED:
             return JSONResponse(status_code=503, content={"detail": "Private APK storage is not configured"})
-    if AUTH_REQUIRED and protected:
+    if AUTH_REQUIRED and auth_protected:
         scheme, _, token = request.headers.get("Authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not token.strip() or len(token) > 16384:
             return JSONResponse(status_code=401, content={"detail": "A valid Supabase access token is required"}, headers={"WWW-Authenticate": "Bearer"})
@@ -1797,20 +1803,30 @@ def analyze_logs(payload: LogAnalysisRequest, request: Request):
         if not owned:
             raise HTTPException(status_code=404, detail="Run not found")
     result = analyze_log_text(payload.text, payload.persona_id)
-    with db() as conn:
-        conn.execute("INSERT INTO analyses(id,created_at,run_id,persona_id,result_json,owner_id) VALUES(?,?,?,?,?,?)",
-                     (result["id"], result["created_at"], payload.run_id, payload.persona_id, json.dumps(result), getattr(request.state, "owner_id", None)))
-        owner_id = getattr(request.state, "owner_id", None)
-        actor_type = "user" if owner_id else "system"
-        record_audit_event(conn, owner_id, actor_type, owner_id, "analysis.created", "analysis", result["id"], {
-            "persona_id": payload.persona_id, "run_id": payload.run_id,
-            "finding_count": result["summary"]["finding_count"],
-            "occurrence_count": result["summary"].get("occurrence_count", result["summary"]["finding_count"]),
-        })
-        if payload.run_id:
-            record_run_event(conn, payload.run_id, "log_analysis_created", actor_type, owner_id, {
-                "analysis_id": result["id"], "finding_count": result["summary"]["finding_count"],
+    database_available = bool(DATABASE_URL) if requires_persistent_database() else True
+    if database_available:
+        with db() as conn:
+            conn.execute("INSERT INTO analyses(id,created_at,run_id,persona_id,result_json,owner_id) VALUES(?,?,?,?,?,?)",
+                         (result["id"], result["created_at"], payload.run_id, payload.persona_id, json.dumps(result), getattr(request.state, "owner_id", None)))
+            owner_id = getattr(request.state, "owner_id", None)
+            actor_type = "user" if owner_id else "system"
+            record_audit_event(conn, owner_id, actor_type, owner_id, "analysis.created", "analysis", result["id"], {
+                "persona_id": payload.persona_id, "run_id": payload.run_id,
+                "finding_count": result["summary"]["finding_count"],
+                "occurrence_count": result["summary"].get("occurrence_count", result["summary"]["finding_count"]),
             })
+            if payload.run_id:
+                record_run_event(conn, payload.run_id, "log_analysis_created", actor_type, owner_id, {
+                    "analysis_id": result["id"], "finding_count": result["summary"]["finding_count"],
+                })
+        result["persistence"] = {"saved": True}
+    else:
+        # Stateless log analysis remains useful when production persistence is
+        # not configured. Never imply that the report was saved or recoverable.
+        result["persistence"] = {
+            "saved": False,
+            "reason": "Persistent PostgreSQL is not configured; this report is available only in the current browser session.",
+        }
     return result
 
 @app.get("/api/v1/analyses")
@@ -1852,8 +1868,8 @@ def capabilities():
     return {
         "database_persistence": database_configured,
         "apk_upload": upload_available, "direct_apk_upload": direct_upload_available,
-        "log_analysis": database_configured, "risk_planner": True,
-        "failure_fingerprinting": database_configured, "bharat_score": database_configured,
+        "log_analysis": True, "analysis_persistence": database_configured, "risk_planner": True,
+        "failure_fingerprinting": True, "bharat_score": True,
         "android_execution": False,
         "worker_dispatch": worker,
         "network_shaping": False,
