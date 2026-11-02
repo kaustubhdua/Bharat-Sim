@@ -30,7 +30,7 @@ export default function UploadPanel({
   apiStatus,
   directUploadAvailable,
   uploadAvailable,
-  lockedReason = "Run registration is unavailable until production PostgreSQL and private APK storage are configured.",
+  lockedReason = "Run registration is unavailable until persistent PostgreSQL and private Supabase Storage are configured.",
   onSubmit
 }: UploadPanelProps) {
   const [isDragging, setIsDragging] = useState(false);
