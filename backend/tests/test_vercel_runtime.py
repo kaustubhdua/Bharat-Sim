@@ -59,7 +59,8 @@ assert client.get('/api/v1/personas').status_code == 200
 capabilities = client.get('/api/v1/capabilities').json()
 assert capabilities['database_persistence'] is False
 assert capabilities['apk_upload'] is False
-assert capabilities['log_analysis'] is False
+assert capabilities['log_analysis'] is True
+assert capabilities['analysis_persistence'] is False
 assert capabilities['risk_planner'] is True
 assert client.get('/api/v1/runs').status_code == 503
 plan = client.post('/api/v1/plan', json={
