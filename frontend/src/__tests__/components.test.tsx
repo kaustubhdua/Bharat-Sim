@@ -615,6 +615,7 @@ describe("Components tests with jsdom", () => {
 
   it("CapabilityPanel renders only the backend-declared capability contract", async () => {
     const capabilities = {
+      database_persistence: true,
       apk_upload: true, direct_apk_upload: false, log_analysis: true, risk_planner: true,
       failure_fingerprinting: true, bharat_score: true, android_execution: false,
       worker_dispatch: true, network_shaping: false, sarvam_translation: false,
