@@ -1,5 +1,7 @@
 from contextlib import contextmanager
 
+import pytest
+
 from app import main
 
 
@@ -93,3 +95,47 @@ def test_production_capabilities_require_database_and_storage_for_upload(monkeyp
 
     assert capabilities["apk_upload"] is True
     assert capabilities["direct_apk_upload"] is True
+
+
+def test_serverless_database_access_fails_closed_without_postgres(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "development")
+    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setenv("VERCEL", "1")
+
+    with pytest.raises(main.HTTPException) as error:
+        with main.db():
+            pass
+
+    assert error.value.status_code == 503
+    assert "Persistent PostgreSQL" in error.value.detail
+
+
+def test_serverless_readiness_requires_persistent_postgres_and_private_storage(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "development")
+    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setattr(main, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", False)
+    monkeypatch.setenv("VERCEL", "1")
+
+    response = main.health_ready()
+
+    assert response.status_code == 503
+    assert b'"database":"unavailable"' in response.body
+    assert b'"private_storage_required":true' in response.body
+    assert b'"status":"not_ready"' in response.body
+
+
+def test_serverless_capabilities_hide_database_dependent_actions_without_postgres(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "development")
+    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", False)
+    monkeypatch.setenv("VERCEL", "1")
+
+    capabilities = main.capabilities()
+
+    assert capabilities["database_persistence"] is False
+    assert capabilities["apk_upload"] is False
+    assert capabilities["direct_apk_upload"] is False
+    assert capabilities["log_analysis"] is False
+    assert capabilities["risk_planner"] is True
