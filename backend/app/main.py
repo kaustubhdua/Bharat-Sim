@@ -1358,7 +1358,9 @@ def require_worker_token(request: Request) -> None:
 
 
 def production_worker_execution_enabled() -> bool:
-    """Require explicit operator approval and isolation assertions before public APK execution."""
+    """Require an attested host before any serverless deployment can dispatch APKs."""
+    if is_serverless_runtime() and APP_ENV not in {"production", "prod"}:
+        return False
     if APP_ENV not in {"production", "prod"}:
         return True
     return all(
