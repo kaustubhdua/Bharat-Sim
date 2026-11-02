@@ -63,6 +63,11 @@ def requires_persistent_database() -> bool:
     return APP_ENV in {"production", "prod"} or is_serverless_runtime()
 
 
+def should_initialize_local_database() -> bool:
+    """Only local development may create and use the SQLite fallback."""
+    return not requires_persistent_database()
+
+
 AUTH_REQUIRED = os.getenv("BHARATSIM_AUTH_REQUIRED", "false").strip().lower() == "true"
 _jwks_client: PyJWKClient | None = None
 
@@ -626,9 +631,9 @@ def init_db() -> None:
             if column not in columns:
                 conn.execute(f"ALTER TABLE runs ADD COLUMN {column} {definition}")
 
-# Local SQLite is initialized for development/test only. Production schema is
-# managed exclusively by versioned Supabase migrations and checked by readiness.
-if APP_ENV not in {"production", "prod"}:
+# SQLite is a local-development convenience only. Vercel/AWS functions must
+# never create or use ephemeral /tmp database files, even in preview mode.
+if should_initialize_local_database():
     init_db()
 
 
