@@ -43,6 +43,8 @@ import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
+import { readSession } from "./auth";
+import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
 const API_DOCS_URL = API || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
 
@@ -53,7 +55,7 @@ export default function App() {
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");
   const [runs, setRuns] = useState<Run[]>([]);
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [analysis, setAnalysis] = useState<Analysis | null>(() => loadSavedAnalysis(readSession()?.user?.id));
   const [logText, setLogText] = useState("");
   const [apk, setApk] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -63,6 +65,12 @@ export default function App() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Keep the latest report across refreshes in this tab only. Reports are
+  // scoped to the authenticated user and are never sent to another service.
+  useEffect(() => {
+    if (analysis) saveAnalysisForSession(readSession()?.user?.id, analysis);
+  }, [analysis]);
 
 
   const currentTab = location.pathname.startsWith("/runs")
