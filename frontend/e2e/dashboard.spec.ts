@@ -201,10 +201,19 @@ test("risk planner validates journeys and returns a real API-generated plan", as
   await expect(generate).toBeDisabled();
   await expect(page.getByText(/add at least one journey to continue/)).toBeVisible();
 
+  await journeys.fill(Array.from({ length: 11 }, (_, index) => "Journey " + (index + 1)).join("\n"));
+  await expect(generate).toBeDisabled();
+  await expect(page.getByText(/remove extra journeys to continue/)).toBeVisible();
+
   await journeys.fill("UPI transfer\nPayment retry");
   await expect(generate).toBeEnabled();
   await generate.click();
   await expect(page.locator(".planner-active-config")).toContainText("2 critical journeys ranked");
   await expect(page.locator(".planner-active-config")).toContainText("Deterministic heuristic");
   await expect(page.getByText(/This ranks tests; it does not execute them or claim a failure/)).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: /Export plan JSON/ }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^bharatsim-risk-plan-fintech\.json$/);
 });
