@@ -94,3 +94,24 @@ def test_serverless_preview_cannot_dispatch_apks_even_with_worker_flags(monkeypa
 
     assert main.production_worker_execution_enabled() is False
     assert main.capabilities()["worker_dispatch"] is False
+
+
+
+def test_vercel_rewrites_browser_deep_links_to_the_fastapi_frontend():
+    root = Path(__file__).resolve().parents[2]
+    config = __import__("json").loads((root / "vercel.json").read_text(encoding="utf-8"))
+    rewrites = config.get("rewrites", [])
+    route_pairs = {(route.get("source"), route.get("destination")) for route in rewrites}
+
+    assert ("/runs", "/") in route_pairs
+    assert ("/runs/:path*", "/") in route_pairs
+    assert ("/analysis", "/") in route_pairs
+    assert ("/analyses", "/") in route_pairs
+    assert ("/analyses/:path*", "/") in route_pairs
+
+    # API, health and internal worker endpoints must not be rewritten to HTML.
+    assert all(
+        not source.startswith(("/api", "/health", "/internal"))
+        for source, _ in route_pairs
+        if isinstance(source, str)
+    )

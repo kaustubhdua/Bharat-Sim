@@ -92,13 +92,51 @@ def test_production_capabilities_require_database_and_storage_for_upload(monkeyp
     monkeypatch.setattr(main, "APP_ENV", "production")
     monkeypatch.setattr(main, "DATABASE_URL", "postgresql://user:pass@db.example.com:5432/postgres?sslmode=require")
     monkeypatch.setattr(main, "STORAGE_ENABLED", True)
+    monkeypatch.setattr(main, "database_is_available", lambda: True)
     monkeypatch.setattr(main, "worker_dispatch_configured", lambda: False)
 
     capabilities = main.capabilities()
 
+    assert capabilities["database_persistence"] is True
+    assert capabilities["analysis_persistence"] is True
     assert capabilities["apk_upload"] is True
     assert capabilities["direct_apk_upload"] is True
     assert capabilities["worker_dispatch"] is False
+
+
+def test_production_capabilities_do_not_claim_persistence_when_database_is_unavailable(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "DATABASE_URL", "postgresql://user:pass@db.example.com:5432/postgres?sslmode=require")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", True)
+    monkeypatch.setattr(main, "database_is_available", lambda: False)
+    monkeypatch.setattr(main, "worker_dispatch_configured", lambda: False)
+
+    capabilities = main.capabilities()
+
+    assert capabilities["database_persistence"] is False
+    assert capabilities["analysis_persistence"] is False
+    assert capabilities["apk_upload"] is False
+    assert capabilities["direct_apk_upload"] is False
+
+
+def test_malformed_production_database_configuration_returns_safe_503(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "DATABASE_URL", "psql postgresql://redacted.invalid/db")
+
+    with pytest.raises(main.HTTPException) as error:
+        with main.db():
+            pass
+
+    assert error.value.status_code == 503
+    assert error.value.detail == "Persistent PostgreSQL is unavailable."
+    assert "psql" not in error.value.detail
+
+
+def test_database_availability_fails_closed_for_malformed_connection_string(monkeypatch):
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "DATABASE_URL", "psql postgresql://redacted.invalid/db")
+
+    assert main.database_is_available() is False
 
 
 

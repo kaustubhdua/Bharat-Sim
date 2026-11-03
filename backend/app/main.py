@@ -522,7 +522,15 @@ def db():
             raise RuntimeError("BHARATSIM_DATABASE_URL requires the psycopg[binary] dependency") from exc
         # Transaction poolers do not preserve session-level settings between
         # clients. Set the private schema path locally for this transaction only.
-        raw = psycopg.connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None)
+        try:
+            validate_database_configuration(DATABASE_URL, APP_ENV)
+            raw = psycopg.connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None)
+        except Exception:
+            # Connection strings and provider diagnostics must never reach API responses.
+            raise HTTPException(
+                status_code=503,
+                detail="Persistent PostgreSQL is unavailable.",
+            ) from None
         conn = PostgresCompatConnection(raw)
     else:
         conn = sqlite3.connect(DB_PATH, timeout=15)
@@ -538,6 +546,29 @@ def db():
         raise
     finally:
         conn.close()
+
+
+def database_is_available() -> bool:
+    """Verify real PostgreSQL connectivity and the namespaced production schema."""
+    if not requires_persistent_database():
+        return True
+    if not DATABASE_URL:
+        return False
+    try:
+        with db() as conn:
+            if conn.execute("SELECT 1").fetchone() is None:
+                return False
+            schema = conn.execute(
+                "SELECT to_regclass('bharatsim.runs') AS runs, "
+                "to_regclass('bharatsim.run_events') AS run_events, "
+                "to_regclass('bharatsim.audit_events') AS audit_events"
+            ).fetchone()
+            return bool(
+                schema
+                and all(schema[key] for key in ("runs", "run_events", "audit_events"))
+            )
+    except Exception:
+        return False
 
 
 def _event_json(payload: dict[str, Any] | None) -> str:
@@ -1893,17 +1924,17 @@ def translate_report(payload: SarvamTranslationRequest):
 @app.get("/api/v1/capabilities")
 def capabilities():
     persistent_database_required = requires_persistent_database()
-    database_configured = bool(DATABASE_URL) if persistent_database_required else True
+    database_available = database_is_available() if persistent_database_required else True
     worker = worker_dispatch_configured()
     # Private APK intake can persist a run while it waits for an approved worker.
     # Execution remains independently gated by worker_dispatch_configured().
     upload_storage_available = STORAGE_ENABLED if persistent_database_required else True
-    upload_available = database_configured and upload_storage_available
-    direct_upload_available = database_configured and STORAGE_ENABLED
+    upload_available = database_available and upload_storage_available
+    direct_upload_available = database_available and STORAGE_ENABLED
     return {
-        "database_persistence": database_configured,
+        "database_persistence": database_available,
         "apk_upload": upload_available, "direct_apk_upload": direct_upload_available,
-        "log_analysis": True, "analysis_persistence": database_configured, "risk_planner": True,
+        "log_analysis": True, "analysis_persistence": database_available, "risk_planner": True,
         "failure_fingerprinting": True, "bharat_score": True,
         "android_execution": False,
         "worker_dispatch": worker,
