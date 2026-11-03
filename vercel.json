@@ -4,5 +4,27 @@
     "backend/app/main.py": {
       "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/runs",
+      "destination": "/"
+    },
+    {
+      "source": "/runs/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/analysis",
+      "destination": "/"
+    },
+    {
+      "source": "/analyses",
+      "destination": "/"
+    },
+    {
+      "source": "/analyses/:path*",
+      "destination": "/"
+    }
+  ]
 }
