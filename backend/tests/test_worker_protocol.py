@@ -467,3 +467,57 @@ def test_private_storage_apk_upload_download_and_cleanup(monkeypatch, tmp_path):
     assert submitted.status_code == 200
     assert submitted.json()["apk_deleted"] is True
     assert deleted == [f"runs/{run_id}/input.apk"]
+
+
+def test_busy_worker_cannot_clear_its_active_lease_or_claim_a_second_job(monkeypatch, tmp_path):
+    client = prepare_isolated_db(monkeypatch, tmp_path)
+    headers = {"X-BharatSim-Worker-Token": os.environ["BHARATSIM_WORKER_TOKEN"]}
+    created_runs = []
+    for filename in ("first.apk", "second.apk"):
+        response = client.post(
+            "/api/v1/runs",
+            data={"persona_id": "baseline"},
+            files={( "apk"): (filename, apk_bytes(), "application/vnd.android.package-archive")},
+        )
+        assert response.status_code == 200
+        created_runs.append(response.json()["id"])
+
+    first = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "single-slot-worker"}
+    )
+    assert first.status_code == 200
+    first_job = first.json()["job"]
+    assert first_job["id"] == created_runs[0]
+
+    # A repeated poll from the same worker identity must not reset its active
+    # assignment or lease and must not consume another queued run.
+    repeated = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "single-slot-worker"}
+    )
+    assert repeated.status_code == 200
+    assert repeated.json() == {"job": None}
+
+    active = client.get("/api/v1/workers").json()
+    worker = next(item for item in active["items"] if item["id"] == "single-slot-worker")
+    assert worker["busy"] is True
+    with main.db() as conn:
+        row = conn.execute(
+            "SELECT status,worker_id,lease_token FROM runs WHERE id=?",
+            (created_runs[0],),
+        ).fetchone()
+        second = conn.execute(
+            "SELECT status,worker_id FROM runs WHERE id=?",
+            (created_runs[1],),
+        ).fetchone()
+    assert row["status"] == "leased"
+    assert row["worker_id"] == "single-slot-worker"
+    assert row["lease_token"] == first_job["lease_token"]
+    assert second["status"] == "queued"
+    assert second["worker_id"] is None
+
+    # A different worker can still claim the next queued job.
+    other = client.post(
+        "/internal/worker/claim", headers=headers, json={"worker_id": "second-worker"}
+    )
+    assert other.status_code == 200
+    assert other.json()["job"]["id"] == created_runs[1]
