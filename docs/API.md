@@ -43,7 +43,7 @@ When `BHARATSIM_REQUIRE_API_KEY=true`, `/api/v1` routes additionally require `X-
 
 The worker protocol is enabled when BHARATSIM_WORKER_TOKEN is configured to a secret of at least 32 characters. Each internal worker request must include X-BharatSim-Worker-Token. Never expose this token in frontend code.
 
-- POST /internal/worker/claim — JSON body: {"worker_id":"android-worker-01"}. Returns {"job":null} when no job is available or a leased job with run ID, APK SHA-256, lease token, and relative callback URLs.
+- POST /internal/worker/claim — JSON body: {"worker_id":"android-worker-01"}. Returns {"job":null} when no job is available or a leased job with run ID, APK SHA-256, lease token, and relative callback URLs. Each worker ID is single-slot: a duplicate poll while that worker owns a live lease returns {"job":null} and does not clear or replace its active assignment. Concurrent claims for the same worker ID are serialized by the worker-row reservation.
 - GET /internal/worker/runs/{run_id}/apk — download the APK attached to the current lease using the X-BharatSim-Lease-Token header.
 - POST /internal/worker/runs/{run_id}/heartbeat — JSON body: {"lease_token":"..."}; extends the five-minute lease.
 - POST /internal/worker/runs/{run_id}/result — JSON body contains lease_token, status (completed or failed), result object, and optional error. Result JSON is capped at 250 KB. A completed status requires result.status=completed.
