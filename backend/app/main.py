@@ -1453,9 +1453,12 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
     lease_until = datetime.fromtimestamp(now.timestamp() + 300, timezone.utc).isoformat()
     lease_token = uuid.uuid4().hex + uuid.uuid4().hex
     with db() as conn:
+        # Register without overwriting an existing worker's active lease state.
+        # A duplicate poll from the same worker ID must not silently make a busy
+        # worker appear idle or allow it to claim a second job.
         conn.execute(
             "INSERT INTO workers(id,last_seen,status,current_run_id) VALUES(?,?,?,NULL) "
-            "ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen,status='idle',current_run_id=NULL",
+            "ON CONFLICT(id) DO NOTHING",
             (payload.worker_id, now_text, "idle"),
         )
         expired_leases = conn.execute(
@@ -1469,6 +1472,11 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             record_audit_event(conn, expired["owner_id"], "system", None, "run.lease_expired", "run", expired["id"], {
                 "worker_id": expired["worker_id"], "attempts": expired["attempts"],
             })
+            if expired["worker_id"]:
+                conn.execute(
+                    "UPDATE workers SET status='idle',current_run_id=NULL WHERE id=? AND current_run_id=?",
+                    (expired["worker_id"], expired["id"]),
+                )
         conn.execute(
             "UPDATE runs SET status='queued', lease_token=NULL, lease_until=NULL, worker_id=NULL, updated_at=? "
             "WHERE status='leased' AND lease_until < ? AND attempts < 3",
@@ -1479,11 +1487,30 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             "WHERE status='leased' AND lease_until < ? AND attempts >= 3",
             (now_text, now_text),
         )
+        # Repair stale worker status only when its referenced run no longer has
+        # a live lease. Never clear a different, currently active assignment.
+        conn.execute(
+            "UPDATE workers SET status='idle',current_run_id=NULL WHERE id=? AND current_run_id IS NOT NULL "
+            "AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.id=workers.current_run_id "
+            "AND r.worker_id=workers.id AND r.status='leased' AND r.lease_until>=?)",
+            (payload.worker_id, now_text),
+        )
+        reserved = conn.execute(
+            "UPDATE workers SET last_seen=?,status='claiming' "
+            "WHERE id=? AND status='idle' AND current_run_id IS NULL",
+            (now_text, payload.worker_id),
+        )
+        if reserved.rowcount != 1:
+            return {"job": None}
         row = conn.execute(
             "SELECT id,apk_name,apk_sha256,persona_id,attempts,owner_id FROM runs "
             "WHERE status='queued' AND (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) ORDER BY created_at ASC LIMIT 1"
         ).fetchone()
         if row is None:
+            conn.execute(
+                "UPDATE workers SET status='idle' WHERE id=? AND status='claiming' AND current_run_id IS NULL",
+                (payload.worker_id,),
+            )
             return {"job": None}
         updated = conn.execute(
             "UPDATE runs SET status='leased', lease_token=?, lease_until=?, worker_id=?, attempts=attempts+1, updated_at=? "
@@ -1491,9 +1518,13 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             (lease_token, lease_until, payload.worker_id, now_text, row["id"]),
         )
         if updated.rowcount != 1:
+            conn.execute(
+                "UPDATE workers SET status='idle' WHERE id=? AND status='claiming' AND current_run_id IS NULL",
+                (payload.worker_id,),
+            )
             return {"job": None}
         conn.execute(
-            "UPDATE workers SET last_seen=?, status='running', current_run_id=? WHERE id=?",
+            "UPDATE workers SET last_seen=?, status='running', current_run_id=? WHERE id=? AND status='claiming' AND current_run_id IS NULL",
             (now_text, row["id"], payload.worker_id),
         )
         record_run_event(conn, row["id"], "worker_claimed", "worker", payload.worker_id, {
