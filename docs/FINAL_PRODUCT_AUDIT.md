@@ -18,7 +18,7 @@ This audit distinguishes implemented code from verified runtime behavior. Fixtur
 
 | Check | Observed result | Classification |
 |---|---|---|
-| Production homepage | HTTP 200 on the last successful production deployment | Responding |
+| Production homepage | HTTP 200 from the previous successful deployment, not the latest main SHA (whose Vercel build failed) | Previous deployment responding; latest main not deployed |
 | `/api/v1/personas` | HTTP 200 | Available |
 | `/api/v1/capabilities` | HTTP 200 | Available, but the audited main payload over-reported some capabilities |
 | `/health/ready` | HTTP 503 | Not ready |
