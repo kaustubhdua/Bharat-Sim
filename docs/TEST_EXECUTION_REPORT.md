@@ -3,7 +3,7 @@
 **Tested code SHA:** `4546d9330f24dacda803cbc887d7bd737dfd2f72` (subsequent documentation/README commits follow it)  
 **Branch:** `fix/accurate-capabilities-and-product-evidence`  
 **Date:** 2026-11-21 (IST)  
-**Candidate after documentation update:** `d12eeac9812e7dd2fbdf0da698d9cda340784cb5`  
+**Latest docs-only head:** `86ea86eb9df8cfaa450ef8bbad7303aa5fcb239c`  
 
 ## Exact-SHA GitHub Actions evidence
 
