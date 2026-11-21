@@ -20,9 +20,6 @@ test("public preview exposes the live planner but keeps private actions gated", 
   // beforeEach authenticates the normal workspace; clear it before observing
   // requests so this assertion measures only the guest preview lifecycle.
   await page.goto("/");
-  await page.evaluate(() => sessionStorage.clear());
-  await page.reload();
-
   let protectedRequestCount = 0;
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
@@ -30,6 +27,9 @@ test("public preview exposes the live planner but keeps private actions gated", 
       protectedRequestCount += 1;
     }
   });
+  await page.evaluate(() => sessionStorage.clear());
+  protectedRequestCount = 0;
+  await page.reload();
   await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
   await page.getByRole("button", { name: /Explore public planner preview/ }).click();
 
