@@ -124,7 +124,15 @@ test("Configure a test navigates to the real APK registration form", async ({ pa
   await expect(page.getByRole("heading", { name: "Select Android APK" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Choose BharatSim Device & Network Persona" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Launch Resilience Test/ })).toBeDisabled();
-  await expect(page.getByText(/Run registration is unavailable until production PostgreSQL and private APK storage are configured/)).toBeVisible();
+  const apkPicker = page.getByRole("button", { name: "Choose Android APK file" });
+  if (await apkPicker.getAttribute("aria-disabled") === "true") {
+    await expect(page.getByText(/Run registration is unavailable until production PostgreSQL and private APK storage are configured/)).toBeVisible();
+    await expect(page.locator('input[type="file"]')).toBeDisabled();
+  } else {
+    await expect(page.locator('input[type="file"]')).toBeEnabled();
+    await expect(page.getByText(/Supports .apk packages up to 150 MB/)).toBeVisible();
+  }
+  await expect(page.getByRole("button", { name: /Budget Android/ })).toHaveAttribute("aria-pressed", "true");
 });
 test("dashboard remains usable at narrow mobile widths without horizontal overflow", async ({ page }) => {
   for (const width of [375, 320]) {
