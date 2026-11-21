@@ -99,7 +99,7 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
               value={constrainedId}
               onChange={(e) => setConstrainedId(e.target.value)}
             >
-              {runs.map((r) => (
+              {completedRuns.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.apk_name || "APK"} · {r.persona_id} ({r.id.slice(0, 8)})
                 </option>
