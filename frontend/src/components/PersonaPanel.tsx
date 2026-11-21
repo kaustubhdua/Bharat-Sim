@@ -32,7 +32,7 @@ export default function PersonaPanel({
             </div>
           )}
           <p className="profile-caveat">
-            These are authored targets, not measurements from physical devices. Full engine mode (BHARATSIM_WORKER_ENGINE=engine) can shape latency, bandwidth, packet-loss stalls, connection resets and outages through the Android system proxy; only traffic that uses that proxy is affected. The default legacy smoke worker has a narrower control set. Reports distinguish applied controls from observed app traffic. CPU throttling is unsupported; RAM behavior depends on emulator provisioning.
+            These are authored targets, not measurements from physical devices. Full engine mode (BHARATSIM_WORKER_ENGINE=engine) uses a host proxy for latency, bandwidth, packet-loss stalls and connection resets on proxy-routed traffic; its outage/recovery check uses an airplane-mode drop. Only traffic that uses the Android system proxy is shaped. The default legacy smoke worker has a narrower control set. Reports distinguish applied controls from observed app traffic. CPU throttling is unsupported; RAM behavior depends on emulator provisioning.
           </p>
           {apiStatus !== "online" && (
             <p className="profile-caveat">
@@ -107,7 +107,7 @@ export default function PersonaPanel({
           </div>
           <p>{persona.description}</p>
           <p className="profile-caveat">
-            Profile targets are not device measurements. Full engine mode (BHARATSIM_WORKER_ENGINE=engine) uses a host proxy for latency, bandwidth, packet-loss stalls, resets and outages, plus supported emulator device controls. Only app traffic that uses the Android system proxy is shaped; each report records whether traffic was observed. The default legacy smoke worker supports fewer controls. CPU throttling is unsupported and RAM limits depend on emulator provisioning.
+            Profile targets are not device measurements. Full engine mode (BHARATSIM_WORKER_ENGINE=engine) uses a host proxy for latency, bandwidth, packet-loss stalls and resets on proxy-routed traffic, plus an airplane-mode outage/recovery check and supported emulator device controls. Only app traffic that uses the Android system proxy is shaped; each report records whether traffic was observed. The default legacy smoke worker supports fewer controls. CPU throttling is unsupported and RAM limits depend on emulator provisioning.
           </p>
           <div className="detail-grid">
             <span>
