@@ -280,4 +280,5 @@ def test_capabilities_disable_unconfigured_provider_and_database_features(monkey
     assert data["sarvam_translation"] is False
     assert data["run_comparison"] is False
     assert data["apk_upload"] is False
+    assert data["max_upload_mb"] == main_module.MAX_UPLOAD_BYTES // (1024 * 1024)
     assert data["android_execution"] is False
