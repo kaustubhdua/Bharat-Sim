@@ -2087,7 +2087,7 @@ def compare_runs(payload: CompareRunsRequest, request: Request):
         if isinstance(value, (int, float)):
             return float(value)
         if isinstance(value, str):
-            match = re.match(r"^\\s*(-?\\d+(?:\\.\\d+)?)", value)
+            match = re.match(r"^\s*(-?\d+(?:\.\d+)?)", value)
             return float(match.group(1)) if match else None
         return None
 
@@ -2175,6 +2175,7 @@ def capabilities():
     persistent_database_required = requires_persistent_database()
     database_available = database_is_available() if persistent_database_required else True
     worker = worker_dispatch_configured()
+    sarvam_configured = len(os.getenv("SARVAM_API_KEY", "").strip()) >= 16
     # Private APK intake can persist a run while it waits for an approved worker.
     # Execution remains independently gated by worker_dispatch_configured().
     upload_storage_available = STORAGE_ENABLED if persistent_database_required else True
@@ -2185,7 +2186,7 @@ def capabilities():
         "apk_upload": upload_available, "direct_apk_upload": direct_upload_available,
         "log_analysis": True, "analysis_persistence": database_available, "risk_planner": True,
         "failure_fingerprinting": True, "bharat_score": True,
-        "ml_classifier": True, "sarvam_audio_tts": True, "evaluator_scenarios": True, "run_comparison": True,
+        "ml_classifier": True, "sarvam_audio_tts": sarvam_configured, "evaluator_scenarios": True, "run_comparison": database_available,
         "android_execution": False,
         "worker_dispatch": worker,
         "network_shaping": False,
@@ -2205,12 +2206,12 @@ def capabilities():
             "unsupported": ["packet_loss", "cpu_constraint"],
             "scope": "Worker executes conditions on disposable Android Emulator targets only; active data-plane app traffic is unverified",
         },
-        "sarvam_translation": len(os.getenv("SARVAM_API_KEY", "").strip()) >= 16,
+        "sarvam_translation": sarvam_configured,
         "notes": [
             "Production worker dispatch remains disabled until BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED, BHARATSIM_WORKER_ISOLATION_ATTESTED, and BHARATSIM_WORKER_EGRESS_RESTRICTED are all true. These flags are operator attestations, not cryptographic proof; independently verify the disposable VM and egress policy before enabling them.",
             "Worker dispatch is configured only when BHARATSIM_WORKER_TOKEN is set and the production safety gate is open; android_execution remains false here because this API cannot prove a live emulator has executed an APK. Check /api/v1/workers for recent worker heartbeats.",
             "The worker supports Android Emulator console latency and bandwidth controls plus reversible battery-saver and bounded storage-pressure simulation with readback/reset evidence. Full persona shaping remains false because packet loss, CPU throttling, RAM restriction, outage/recovery, and arbitrary-app traffic verification are not supported.",
-            "Sarvam translation is available only when SARVAM_API_KEY is configured; only the user-selected condensed report summary is sent.",
+            "Sarvam translation and Bulbul speech are available only when SARVAM_API_KEY is configured; only user-selected bounded text is sent to the provider.",
             "When private Storage is configured, APK bytes use short-lived signed uploads directly to Supabase Storage, bypassing Vercel function request-body limits. The API verifies the stored object size before queueing.",
             "Worker result payloads are bounded and protected by lease tokens; inline artifact payloads are limited to 250 KB.",
         ],
