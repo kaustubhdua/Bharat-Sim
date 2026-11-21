@@ -74,6 +74,8 @@ The latest connected read-only infrastructure audit in [Production Readiness](PR
 - Production flags remain fail-closed: public APK execution false, worker isolation attestation false and worker egress restriction false.
 - The connected Render workspace showed legacy API/web services, not a dedicated isolated Android worker.
 - No live production private-Storage upload/download/delete round-trip or two-account tenant-isolation matrix has been accepted.
+- Vercel Production's latest READY deployment is on commit `76f5b7e6`, while current GitHub main is `ccb85d56` (two commits ahead). The deployment must be refreshed to the exact merged SHA.
+- Production `BHARATSIM_MAX_UPLOAD_MB` is currently 50, even though the code supports 500 MB total APKs using 45 MB chunks. Raise this only after Storage credentials and multipart lifecycle are verified.
 
 **Do not change the shared database or enable public execution as a shortcut.** Confirm the authoritative project, backup plan and ownership before applying migrations.
 
