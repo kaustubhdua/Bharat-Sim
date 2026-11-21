@@ -2195,6 +2195,7 @@ def capabilities():
     direct_upload_available = database_available and STORAGE_ENABLED
     return {
         "database_persistence": database_available,
+        "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
         "apk_upload": upload_available, "direct_apk_upload": direct_upload_available,
         "log_analysis": True, "analysis_persistence": database_available, "risk_planner": True,
         "failure_fingerprinting": True, "bharat_score": True,
