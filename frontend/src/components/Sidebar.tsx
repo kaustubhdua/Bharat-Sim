@@ -169,7 +169,7 @@ export default function Sidebar({
               <b>Android Worker</b>
               <small>
                 {previewMode
-                  ? "Operational"
+                  ? "Not exposed in guest preview"
                   : onlineWorkers.length > 0
                   ? `${onlineWorkers.length} heartbeat(s)`
                   : "No recent heartbeat"}
