@@ -154,3 +154,6 @@ input,select,textarea{accent-color:#75aaff}
 .api-docs-link{display:inline-flex;align-items:center;min-height:32px;padding:0 9px;border:1px solid var(--line);border-radius:7px;color:var(--muted);font-size:10px;font-weight:700;text-decoration:none;white-space:nowrap;transition:color .15s,border-color .15s,background .15s}
 .api-docs-link:hover{color:#dce9ff;border-color:#75aaff;background:#17243a}
 :root[data-theme="light"] .api-docs-link:hover{color:#1d55b5;border-color:#9db9ed;background:#edf3ff}
+
+.report-export-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:520px){.report-export-actions{width:100%;justify-content:flex-start}.report-export-actions .secondary-button{flex:1;justify-content:center}}
