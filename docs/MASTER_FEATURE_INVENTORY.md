@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-11-21 (IST)  
 **Main baseline:** `2c754dcb428fdbacc67da18d41fad3c1d0745c83`  
-**Candidate:** `75d78e108ab9b2778131847a0d25f45ac7ccd2e6`  
+**Candidate branch:** `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb`  
 **Production:** https://bharat-sim-81g2.vercel.app
 
 ## Status definitions
@@ -43,7 +43,7 @@ This inventory records major end-user flows and backend subsystems. It is not an
 | SCORE-001 | BharatScore | Analysis / run detail | Deterministic scoring | IMPLEMENTED BUT NOT VERIFIED | Evidence-driven code; comprehensive boundaries/reproducibility not independently reviewed |
 | REPORT-001 | JSON analysis export | Analysis route | Browser Blob | IMPLEMENTED BUT NOT VERIFIED | Download code exists; full generated artifact validation still needed |
 | REPORT-002 | JSON run report | Run detail | Owner-scoped API report | IMPLEMENTED BUT NOT VERIFIED | API code exists; production persisted object retention not verified |
-| REPORT-003 | PDF report export | Reports | PDF generation | NOT IMPLEMENTED | No complete PDF generation/export path found |
+| REPORT-003 | Analysis PDF export | Analysis route | Client-side PDF generator (`pdfExport.ts`) | IMPLEMENTED BUT NOT VERIFIED | PDF generator and Vitest artifact-content/pagination tests exist; exact latest-SHA test result not separately isolated from CI yet. This is analysis PDF, not persisted run-report PDF. |
 | REPORT-004 | Report library / sharing | Reports | DB/storage/share tokens | NOT IMPLEMENTED | No complete persisted report catalogue/share lifecycle |
 | SARVAM-001 | Translation | Analysis route | Sarvam API key | BLOCKED BY EXTERNAL DEPENDENCY | Server credential needed; live provider call not verified |
 | SARVAM-002 | Hindi/Tamil/Marathi TTS | Audio player | Sarvam Bulbul | BLOCKED BY EXTERNAL DEPENDENCY | Live speech not verified; never substitute fixture WAV |
