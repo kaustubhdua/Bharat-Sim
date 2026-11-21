@@ -6,6 +6,7 @@ export type Capabilities = {
   apk_upload: boolean; direct_apk_upload: boolean; log_analysis: boolean; risk_planner: boolean;
   failure_fingerprinting: boolean; bharat_score: boolean; android_execution: boolean;
   worker_dispatch: boolean; network_shaping: boolean; sarvam_translation: boolean;
+  sarvam_audio_tts?: boolean; ml_classifier?: boolean; evaluator_scenarios?: boolean; run_comparison?: boolean;
   emulator_network_controls: {
     latency: boolean; bandwidth: boolean; configuration_readback: boolean;
     packet_loss: boolean; outage_and_recovery: boolean; arbitrary_app_traffic_verified: boolean; scope: string;
