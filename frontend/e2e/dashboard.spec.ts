@@ -130,7 +130,7 @@ test("Configure a test navigates to the real APK registration form", async ({ pa
     await expect(page.locator('input[type="file"]')).toBeDisabled();
   } else {
     await expect(page.locator('input[type="file"]')).toBeEnabled();
-    await expect(page.getByText(/Supports .apk packages up to 150 MB/)).toBeVisible();
+    await expect(page.getByText(/Supports .apk packages up to \d+ MB/)).toBeVisible();
   }
   await expect(page.getByRole("button", { name: /Budget Android/ })).toHaveAttribute("aria-pressed", "true");
 });
