@@ -1,7 +1,8 @@
 # BharatSim — Production Readiness
 
 **Audit date:** 2026-11-21 (IST)  
-**Candidate:** `75d78e108ab9b2778131847a0d25f45ac7ccd2e6`  
+**Candidate branch (latest docs/README SHA):** `d12eeac9812e7dd2fbdf0da698d9cda340784cb5`  
+**Application code tested by green CI:** `4546d9330f24dacda803cbc887d7bd737dfd2f72`  
 **Production URL:** https://bharat-sim-81g2.vercel.app  
 **Decision: NO-GO for public APK testing. Controlled preview only.**
 
@@ -18,6 +19,12 @@
 | Android execution | Disabled |
 | Sarvam translation | Reported unavailable |
 | Sarvam TTS | Previously reported enabled on a stale deployed capability payload; this branch gates by server-side key |
+
+## CI and deployment status
+
+- The application-code candidate `4546d9330f24dacda803cbc887d7bd737dfd2f72` passed all seven CI jobs and the dependency audit. Subsequent changes were limited to test-report/readme documentation.
+- Vercel status on the latest documentation SHA is a failed `build-rate-limit` check. This is a platform quota issue; do not claim a production deployment of the candidate.
+- A production HTTP capture returned 503 from readiness and was edge-cached at 2026-11-21 14:01 UTC. It is valid evidence for that captured state, not proof that a later deployment is live.
 
 ## Gate assessment
 
