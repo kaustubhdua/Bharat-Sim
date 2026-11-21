@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import UploadPanel from "../components/UploadPanel";
 import ScoreRing from "../components/ScoreRing";
 import FindingCard from "../components/FindingCard";
-import PersonaPanel from "../components/PersonaPanel";
+import PersonaPanel from "../components/PersonaPanel";\nimport CompareRunsView from "../components/CompareRunsView";
 import RunsTable from "../components/RunsTable";
 import CapabilityPanel from "../components/CapabilityPanel";
 import EvidenceSynthesisPanel from "../components/EvidenceSynthesisPanel";
@@ -128,6 +128,43 @@ describe("Components tests with jsdom", () => {
     expect(container.querySelector(".interaction-item")).toBeNull();
     expect(container.querySelector(".planner-caveat")).toBeNull();
     expect(container.textContent).not.toContain("pairwise interactions examined");
+  });
+
+  it("CompareRunsView describes the comparison as a heuristic, not covariance or probability", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        baseline_run_id: "baseline-run",
+        constrained_run_id: "constrained-run",
+        baseline_metrics: {},
+        constrained_metrics: {},
+        deltas: {},
+        anomaly_detected: false,
+        anomaly_score: 22,
+        anomalies: [],
+        verdict: "No major regression detected",
+        details: "No threshold breach was found in the available metrics."
+      })
+    }));
+
+    await act(async () => {
+      root.render(
+        <CompareRunsView
+          runs={[
+            { id: "baseline-run", created_at: "2026-11-22T00:00:00Z", status: "completed", persona_id: "baseline", apk_name: "demo.apk" },
+            { id: "constrained-run", created_at: "2026-11-22T00:01:00Z", status: "completed", persona_id: "edge-village", apk_name: "demo.apk" }
+          ]}
+          onBack={vi.fn()}
+        />
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain("Baseline vs. Constrained Run Comparison");
+    expect(container.textContent).toContain("Heuristic anomaly score (0–100; not a probability)");
+    expect(container.textContent).toContain("Metric changes");
+    expect(container.textContent).not.toContain("covariance");
+    expect(container.textContent).not.toContain("Multivariate Anomaly");
   });
 
   it("PlannerPanel submits selected app category and edited critical journeys", async () => {
