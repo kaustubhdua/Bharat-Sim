@@ -69,3 +69,15 @@ def test_user_impact_is_a_relative_priority_not_a_population_claim():
     assert impact["priority_score"] == 100
     assert not any("affected users" in key for key in impact)
     assert any("not an affected-user" in item.lower() for item in impact["assumptions"])
+
+
+def test_failure_dna_fingerprint_is_stable_across_repeated_run_inputs():
+    logs = [
+        "11-22 10:01:01.100 1201 1201 E Network: java.net.SocketTimeoutException: read timed out after 120 ms",
+        "11-22 10:05:44.900 8842 8842 E Network: java.net.SocketTimeoutException: read timed out after 240 ms",
+        "11-22 11:12:00.010 9910 9910 E Network: java.net.SocketTimeoutException: read timed out after 900 ms",
+    ]
+    dna = [analyze_log_text(log, "edge-village")["failure_dna"] for log in logs]
+    fingerprints = [item["items"][0]["fingerprint"] for item in dna]
+    assert len(set(fingerprints)) == 1
+    assert all(item["group_count"] == 1 and item["total_occurrences"] == 1 for item in dna)
