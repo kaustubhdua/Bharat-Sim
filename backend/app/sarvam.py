@@ -31,8 +31,12 @@ SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
 
 
 def get_sarvam_api_key() -> str:
-    """Retrieve and validate the server-side Sarvam API key."""
-    return os.getenv("SARVAM_API_KEY", "").strip()
+    """Retrieve the server-side Sarvam key, preferring the documented name.
+
+    The lowercase sarvam_api variable is retained as a compatibility alias
+    for an existing Vercel project variable. Both names remain server-only.
+    """
+    return (os.getenv("SARVAM_API_KEY", "").strip() or os.getenv("sarvam_api", "").strip())
 
 
 def translate_report_text(text: str, target_language_code: str) -> str:
