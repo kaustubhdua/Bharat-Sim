@@ -88,7 +88,7 @@ test("log analysis reports findings from submitted evidence and preserves source
   expect(analysisPayload, "Log analysis response must include BharatScore").toHaveProperty("bharat_score");
   expect(analysisPayload, "Log analysis response must include evidence findings").toHaveProperty("findings");
 
-  await expect(page).toHaveURL(/\\/analysis$/);
+  await expect(page).toHaveURL(new RegExp("/analysis$"));
   await expect(page.getByRole("heading", { name: "Log analysis results" })).toBeVisible();
   await expect(page.getByText("Signals detected in supplied logs")).toBeVisible();
   await expect(page.getByText(/SOURCE EVIDENCE/).first()).toBeVisible();
