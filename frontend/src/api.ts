@@ -3,6 +3,7 @@ export const API = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 export type Capabilities = {
   database_persistence?: boolean;
   analysis_persistence?: boolean;
+  max_upload_mb?: number;
   apk_upload: boolean; direct_apk_upload: boolean; log_analysis: boolean; risk_planner: boolean;
   failure_fingerprinting: boolean; bharat_score: boolean; android_execution: boolean;
   worker_dispatch: boolean; network_shaping: boolean; sarvam_translation: boolean;
