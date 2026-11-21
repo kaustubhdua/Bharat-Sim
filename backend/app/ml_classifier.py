@@ -51,7 +51,7 @@ def classify_log_snippet(line: str) -> dict[str, Any]:
             - 'category': 'crash' | 'anr' | 'oom' | 'network' | 'storage' | 'normal'
             - 'confidence': float (0.0 to 1.0)
             - 'is_failure': bool
-            - 'probabilities': dict mapping each category to probability
+            - 'scores': normalized relative class scores (not calibrated probabilities)
     """
     cleaned = line.strip()
     if not cleaned:
@@ -85,7 +85,7 @@ def classify_log_snippet(line: str) -> dict[str, Any]:
         score = sum(vec.get(t, 0.0) * idf.get(t, 1.0) for t in tokens)
         raw_scores[c] = score
 
-    # Apply softmax for calibrated probabilities
+    # Normalize relative class scores for ranking; this is not probability calibration.
     max_score = max(raw_scores.values()) if raw_scores else 0.0
     if max_score > 0.0:
         exp_scores = {c: math.exp(min(50.0, s / 2.0)) for c, s in raw_scores.items()}
