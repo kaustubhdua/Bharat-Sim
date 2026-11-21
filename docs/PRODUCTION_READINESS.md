@@ -201,3 +201,9 @@ The active `common 1` project is shared by `bharatsim` and `genomeguard`. Its mi
 The live `bharatsim.runs` table is missing `persona_json`, `apk_meta_json` and `scenario_json`; the live `bharatsim.workers` table has only `id`, `last_seen`, `status` and `current_run_id`, and is missing personal-worker ownership/key metadata. The shared project's private `bharatsim-private` bucket exists with a 150 MiB object limit and APK/ZIP/octet-stream MIME types, but it contains zero objects; `bharatsim.runs` also contains zero rows. This is not evidence of a successful production upload/run journey.
 
 **No migrations, Storage objects, user rows, Vercel environment variables or secrets were changed.** The shared project must not be migrated without the owner confirming that it is the intended target and providing a backup/restore plan.
+
+
+### Vercel deployment and upload-limit observations
+
+- The latest Vercel Production deployment record is READY on commit `76f5b7e67d7dd400be9a0e3e7900907e77b0611f`. Current GitHub `main` is `ccb85d56a88299bd9cbc33da6c153a47645ccc83`, so the live deployment is two commits behind the current branch tip. The latest two commits add local-runner and installer fallback routes; verify the exact merged SHA after deployment.
+- Vercel Production currently sets `BHARATSIM_MAX_UPLOAD_MB=50`. The API code supports a 500 MB total APK with 45 MB storage parts, but the production environment cap remains 50 MB. Do not raise it until the correct private Storage project and server-side secret key are configured and the multipart upload/download/delete round-trip passes.
