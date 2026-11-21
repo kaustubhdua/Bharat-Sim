@@ -164,3 +164,14 @@ The preflight previously treated an active ConnectivityManager transport as suff
 - **Failure DNA and FixProof:** repeat-run stability and same-scenario before/after comparison need persisted, completed runs and evidence-based acceptance; UI availability alone is insufficient.
 - **Accessibility:** automated responsive assertions are not a substitute for keyboard-only, screen-reader, contrast, focus-order and reduced-motion manual review.
 
+
+
+## Addendum — personal laptop worker workflow on current main (22 Nov 2026)
+
+The latest main line now includes per-user laptop workers:
+- Personal worker keys are scoped to a signed-in owner; only a hash is stored server-side and the key is shown once.
+- The account can connect up to three laptops and revoke an individual laptop key.
+- Windows and macOS/Linux installers set up a private Python 3.12 environment, Java 17, Android SDK/Android 11 emulator and a lab supervisor.
+- The supervisor restarts the emulator/worker and defaults to `BHARATSIM_WORKER_ENGINE=engine`.
+
+This is a useful judge/demo path for a user's own laptop and owner-scoped jobs. It does **not** establish per-job isolation from the laptop owner, host compromise resistance, default-deny egress, or production multi-tenant safety. The installers currently download the repository's main-branch worker bundle; pinned release provenance, installer checksums/signatures, update/rollback and full Windows/macOS/Linux acceptance remain follow-up work. Keep public arbitrary APK execution disabled until the separate production isolation gates pass.
