@@ -16,13 +16,15 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!baselineId && completedRuns.length > 0) {
+    let selectedBaselineId = baselineId;
+    if (!selectedBaselineId && completedRuns.length > 0) {
       const baseline = completedRuns.find((run) => run.persona_id === "baseline") || completedRuns[0];
+      selectedBaselineId = baseline.id;
       setBaselineId(baseline.id);
     }
     if (!constrainedId && completedRuns.length > 1) {
-      const constrained = completedRuns.find((run) => run.persona_id !== "baseline" && run.id !== baselineId)
-        || completedRuns.find((run) => run.id !== baselineId);
+      const constrained = completedRuns.find((run) => run.id !== selectedBaselineId && run.persona_id !== "baseline")
+        || completedRuns.find((run) => run.id !== selectedBaselineId);
       if (constrained) setConstrainedId(constrained.id);
     }
   }, [runs, baselineId, constrainedId]);
@@ -110,7 +112,7 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
           <button
             type="button"
             className="primary-button"
-            disabled={loading || !baselineId || !constrainedId}
+            disabled={loading || !baselineId || !constrainedId || baselineId === constrainedId}
             onClick={() => void handleCompare()}
           >
             {loading ? <LoaderCircle size={15} className="spin" /> : <GitCompare size={15} />}
