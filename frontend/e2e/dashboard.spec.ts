@@ -53,7 +53,8 @@ test("dashboard connects to the real API and renders authored profiles", async (
   await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
   await expect(page.getByText("Budget Android", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Profiles returned by API")).toBeVisible();
-  await expect(page.getByText(/authored test targets, not measurements from physical devices/)).toBeVisible();
+  await expect(page.getByText(/These are authored targets, not measurements from physical devices/)).toBeVisible();
+  await expect(page.getByText(/Only traffic that uses the Android system proxy is shaped/)).toBeVisible();
   await expect(page.getByText("PACKET LOSS", { exact: true })).toBeVisible();
   await expect(page.getByText("2% target", { exact: true })).toBeVisible();
 });
@@ -300,7 +301,8 @@ test("risk planner validates journeys and returns a real API-generated plan", as
   await generate.click();
   await expect(page.locator(".planner-active-config")).toContainText("2 critical journeys ranked");
   await expect(page.locator(".planner-active-config")).toContainText("Deterministic heuristic");
-  await expect(page.getByText(/This ranks tests; it does not execute them or claim a failure/)).toBeVisible();
+  await expect(page.locator(".interaction-item")).toHaveCount(0);
+  await expect(page.locator(".planner-caveat")).toHaveCount(0);
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: /Export plan JSON/ }).click();
