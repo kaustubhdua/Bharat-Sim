@@ -25,6 +25,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+MAX_APK_BYTES = 500 * 1024 * 1024
+
 from worker.condition_planner import plan_conditions
 from worker.condition_applicator import ConditionManager
 
@@ -333,8 +335,8 @@ def main() -> int:
     apk = args.apk.resolve()
     if not apk.is_file() or apk.suffix.lower() != ".apk":
         parser.error("APK path must be an existing .apk file")
-    if apk.stat().st_size > 150 * 1024 * 1024:
-        parser.error("APK exceeds 150 MiB limit")
+    if apk.stat().st_size > MAX_APK_BYTES:
+        parser.error("APK exceeds 500 MiB limit")
     if shutil.which("adb") is None or shutil.which("aapt") is None:
         parser.error("adb and aapt must both be available on PATH")
     with apk.open("rb") as stream:
