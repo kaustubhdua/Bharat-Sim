@@ -2,6 +2,11 @@ import os from "node:os";
 import path from "node:path";
 import { defineConfig } from "@playwright/test";
 
+// Set deterministic non-secret auth placeholders before Vite is spawned. The
+// webServer.env values below are retained as an explicit child-process contract.
+process.env.VITE_SUPABASE_URL ||= "https://auth.e2e.invalid";
+process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||= "sb_publishable_e2e_placeholder_only";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
