@@ -24,8 +24,8 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
         </div>
         <div className="finding-badges">
           {f.ml_classification && (
-            <span className="ml-badge" title={`Confidence: ${(f.ml_classification.confidence * 100).toFixed(1)}%`}>
-              <Brain size={12} /> ML: {String(f.ml_classification.category || "other").toUpperCase()} ({Math.round(f.ml_classification.confidence * 100)}%)
+            <span className="ml-badge" title={`Relative model score: ${(f.ml_classification.confidence * 100).toFixed(1)} / 100; not calibrated confidence`}>
+              <Brain size={12} /> ML triage: {String(f.ml_classification.category || "other").toUpperCase()} ({Math.round(f.ml_classification.confidence * 100)} / 100 score)
             </span>
           )}
           {f.occurrence_count ? <span className="occurrence-badge">{f.occurrence_count} occurrence{f.occurrence_count === 1 ? "" : "s"}</span> : null}
