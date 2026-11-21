@@ -3,14 +3,14 @@ import { Languages, LoaderCircle, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 import SarvamAudioPlayer from "./SarvamAudioPlayer";
 
-type Props = { enabled: boolean; text: string };
+type Props = { enabled: boolean; audioEnabled?: boolean; text: string };
 const languages = [
   { code: "hi-IN", label: "Hindi" },
   { code: "ta-IN", label: "Tamil" },
   { code: "mr-IN", label: "Marathi" }
 ] as const;
 
-export default function SarvamTranslation({ enabled, text }: Props) {
+export default function SarvamTranslation({ enabled, audioEnabled = false, text }: Props) {
   const [language, setLanguage] = useState<(typeof languages)[number]["code"]>("hi-IN");
   const [translated, setTranslated] = useState("");
   const [error, setError] = useState("");
@@ -69,6 +69,7 @@ export default function SarvamTranslation({ enabled, text }: Props) {
           <div className="translation-result" lang={language} aria-live="polite">{translated}</div>
           <SarvamAudioPlayer
             text={translated}
+            enabled={audioEnabled}
             defaultLang={language}
             label={`Listen to translated briefing (${languages.find(l => l.code === language)?.label || "Indic"})`}
           />
