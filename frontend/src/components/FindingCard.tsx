@@ -65,11 +65,12 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
         <div className="sarvam-explanation-card">
           <div className="sarvam-exp-header">
             <Sparkles size={14} />
-            <span>SARVAM AI DIAGNOSTIC & DEVELOPER REMEDY</span>
+            <span>DEVELOPER GUIDANCE · RULE-BASED TEMPLATE</span>
           </div>
           <div className="sarvam-exp-body">
-            <p><strong>Root Cause:</strong> {f.sarvam_explanation.root_cause}</p>
-            <p><strong>Impact:</strong> {f.sarvam_explanation.impact}</p>
+            <p><strong>Typical failure pattern:</strong> {f.sarvam_explanation.root_cause}</p>
+            <p><strong>Potential impact:</strong> {f.sarvam_explanation.impact}</p>
+            <small>Template guidance is a starting point, not a confirmed root cause.</small>
             {fix && <p><strong>Fix:</strong> {fix}</p>}
             {f.sarvam_explanation.hindi_explanation && (
               <div className="hindi-briefing-box" lang="hi">
