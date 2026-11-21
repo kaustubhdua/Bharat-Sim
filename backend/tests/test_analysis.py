@@ -78,6 +78,6 @@ def test_failure_dna_fingerprint_is_stable_across_repeated_run_inputs():
         "11-22 11:12:00.010 9910 9910 E Network: java.net.SocketTimeoutException: read timed out after 900 ms",
     ]
     dna = [analyze_log_text(log, "edge-village")["failure_dna"] for log in logs]
-    fingerprints = [item["items"][0]["fingerprint"] for item in dna]
+    fingerprints = [item["groups"][0]["fingerprint"] for item in dna]
     assert len(set(fingerprints)) == 1
     assert all(item["group_count"] == 1 and item["total_occurrences"] == 1 for item in dna)
