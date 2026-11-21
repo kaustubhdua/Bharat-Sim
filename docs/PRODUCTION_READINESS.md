@@ -1,7 +1,7 @@
 # BharatSim — Production Readiness
 
 **Audit date:** 2026-11-21 (IST)  
-**Candidate branch:** `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb`  
+**Candidate branch:** `d4f3605711aa51929b8148a4fee296768085776f`  
 **Application code tested by green CI:** `4546d9330f24dacda803cbc887d7bd737dfd2f72`  
 **Production URL:** https://bharat-sim-81g2.vercel.app  
 **Decision: NO-GO for public APK testing. Controlled preview only.**
