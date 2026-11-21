@@ -145,3 +145,8 @@ input,select,textarea{accent-color:#75aaff}
 :root[data-theme="light"] .tour-scenario-btn{background:#fff;border-color:#dce4f0;color:#263750}
 :root[data-theme="light"] .tour-scenario-btn:hover{border-color:#a9c3f3;background:#f3f7ff}
 :root[data-theme="light"] .audio-error{color:#b42318}
+
+.auth-landing-link{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;color:var(--green);font-size:12px;font-weight:700;text-decoration:none}
+.auth-landing-link:hover{text-decoration:underline}
+.worker-defaults-note{margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
+.anomaly-explanation{margin:8px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
