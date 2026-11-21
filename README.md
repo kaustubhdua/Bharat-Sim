@@ -7,12 +7,16 @@ Grand Finale Showcase: hackFront India Grand Finale · IIIT Delhi (21–22 Novem
 
 ---
 
-## ⚡ Evaluator Quick Tour (One-Click Live Demo)
+## Evaluator Quick Tour (fixture-based analysis)
 
-Evaluators can open the live deployment and test BharatSim immediately without driving external setup:
-1. Click **⚡ EVALUATOR QUICK TOUR** at the top of the dashboard.
-2. Select **Scenario A: Fintech UPI Checkout Timeout** (simulated Edge Village 450ms network, SocketTimeoutException) or **Scenario B: Quick-Commerce OOM** (simulated Budget Android 2GB RAM, Bitmap ARGB_8888 OOM and LMKD kill).
-3. The platform instantly runs authentic Android logcat telemetry through the **ML Failure Classifier**, detects **Telemetry Anomalies**, generates **Sarvam AI Indic Developer Explanations**, and plays **Bulbul TTS Audio Briefings** in Hindi, Tamil, or Marathi!
+BharatSim includes curated Android logcat examples for demonstrating the log-analysis UI. These are **illustrative fixtures**, not APK installations, Android device telemetry, or production test executions.
+
+1. Open the public product tour at `/landing`, or enter the workspace using an authenticated account.
+2. Select a labelled evaluator fixture (for example, a timeout or out-of-memory logcat sample).
+3. Review findings and source-line evidence returned by the analysis endpoint. Classifier output is a triage hint from the current small curated model, not independently validated diagnosis.
+4. Provider-backed translation and Bulbul speech are available only when the backend has a valid `SARVAM_API_KEY`; do not expect audio or a translated result when that capability is disabled.
+
+APK upload, persistent history and actual Android execution require production PostgreSQL, private Storage and an independently isolated Android worker. See [production readiness](docs/PRODUCTION_READINESS.md) and [known limitations](docs/KNOWN_LIMITATIONS.md).
 
 ---
 
