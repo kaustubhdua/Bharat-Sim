@@ -4,6 +4,7 @@ import { synthesizeSpeechAudio } from "../api";
 
 interface SarvamAudioPlayerProps {
   text: string;
+  enabled?: boolean;
   defaultLang?: string;
   label?: string;
 }
@@ -17,6 +18,7 @@ const LANGUAGES = [
 
 export default function SarvamAudioPlayer({
   text,
+  enabled = true,
   defaultLang = "hi-IN",
   label = "Listen to diagnostic briefing (Sarvam Bulbul TTS)"
 }: SarvamAudioPlayerProps) {
@@ -126,7 +128,7 @@ export default function SarvamAudioPlayer({
           type="button"
           className={"audio-play-button " + (playing ? "playing" : "")}
           onClick={() => void handlePlay()}
-          disabled={loading || !text.trim()}
+          disabled={!enabled || loading || !text.trim()}
           title={playing ? "Pause briefing" : "Generate and play voice briefing"}
         >
           {loading ? (
@@ -136,10 +138,11 @@ export default function SarvamAudioPlayer({
           ) : (
             <Volume2 size={15} />
           )}
-          <span>{loading ? "Generating audio…" : playing ? "Pause audio" : audioUrl ? "Play audio" : "Generate voice briefing"}</span>
+          <span>{!enabled ? "Voice unavailable" : loading ? "Generating audio…" : playing ? "Pause audio" : audioUrl ? "Play audio" : "Generate voice briefing"}</span>
         </button>
       </div>
 
+      {!enabled && <span className="audio-error" role="status">Speech generation is not configured. Add SARVAM_API_KEY to the server environment.</span>}
       {error && <span className="audio-error" role="status">{error}</span>}
     </div>
   );
