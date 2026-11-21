@@ -1,8 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test.beforeEach(async ({ page }) => {
-  // Set the non-expiring local test session before AuthGate mounts.
-  // This UI fixture is only used by the localhost Playwright runner.
+async function installLocalWorkspaceSession(page: import("@playwright/test").Page) {
+  // Non-production UI fixture, used only against the localhost E2E API.
   await page.addInitScript(() => {
     sessionStorage.setItem("bharatsim.supabase.session", JSON.stringify({
       access_token: "playwright-local-test-token",
@@ -12,8 +11,7 @@ test.beforeEach(async ({ page }) => {
       user: { id: "11111111-1111-4111-8111-111111111111", email: "playwright@example.test" },
     }));
   });
-  await page.goto("/");
-});
+}
 
 
 test("public preview exposes the live planner but keeps private actions gated", async ({ page }) => {
@@ -48,6 +46,7 @@ test("public preview exposes the live planner but keeps private actions gated", 
 });
 
 test("dashboard connects to the real API and renders authored profiles", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
@@ -59,6 +58,7 @@ test("dashboard connects to the real API and renders authored profiles", async (
 });
 
 test("log analysis reports findings from submitted evidence and preserves source lines", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.stack || error.message));
   await page.goto("/");
@@ -105,6 +105,7 @@ test("log analysis reports findings from submitted evidence and preserves source
 });
 
 test("run registration is disabled until a real APK is selected", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
@@ -115,6 +116,7 @@ test("run registration is disabled until a real APK is selected", async ({ page 
 });
 
 test("Configure a test navigates to the real APK registration form", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
@@ -134,6 +136,7 @@ test("Configure a test navigates to the real APK registration form", async ({ pa
   await expect(page.getByRole("button", { name: /Budget Android/ })).toHaveAttribute("aria-pressed", "true");
 });
 test("dashboard remains usable at narrow mobile widths without horizontal overflow", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   for (const width of [375, 320]) {
     await page.setViewportSize({ width, height: 812 });
     await page.goto("/");
@@ -152,6 +155,7 @@ test("dashboard remains usable at narrow mobile widths without horizontal overfl
 
 
 test("API documentation link stays same-origin in production builds", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   const docsLink = page.getByRole("link", { name: /API documentation/ });
   const href = await docsLink.getAttribute("href");
@@ -161,6 +165,7 @@ test("API documentation link stays same-origin in production builds", async ({ p
 
 
 test("overview uses live readiness instead of a synthetic device demo", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Service & Worker Status" })).toBeVisible();
   await expect(page.getByText("Live health verified through control plane contracts.")).toBeVisible();
@@ -170,15 +175,15 @@ test("overview uses live readiness instead of a synthetic device demo", async ({
 });
 
 test("secure workspace requires sign-in when no session exists", async ({ page }) => {
+  // No auth fixture is installed for this test; assert the default guest gate.
   await page.goto("/");
-  await page.evaluate(() => sessionStorage.removeItem("bharatsim.supabase.session"));
-  await page.reload();
   await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
   await expect(page.getByLabel("Email address")).toBeVisible();
   await expect(page.getByLabel("Password")).toBeVisible();
 });
 
 test("workspace deep links render after direct browser navigation", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/runs");
   await expect(page).toHaveURL(/runs$/);
   await expect(page.getByRole("heading", { name: "Test sessions" })).toBeVisible();
@@ -191,6 +196,7 @@ test("workspace deep links render after direct browser navigation", async ({ pag
 
 
 test("workspace sections never overlap at common desktop, tablet and phone widths", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   const widths = [320, 375, 520, 720, 768, 1024, 1280, 1440];
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
@@ -240,6 +246,7 @@ test("workspace sections never overlap at common desktop, tablet and phone width
 
 
 test("risk planner validates journeys and returns a real API-generated plan", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Risk-first test plan" })).toBeVisible();
