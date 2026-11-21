@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import EvidenceSynthesisPanel from "./EvidenceSynthesisPanel";
 import EngineReportView, { isEngineReport } from "./EngineReportView";
+import DiagnosisPanel from "./DiagnosisPanel";
 import RunComparisonModal from "./RunComparisonModal";
 import {
   api,
@@ -389,6 +390,14 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
           <span>{report.result_interpretation}</span>
         </div>
       )}
+
+      <DiagnosisPanel
+        key={run.id}
+        runId={run.id}
+        runFinished={!isRunActive(run.status)}
+        reportedProblem={(run as unknown as { scenario?: { spec?: { request_text?: string; objective?: string } } }).scenario?.spec?.request_text
+          || (run as unknown as { scenario?: { spec?: { objective?: string } } }).scenario?.spec?.objective}
+      />
 
       {/* Empty state when no worker report exists */}
       {!report ? (
