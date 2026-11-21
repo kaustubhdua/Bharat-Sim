@@ -1,8 +1,8 @@
 # BharatSim — final product audit
 
 **Audit date:** 2026-11-21  
-**Audited ref:** `main` at `5ab14c89b6159c07ba538c1c5c5ddbc44ba8a49c`  
-**Working branch:** `product/final-completion-audit-2026-11`  
+**Audited ref:** `main` at `529d308532f042a3ba4092171370cd4c29a068cb`  
+**Working branch:** `fix/production-capability-gates-2026-11`  
 **Decision:** controlled-beta MVP; **not approved for production arbitrary-APK execution**.
 
 This is a repository and evidence audit. It does not imply access to private Vercel/Supabase credentials, production customer data, a live isolated worker host, or a physical Android test fleet. Items are classified by what the checked-in implementation and recorded CI evidence establish.
@@ -21,9 +21,9 @@ The key issue is not absence of all engineering. It is the gap between a careful
 | Main SHA | `4a1381db9d21e05a5f351bdac5d5710377839c1c` (2026-11-21) | Verified |
 | Branch inventory | Numerous feature/fix/docs branches exist; branch names and heads were inspected. A branch existing is not proof it is merged or current. | Reviewed |
 | PR inventory | PRs through #130 inspected; #130 merged 2026-11-03. Latest relevant integration PRs #126/#127 merged 2026-11-02. | Reviewed |
-| CI on audited main | Run #44906616552 completed 2026-11-21: backend, frontend build, PostgreSQL integration, worker guards, container build and unified build passed; Playwright E2E failed (10 failures, 2 passes) waiting for the API-connected UI state. | Mixed; E2E blocker |
+| CI on audited main | Run #44907739421 completed 2026-11-21: backend, frontend build, PostgreSQL integration, worker guards, container build and unified build passed; Playwright E2E had 11 passing tests and one failure in the submitted-log analysis journey (the results heading did not appear after submission). | Mixed; E2E blocker |
 | Dependency audit | Run #44906460952 completed successfully 2026-11-21; Python and JavaScript dependency jobs succeeded. | Verified on audited main |
-| Android emulator CI | Latest main emulator smoke #44906616568 passed 2026-11-21 on a fixture APK with Appium/UiAutomator2 and a verified network-shaping path in CI. | Earlier fixture only; current run unverified |
+| Android emulator CI | Latest main emulator smoke #44907739403 failed during the Appium/UiAutomator2 primary-action journey with a stale element reference. The fixture traffic-path setup and proxy checks passed before the UI action failure. This branch adds locator re-resolution and retry tests. | Earlier fixture only; current run unverified |
 | Main deployment status | Vercel status for audited SHA `5ab14c8` reports deployment completed successfully. This proves provider deployment status, not live application health or full product readiness. | Deployment reported successful |
 | Current live HTTP | Production homepage returns HTTP 200; `/api/v1/personas` and `/api/v1/capabilities` return 200. `/health/ready` returns 503: database and private storage unavailable, worker not configured, execution disabled. Preview deployment returns the same readiness result. | Runtime inspected; not ready |
 
@@ -51,7 +51,7 @@ Legend: **Working (bounded)** means code and automated evidence support the stat
 | ML anomaly detection | Partial | Baseline/constrained comparison uses fixed metric thresholds and a hand-coded reference z-score. It is not IsolationForest or a trained ML model. Only persisted metrics present in both runs are valid inputs. |
 | Report export | Partial | JSON export exists for log analysis and worker run reports. PDF export is not evidenced. |
 | Sarvam translation | Partial | Server-side Sarvam text translation supports Hindi, Tamil and Marathi; English is the source language. A limited deterministic fallback exists for common summaries; real provider translation requires the server-only API key. |
-| Audio generation/playback | Partial | Bulbul TTS endpoint and an audio player component now exist. However, the audited main frontend expects `audio_content/content_type` while FastAPI returns `audio_base64/format`; without credentials the backend returns a silent fixture WAV. The branch aligns the contract and refuses to present fixture audio as speech. |
+| Audio generation/playback | Partial | PR #131 aligned the Bulbul TTS response contract and the player refuses silent fixture WAVs. The live capability payload still advertises TTS while `SARVAM_API_KEY` is absent; this branch gates the capability and disables the voice control until the provider is configured. |
 | Evaluator quick tour | Partial | Curated scenario fixture endpoint/component exists. The endpoint returns an `items` envelope while the original frontend expected `scenarios`, and the banner was not mounted. This branch corrects the response contract, mounts it and labels scenario content as fixtures. |
 | Run comparison | Partial | Modal and endpoint exist, but audited main queried a non-existent `report_json` column, lacked owner scoping, substituted invented metrics and returned a mismatched nested contract. This branch corrects these issues and refuses comparisons without shared persisted telemetry. |
 | Settings | Missing | No dedicated settings route for profile, security, notifications, language or account management was found. |
@@ -68,7 +68,7 @@ Legend: **Working (bounded)** means code and automated evidence support the stat
 | Performance | Partial | Vite production build and test infrastructure exist. No current Lighthouse/Web Vitals, bundle budget, mobile performance or large-log virtualization evidence was found. |
 | E2E testing | Blocked by current regression | Playwright dashboard E2E exists. On audited main SHA, 10 tests failed and 2 passed because assertions timed out waiting for the API-connected UI state; exact root cause is not yet isolated. Earlier CI passed on 2026-11-08. |
 | Security tests | Working (bounded) | Backend security, upload, worker protocol, auth and dependency audit suites exist. A passing dependency audit is not a penetration test or production security certification. |
-| Production deployment | Provider reports success; runtime unverified | Vercel reports a completed deployment for audited SHA `5ab14c8`. The public site was not independently fetched and production database/storage/worker readiness remains unverified. |
+| Production deployment | Provider reports success; runtime unverified | Vercel reports a READY production deployment for audited SHA `529d308`. The public site was not independently fetched and production database/storage/worker readiness remains unverified. |
 
 ## Frontend route and interaction inventory
 
@@ -159,7 +159,7 @@ Design work required:
 
 ## Latest upstream additions and critical gaps
 
-The audited main commit `5ab14c8` added a portable classifier, statistical comparison, evaluator scenario fixtures, Bulbul TTS endpoint/player, run-comparison UI and additional Android telemetry. These features are real code additions, but the following gaps were found during review:
+The audited main commit `529d308` added a portable classifier, statistical comparison, evaluator scenario fixtures, Bulbul TTS endpoint/player, run-comparison UI and additional Android telemetry. These features are real code additions, but the following gaps were found during review:
 
 - `/api/v1/runs/compare` selected a non-existent `report_json` column (the schema uses `result_json`), did not scope both rows to the authenticated owner, substituted hardcoded telemetry values when measurements were absent, and returned a nested response that did not match the frontend contract.
 - The evaluator scenarios API returns `items`, while the frontend client expected `scenarios`; the banner was imported but not mounted in the overview.
@@ -172,7 +172,7 @@ The audited main commit `5ab14c8` added a portable classifier, statistical compa
 ## Remediation implemented on this working branch
 
 - Persistent light/dark theme with pre-paint initialization, semantic navy/graphite/electric-blue styling and reduced-motion handling.
-- Run comparison now uses `result_json`, completed runs only, owner-scoped lookups, real persisted metrics only, a 422 response when no common telemetry exists, and a response matching the frontend comparison contract.
+- Run comparison now uses `result_json`, completed runs only, owner-scoped lookups, real persisted metrics only, a 422 response when no common telemetry exists, and a response matching the frontend comparison contract (merged in PR #131).
 - Statistical anomaly scoring is labelled and scaled as a statistical heuristic rather than IsolationForest.
 - Classifier metadata now describes the actual portable TF-IDF class-centroid implementation.
 - Sarvam audio contract now matches the backend response; fixture audio is explicitly rejected by the player instead of being represented as speech.
