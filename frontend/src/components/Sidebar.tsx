@@ -85,6 +85,16 @@ export default function Sidebar({
       <nav className="sidebar-nav">
         <button
           type="button"
+          className={"nav-item " + (currentTab === "landing" ? "active" : "")}
+          onClick={() => onSelectTab("landing")}
+          title="Product Showcase Landing Page"
+        >
+          <Flame size={17} />
+          {!collapsed && <span>Platform Showcase</span>}
+        </button>
+
+        <button
+          type="button"
           className={"nav-item " + (currentTab === "overview" ? "active" : "")}
           onClick={() => onSelectTab("overview")}
           title="Overview & Dashboard"
@@ -166,16 +176,6 @@ export default function Sidebar({
         >
           <GitCompare size={17} />
           {!collapsed && <span>Run Comparison</span>}
-        </button>
-
-        <button
-          type="button"
-          className={"nav-item " + (currentTab === "landing" ? "active" : "")}
-          onClick={() => onSelectTab("landing")}
-          title="Product Showcase Landing Page"
-        >
-          <Flame size={17} />
-          {!collapsed && <span>Platform Showcase</span>}
         </button>
 
         <button
