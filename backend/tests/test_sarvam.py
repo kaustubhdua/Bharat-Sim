@@ -9,6 +9,7 @@ from app import main, sarvam
 
 def test_translation_request_is_rejected_without_provider_key(monkeypatch):
     monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.delenv("sarvam_api", raising=False)
     response = TestClient(main.app).post(
         "/api/v1/translate/report",
         json={"text": "Payment retry failed.", "target_language_code": "hi-IN"},
