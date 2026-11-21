@@ -26,6 +26,7 @@ export function applyTheme(theme: Theme) {
   if (typeof document !== "undefined") {
     document.documentElement.setAttribute("data-theme", theme);
     document.documentElement.style.colorScheme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0b1020" : "#f4f7fc");
     try { localStorage.setItem(THEME_KEY, theme); } catch { /* Theme remains active for this session. */ }
   }
 }
