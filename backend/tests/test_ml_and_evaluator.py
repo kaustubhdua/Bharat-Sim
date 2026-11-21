@@ -82,8 +82,6 @@ def test_anomaly_detector_regressions():
     result = detect_regressions(baseline, constrained)
     assert result["regression_count"] >= 2
     assert 0 <= result["anomaly_score"] <= 100
-    memory_anomaly = next(item for item in result["anomalies"] if item["metric"] == "peak_memory_mb")
-    assert memory_anomaly["delta_pct"] == 222.2
     metrics = [a["metric"] for a in result["anomalies"]]
     assert "cold_start_ms" in metrics
     assert "jank_percentage" in metrics
@@ -222,6 +220,8 @@ def test_run_comparison_uses_owner_scoped_persisted_telemetry(monkeypatch):
     assert result["constrained_metrics"] == {"jank_percentage": 36.0, "peak_memory_mb": 290.0}
     assert result["anomaly_detected"] is True
     assert 0 <= result["anomaly_score"] <= 100
+    memory_anomaly = next(item for item in result["anomalies"] if item["metric"] == "peak_memory_mb")
+    assert memory_anomaly["delta_pct"] == 222.2
 
 
 def test_run_comparison_hides_foreign_owner_run(monkeypatch):
