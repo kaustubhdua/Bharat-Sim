@@ -60,6 +60,8 @@ test("dashboard connects to the real API and renders authored profiles", async (
 });
 
 test("log analysis reports findings from submitted evidence and preserves source lines", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.stack || error.message));
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
@@ -68,9 +70,35 @@ test("log analysis reports findings from submitted evidence and preserves source
     "01-01 00:00:01.001 100 100 E AndroidRuntime: java.lang.OutOfMemoryError: Failed allocation",
   ].join("\n");
   await page.getByPlaceholder("Paste Android logcat output here…").fill(input);
+  const analysisResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/analyze/logs") && response.request().method() === "POST"
+  );
   await page.getByRole("button", { name: "Analyze evidence" }).click();
+  const analysisResponse = await analysisResponsePromise;
+  const analysisBody = await analysisResponse.text();
+  expect(
+    analysisResponse.ok(),
+    `Log analysis API returned ${analysisResponse.status()}: ${analysisBody}`
+  ).toBe(true);
+  let analysisPayload: Record<string, unknown>;
+  try {
+    analysisPayload = JSON.parse(analysisBody) as Record<string, unknown>;
+  } catch {
+    throw new Error(`Log analysis API returned non-JSON content: ${analysisBody.slice(0, 1000)}`);
+  }
+  expect(analysisPayload).toHaveProperty("summary");
+  expect(analysisPayload).toHaveProperty("bharat_score");
+  expect(analysisPayload).toHaveProperty("findings");
 
-  await expect(page.getByRole("heading", { name: "Log analysis results" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp("/analysis$"));
+  try {
+    await expect(page.getByRole("heading", { name: "Log analysis results" })).toBeVisible();
+  } catch (error) {
+    const bodyText = await page.locator("body").innerText().catch(() => "<body unavailable>");
+    throw new Error(
+      `Analysis result screen did not render. URL=${page.url()}\\nPage errors=${pageErrors.join("\\n")}\\nBody=${bodyText.slice(0, 3000)}\\nOriginal=${String(error)}`
+    );
+  }
   await expect(page.getByText("Signals detected in supplied logs")).toBeVisible();
   await expect(page.getByText(/SOURCE EVIDENCE/).first()).toBeVisible();
   await expect(page.getByText(/FATAL EXCEPTION/).first()).toBeVisible();
@@ -230,4 +258,13 @@ test("risk planner validates journeys and returns a real API-generated plan", as
   await page.getByRole("button", { name: /Export plan JSON/ }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^bharatsim-risk-plan-fintech\.json$/);
+});
+
+
+test("public product landing is reachable without signing in", async ({ page }) => {
+  await page.goto("/landing");
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /Test Android apps for the phones/ })).toBeVisible();
+  await expect(page.getByText(/INTERACTIVE PRODUCT PREVIEW/)).toBeVisible();
 });
