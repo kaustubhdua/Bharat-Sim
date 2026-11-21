@@ -35,9 +35,10 @@ export default function NewTestWizard({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [fileSha, setFileSha] = useState<string | null>(null);
   const [calculatingHash, setCalculatingHash] = useState(false);
-  const [interactionCount, setInteractionCount] = useState(100);
-  const [enableGfxinfo, setEnableGfxinfo] = useState(true);
-  const [enableMeminfo, setEnableMeminfo] = useState(true);
+  // Current worker API applies fixed defaults; these are shown read-only until per-run overrides are supported.
+  const interactionCount = 100;
+  const enableGfxinfo = true;
+  const enableMeminfo = true;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const activePersonaObj = personas.find((p) => p.id === selectedPersona) || personas[0];
@@ -249,11 +250,7 @@ export default function NewTestWizard({
           <div className="wizard-settings-row">
             <div className="setting-box">
               <label htmlFor="monkey-events">Automated UI Exploration</label>
-              <select
-                id="monkey-events"
-                value={interactionCount}
-                onChange={(e) => setInteractionCount(Number(e.target.value))}
-              >
+              <select id="monkey-events" value={interactionCount} disabled aria-describedby="worker-defaults-note">
                 <option value={50}>50 Throttled Monkey Events (Quick Smoke)</option>
                 <option value={100}>100 Throttled Monkey Events (Recommended)</option>
                 <option value={200}>200 Throttled Monkey Events (Deep Stress)</option>
@@ -266,7 +263,7 @@ export default function NewTestWizard({
                 <input
                   type="checkbox"
                   checked={enableGfxinfo}
-                  onChange={(e) => setEnableGfxinfo(e.target.checked)}
+                  disabled
                 />
                 <span>Capture Frame Render Jank (`dumpsys gfxinfo`)</span>
               </label>
@@ -275,12 +272,13 @@ export default function NewTestWizard({
                 <input
                   type="checkbox"
                   checked={enableMeminfo}
-                  onChange={(e) => setEnableMeminfo(e.target.checked)}
+                  disabled
                 />
                 <span>Capture Memory Footprint (`dumpsys meminfo PSS`)</span>
               </label>
             </div>
           </div>
+          <p id="worker-defaults-note" className="worker-defaults-note">These are the current worker defaults. Per-run monkey-event and telemetry overrides are not yet supported by the run-registration API, so these controls are read-only and will not imply a custom configuration.</p>
         </div>
 
         {/* Action Summary & Submit */}
