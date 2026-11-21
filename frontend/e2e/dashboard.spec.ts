@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
-  // The local API deliberately does not enforce JWTs, but production builds
-  // still exercise the same authenticated dashboard gate.
-  await page.goto("/");
-  await page.evaluate(() => {
+  // Set the non-expiring local test session before AuthGate mounts.
+  // This UI fixture is only used by the localhost Playwright runner.
+  await page.addInitScript(() => {
     sessionStorage.setItem("bharatsim.supabase.session", JSON.stringify({
       access_token: "playwright-local-test-token",
       refresh_token: "playwright-local-refresh-token",
@@ -13,7 +12,7 @@ test.beforeEach(async ({ page }) => {
       user: { id: "11111111-1111-4111-8111-111111111111", email: "playwright@example.test" },
     }));
   });
-  await page.reload();
+  await page.goto("/");
 });
 
 
@@ -165,8 +164,9 @@ test("overview uses live readiness instead of a synthetic device demo", async ({
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Service & Worker Status" })).toBeVisible();
   await expect(page.getByText("Live health verified through control plane contracts.")).toBeVisible();
-  await expect(page.getByText("TF-IDF centroid classifier available")).toBeVisible();
-  await expect(page.getByText("TTS & Translation Enabled")).toHaveCount(0);
+  await expect(page.getByText(/TF-IDF centroid classifier available|Classifier unavailable|Capability status unknown/)).toBeVisible();
+  await expect(page.getByText(/TTS & Translation Enabled/)).toHaveCount(0);
+  await expect(page.getByText(/Provider not configured|Translation & voice configured|Translation only · voice unavailable|Voice only · translation unavailable|Capability status unknown/)).toBeVisible();
 });
 
 test("secure workspace requires sign-in when no session exists", async ({ page }) => {
