@@ -1,7 +1,7 @@
 # BharatSim — Production Readiness
 
 **Audit date:** 2026-11-21 (IST)  
-**Candidate branch (latest docs/README SHA):** `d12eeac9812e7dd2fbdf0da698d9cda340784cb5`  
+**Candidate branch (latest SHA):** `86ea86eb9df8cfaa450ef8bbad7303aa5fcb239c`  
 **Application code tested by green CI:** `4546d9330f24dacda803cbc887d7bd737dfd2f72`  
 **Production URL:** https://bharat-sim-81g2.vercel.app  
 **Decision: NO-GO for public APK testing. Controlled preview only.**
@@ -28,8 +28,8 @@
 
 ## Gate assessment
 
-- **Frontend:** Main UI and public landing route implemented. Candidate build passed on parent snapshot; final E2E on exact candidate SHA is pending.
-- **Backend:** Pytest and unified ASGI smoke passed on parent snapshot; live database-backed product journey not ready.
+- **Frontend:** Frontend build, TypeScript and Playwright E2E passed on application-code SHA `4546d9330f24dacda803cbc887d7bd737dfd2f72`; later commits only adjusted documentation/README.
+- **Backend:** Backend pytest, unified ASGI/SPA smoke and Docker/Compose acceptance passed on application-code SHA `4546d9330f24dacda803cbc887d7bd737dfd2f72`; deployed database-backed workflow not ready.
 - **Database:** Clean disposable PostgreSQL migrations/restart integration passed on parent snapshot; production persistence unverified.
 - **Android:** Fixture-only emulator/worker tests exist; no production worker host and no arbitrary APK verification.
 - **Network:** Limited emulator fixture control; arbitrary app traffic not proven; unsupported controls remain disabled.
