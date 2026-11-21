@@ -33,7 +33,7 @@ export default function LandingPage({
   const faqs = [
     {
       q: "How does BharatSim simulate real Indian network conditions?",
-      a: "The current emulator controls can set and read back latency and bandwidth. Packet loss, outage/recovery and CPU constraints are not supported, and arbitrary APK traffic fidelity is not verified. CI also exercises a bounded fixture proxy path; that is not proof of production device traffic."
+      a: "CI exercises a bounded fixture proxy path that can set and read back selected latency/bandwidth controls. Production network shaping is currently disabled; packet loss, outage/recovery and CPU constraints are unsupported, and arbitrary APK traffic fidelity is not verified."
     },
     {
       q: "What is the Bharat Readiness Score?",
