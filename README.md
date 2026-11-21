@@ -26,6 +26,9 @@
 - Findings are diagnostic signals, not confirmed root causes. Absence of a marker does not prove app health.
 
 ### Android execution workers
+
+The workspace includes **Connect a Laptop**: a signed-in user can create a personal worker key, install the worker on their own Windows/macOS/Linux laptop, and revoke that laptop. Personal keys are stored as hashes server-side and scoped to the owner's jobs; the supervisor keeps the emulator and worker process running. This is a user-owned execution convenience, not a per-job security sandbox or proof of production isolation.
+
 Two distinct worker modes exist:
 
 - **Legacy smoke mode (default):** install/launch, bounded observation, Logcat collection, emulator-console latency/bandwidth control readback, battery-saver and bounded storage-pressure controls where supported.
