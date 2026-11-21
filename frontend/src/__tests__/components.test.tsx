@@ -76,7 +76,7 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("/100");
   });
 
-  it("PlannerPanel renders API-ranked scenarios and interaction hypotheses", async () => {
+  it("PlannerPanel renders ranked scenarios without test-selection hypotheses", async () => {
     const plan = {
       generated_at: "2026-11-01T00:00:00Z",
       strategy: "deterministic-category-aware-risk-and-pairwise-interaction-v3",
@@ -123,8 +123,11 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("Risk-first test plan");
     expect(container.textContent).toContain("payment retry");
     expect(container.textContent).toContain("92 / 100");
-    expect(container.textContent).toContain("High latency × limited bandwidth");
-    expect(container.textContent).toContain("test-selection hypotheses only");
+    expect(container.textContent).not.toContain("High latency × limited bandwidth");
+    expect(container.textContent).not.toContain("test-selection hypotheses");
+    expect(container.querySelector(".interaction-item")).toBeNull();
+    expect(container.querySelector(".planner-caveat")).toBeNull();
+    expect(container.textContent).not.toContain("pairwise interactions examined");
   });
 
   it("PlannerPanel submits selected app category and edited critical journeys", async () => {
