@@ -1,40 +1,44 @@
 # BharatSim — Test Execution Report
 
-**Audit date:** 2026-11-21 (IST)  
-**Earlier candidate:** `c037fb0fb471d13e2f0115b9d3f9d8074b4687e0`
+**Candidate SHA:** `58af61db5aac2f29e8128d512a7cf999eb71dc92`  
+**Branch:** `fix/accurate-capabilities-and-product-evidence`  
+**Date:** 2026-11-21 (IST)
 
-## Evidence reviewed
+## Exact-SHA GitHub Actions evidence
 
-This report distinguishes test execution from feature availability. GitHub Actions for the candidate head must be fully complete before the PR can be considered merge-ready. CI for its immediate parent snapshot `54ac4377b8a961822ebff80d19d07e6faafbf0c6` had passing backend Pytest, PostgreSQL integration, worker guards, frontend build, unified FastAPI/SPA build and container smoke. Playwright E2E was still running at last inspection. An earlier candidate snapshot had 4 passes and 9 failures in Playwright E2E. Android emulator smoke on a subsequent intermediate snapshot was cancelled. A successful Android smoke from a different commit is not transferred to this candidate.
+For the candidate SHA above, CI run [44913283418](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913283418) completed successfully. All seven jobs passed:
+- Backend pytest.
+- Frontend install/build.
+- Playwright frontend E2E.
+- PostgreSQL migration/persistence integration.
+- Android worker unit/guard and Python compile checks.
+- Docker / Compose build and hardened stack smoke.
+- Unified FastAPI + frontend ASGI/deep-link smoke.
 
-A follow-up candidate `0e31d2ab117a20c4a29118855fdfa1e4abaaa46f` adds a per-test authentication fixture so guest preview and the sign-in gate begin from a clean browser context. Its CI run is still in progress and must finish before acceptance.
+Dependency security audit run [44913283488](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913283488) completed successfully.
 
-## Live production read-only smoke
+Android emulator smoke run [44913283436](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913283436) was still in progress at report time. Its early steps had passed: Linux netem shaping verification, Appium + UiAutomator2 installation, Android SDK setup, emulator image preparation, proxy setup. The known-good APK build and emulator boot/run stages were not yet completed; do not treat this as a passed Android end-to-end test.
+
+The preceding Playwright run on `c037fb0...` found 2 failed tests / 11 passed because a global test session contaminated intentionally guest-only tests. CI captured traces/screenshots as artifact 14710617269. The E2E fixture was corrected to apply a local authenticated session only to authenticated workspace tests. The subsequent exact-SHA CI run above passed the entire E2E job.
+
+## Production read-only smoke
 
 | Endpoint | Observed | Interpretation |
 |---|---|---|
-| `/` | HTTP 200; sign-in screen rendered | Frontend reachable; not an authenticated journey |
-| `/api/v1/capabilities` | HTTP 200 | API reachable; the previously deployed payload incorrectly reported TTS/comparison capability despite dependency unavailability |
-| `/health/ready` | HTTP 503 | Not ready: database/private storage unavailable; Android worker not configured |
+| `/` | HTTP 200; sign-in experience rendered | Frontend reachable, not proof of authenticated workflows |
+| `/api/v1/capabilities` | HTTP 200 | API reachable; the captured response was edge-cached and reflected an older capability payload |
+| `/health/ready` | HTTP 503 | Not ready: PostgreSQL/private Storage unavailable and Android worker not configured |
 
-No production accounts, APK uploads, writes or destructive operations were performed.
+No production account, APK upload, write, test execution or destructive operation was performed.
 
-## Follow-up candidate run\n\nThe first candidate E2E run exposed two test-isolation defects: a suite-wide local auth session was applied even to guest preview/sign-in tests, and the test then expected an unauthenticated screen. Playwright traces and screenshots were captured as CI artifact `14710617269`. The fix now applies the local session only to authenticated dashboard scenarios and leaves guest/sign-in tests unauthenticated. The new candidate CI is pending.\n\n## Test suites
+## Remaining test categories
 
-| Suite | Current report |
-|---|---|
-| Frontend Vitest/typecheck/build | Passed on parent CI snapshot; re-run required on exact candidate SHA |
-| Backend Pytest | Passed on parent CI snapshot; re-run required on exact candidate SHA |
-| PostgreSQL integration | Passed on parent CI snapshot; re-run required on exact candidate SHA |
-| Worker unit/guard suite | Passed on parent CI snapshot; Android production worker not present |
-| Container/Compose | Passed on parent CI snapshot |
-| Playwright E2E | Earlier snapshot failed; candidate rerun pending at time this report was drafted |
-| Android emulator smoke | Candidate attempt cancelled; fixture-only; production arbitrary APK execution unverified |
-| Dependency audit | Earlier candidate passed; exact candidate's result must be refreshed |
-| Performance/load | Not run |
-| Accessibility/WCAG | Not run as a complete audit |
-| Live Sarvam | Blocked; no verified live provider output |
-| Production DB/storage | Blocked; health readiness HTTP 503 |
+- Actual production Android worker and APK install/launch/telemetry: blocked by absent production worker.
+- Live two-tenant Supabase RLS test: not run against production.
+- Sarvam live Hindi/Tamil/Marathi translation and Bulbul speech: blocked until provider credential and successful live calls.
+- PDF/JSON generated report structure: PDF path not implemented; JSON paths exist but need full authenticated artifact acceptance.
+- Accessibility/WCAG: no independent audit completed.
+- k6/performance: no controlled staging load test run.
 
 ## Reproduction
 
@@ -43,5 +47,3 @@ cd frontend && npm ci && npm test && npm run typecheck && npm run build
 cd frontend && npx playwright install chromium && npm run test:e2e
 cd backend && pip install -r requirements-dev.txt && pytest -q
 ```
-
-The CI run attached to the exact candidate SHA is authoritative. Do not mark the feature inventory green from code existence.
