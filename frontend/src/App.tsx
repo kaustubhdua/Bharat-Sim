@@ -202,7 +202,11 @@ export default function App() {
         if (problems.length) throw new Error("Fix the custom persona first: " + problems.join("; "));
       }
       const personaFields = options
-        ? { persona_id: options.personaId, ...(options.scenario ? { scenario: options.scenario } : {}) }
+        ? {
+            persona_id: options.personaId,
+            ...(options.customPersona ? { custom_persona: options.customPersona } : {}),
+            ...(options.scenario ? { scenario: options.scenario } : {})
+          }
         : selected === "custom" ? { persona_id: "custom", custom_persona: customPersona } : { persona_id: selected };
       let run: Run & { message: string };
       if (capabilities?.direct_apk_upload) {
@@ -267,6 +271,7 @@ export default function App() {
         const body = new FormData();
         body.append("persona_id", personaFields.persona_id);
         if (!options && selected === "custom") body.append("custom_persona", JSON.stringify(customPersona));
+        if (options?.customPersona) body.append("custom_persona", JSON.stringify(options.customPersona));
         if (options?.scenario) body.append("scenario", JSON.stringify(options.scenario));
         body.append("apk", targetFile);
         run = await api<Run & { message: string }>("/api/v1/runs", {
@@ -662,8 +667,11 @@ export default function App() {
               path="/speak"
               element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} />}
             />
+            <Route path="/speak-to-test" element={<Navigate to="/speak" replace />} />
             <Route path="/fixproof" element={<FixProofView runs={runs} previewMode={previewMode} />} />
+            <Route path="/fix-proof" element={<Navigate to="/fixproof" replace />} />
             <Route path="/connect" element={<ConnectLaptopView previewMode={previewMode} />} />
+            <Route path="/connect-laptop" element={<Navigate to="/connect" replace />} />
 
             {/* Comparative Telemetry & Anomaly Analysis route */}
             <Route
