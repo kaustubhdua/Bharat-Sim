@@ -33,7 +33,7 @@ export default function LandingPage({
     },
     {
       q: "How does the Machine Learning failure classifier work?",
-      a: "Emulator runs use a TF-IDF + logistic-regression classifier trained on about 9,100 labelled log lines (LogHub Android plus templated failures). Grouped 5-fold cross-validation gives 78% accuracy and 0.77 macro F1 on that mixed dataset, which is not field accuracy. Every finding links the exact log lines, so treat the category as a triage hint and check the evidence."
+      a: "Emulator runs use a TF-IDF + logistic-regression classifier trained on about 9,100 mixed log lines (weak-rule-labelled LogHub Android plus templated failures). Grouped 5-fold cross-validation gives 78% accuracy and 0.77 macro F1 on that mixed dataset, which is not field accuracy. Every finding links the exact log lines, so treat the category as a triage hint and check the evidence."
     },
     {
       q: "How is Sarvam AI integrated into the testing workflow?",
