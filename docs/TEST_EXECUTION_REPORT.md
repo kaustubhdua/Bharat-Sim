@@ -1,13 +1,13 @@
 # BharatSim — Test Execution Report
 
-**CI-tested application candidates:** `4546d9330f24dacda803cbc887d7bd737dfd2f72` (7/7 CI jobs + dependency audit) and `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb` (7/7 CI jobs).  
+**CI-tested application candidates:** `4546d9330f24dacda803cbc887d7bd737dfd2f72` (7/7 CI jobs + dependency audit), `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb` (7/7 CI jobs), and Android smoke candidate `d5684752e7f5202c83bb401bf651595290815188` (emulator workflow passed).  
 **Branch:** `fix/accurate-capabilities-and-product-evidence`  
 **Date:** 2026-11-21 (IST)  
-**Candidate branch:** `d4f3605711aa51929b8148a4fee296768085776f`  
+**Candidate branch:** `5b751f88ca8679e5cd32fbdc3eab289451f6aab0`  
 
 ## Exact-SHA GitHub Actions evidence
 
-For the candidate SHA above, CI run [44913283418](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913283418) completed successfully. All seven jobs passed:
+For application SHA `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb`, CI run [44913787012](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913787012) completed successfully. All seven jobs passed:
 - Backend pytest.
 - Frontend install/build.
 - Playwright frontend E2E.
@@ -16,11 +16,11 @@ For the candidate SHA above, CI run [44913283418](https://github.com/kaustubhdua
 - Docker / Compose build and hardened stack smoke.
 - Unified FastAPI + frontend ASGI/deep-link smoke.
 
-Dependency security audit run [44913283488](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913283488) completed successfully.
+Dependency security audit run [44913441381](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913441381) completed successfully on the earlier verified code candidate; run [44913787035](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913787035) also completed successfully for the Android candidate.
 
 Android emulator smoke run [44913283436](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913283436) was still in progress at report time. Its early steps had passed: Linux netem shaping verification, Appium + UiAutomator2 installation, Android SDK setup, emulator image preparation, proxy setup. The known-good APK build and emulator boot/run stages were not yet completed; do not treat this as a passed Android end-to-end test.
 
-The preceding Playwright run on `c037fb0...` found 2 failed tests / 11 passed because a global test session contaminated intentionally guest-only tests. CI captured traces/screenshots as artifact 14710617269. The E2E fixture was corrected to apply a local authenticated session only to authenticated workspace tests. The exact-SHA CI run [44913441396](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913441396) completed successfully with all seven jobs green. The later PR candidate `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb` also had all seven CI jobs pass (run [44913787012](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913787012)). The PDF export unit tests are part of that later frontend test suite. The Android emulator fixture workflow passed on `d5684752e7f5202c83bb401bf651595290815188` (run [44913787016](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913787016)). The very latest head `d4f3605711aa51929b8148a4fee296768085776f` consists of follow-on documentation updates; no CI run was found for that exact docs-only SHA.
+The preceding Playwright run on `c037fb0...` found 2 failed tests / 11 passed because a global test session contaminated intentionally guest-only tests. CI captured traces/screenshots as artifact 14710617269. The E2E fixture was corrected to apply a local authenticated session only to authenticated workspace tests. The exact-SHA CI run [44913441396](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913441396) completed successfully with all seven jobs green. The later PR candidate `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb` also had all seven CI jobs pass (run [44913787012](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913787012)). The PDF export unit tests are part of that later frontend test suite. The later Android emulator fixture workflow passed on `d5684752e7f5202c83bb401bf651595290815188` (run [44913787016](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44913787016)). The current branch head `5b751f88ca8679e5cd32fbdc3eab289451f6aab0` consists of follow-on documentation updates; no CI run was found for that exact docs-only SHA.
 
 ## Production read-only smoke
 
