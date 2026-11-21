@@ -168,6 +168,10 @@ def test_analyze_logs_with_ml_enrichment(client):
     first_finding = data["findings"][0]
     assert "sarvam_explanation" in first_finding
     assert "code_remedy" in first_finding["sarvam_explanation"]
+    assert isinstance(first_finding["ml_classification"], dict)
+    assert first_finding["ml_classification"]["category"] == first_finding["kind"]
+    assert 0 <= first_finding["ml_classification"]["confidence"] <= 1
+    assert first_finding["classification_method"] == "ml_corroborated"
 
 
 
