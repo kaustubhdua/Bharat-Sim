@@ -239,13 +239,29 @@ export default function DashboardOverview({
             <div className="status-grid-item">
               <small>ML Classifier</small>
               <b className={capabilities?.ml_classifier === true ? "text-success" : "text-danger"}>
-                {capabilities?.ml_classifier === true ? "TF-IDF centroid classifier available" : "Classifier unavailable"}
+                {capabilities?.ml_classifier === true
+                  ? "TF-IDF centroid classifier available"
+                  : capabilities?.ml_classifier === false
+                  ? "Classifier unavailable"
+                  : "Capability status unknown"}
               </b>
             </div>
             <div className="status-grid-item">
               <small>Sarvam AI Bulbul</small>
-              <b className={capabilities?.sarvam_translation === true && capabilities?.sarvam_audio_tts === true ? "text-success" : "text-danger"}>
-                {capabilities?.sarvam_translation === true && capabilities?.sarvam_audio_tts === true ? "Provider configured" : "Not configured"}
+              <b className={
+                capabilities?.sarvam_translation === true && capabilities?.sarvam_audio_tts === true
+                  ? "text-success"
+                  : "text-danger"
+              }>
+                {capabilities?.sarvam_translation === true && capabilities?.sarvam_audio_tts === true
+                  ? "Translation & voice configured"
+                  : capabilities?.sarvam_translation === true
+                  ? "Translation only · voice unavailable"
+                  : capabilities?.sarvam_audio_tts === true
+                  ? "Voice only · translation unavailable"
+                  : capabilities
+                  ? "Provider not configured"
+                  : "Capability status unknown"}
               </b>
             </div>
           </div>
