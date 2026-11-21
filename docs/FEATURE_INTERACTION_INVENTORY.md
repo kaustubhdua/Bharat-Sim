@@ -1,6 +1,6 @@
 # BharatSim — feature interaction inventory
 
-**Baseline:** main `5ab14c89b6159c07ba538c1c5c5ddbc44ba8a49c`  
+**Baseline:** main `529d308532f042a3ba4092171370cd4c29a068cb`  
 **Audit date:** 2026-11-21
 
 This inventory records the interactive surface discovered in the current React application. It is not a claim that production credentials or infrastructure are configured.
@@ -19,20 +19,20 @@ This inventory records the interactive surface discovered in the current React a
 | Overview | Risk planner | Generate risk-first plan | Planner API | Implemented; planning is not execution |
 | Overview | Logcat textarea and analyze | Analyze submitted logs and return findings | Analysis API | Implemented; private analysis requires auth |
 | Overview | Recent run link / View all | Open run detail/history | FastAPI + router | Implemented |
-| Overview | Evaluator quick tour | Load curated logcat fixture into analyzer | Evaluator scenarios API | Mounted on this branch; API envelope corrected; clearly labelled fixture, not an executed APK run |
+| Overview | Evaluator quick tour | Load curated logcat fixture into analyzer | Evaluator scenarios API | Mounted in merged PR #131; API envelope corrected; clearly labelled fixture, not an executed APK run |
 | Runs | Search | Filter loaded run records | Client-side | Implemented |
 | Runs | Status filter | Filter active/completed/failed records | Client-side | Implemented |
 | Runs | Open run | Navigate to run evidence | FastAPI | Implemented |
 | Run detail | Refresh/poll | Refresh active run and lifecycle events | FastAPI | Implemented |
 | Run detail | Download report | Download worker report JSON | FastAPI | Implemented |
 | Run detail | Delete | Confirm and delete eligible owner-scoped run | FastAPI | Implemented; active execution guarded |
-| Run detail | Compare runs | Compare completed baseline and constrained runs | FastAPI + persisted telemetry | Main implementation had a broken query/tenant/metric/response contract; corrected on this branch to use owner-scoped `result_json` and measured metrics only |
+| Run detail | Compare runs | Compare completed baseline and constrained runs | FastAPI + persisted telemetry | Corrected in merged PR #131 to use owner-scoped `result_json` and measured metrics only; current database unavailability keeps the operation disabled by this branch's capability gate |
 | Analysis | Export JSON | Download current analysis report | Browser Blob | Implemented |
 | Analysis | Finding expansion | Inspect evidence and recommendations | React state/component | Implemented |
 | Analysis | Sarvam language selector | Choose Hindi/Tamil/Marathi | Local state | Implemented |
 | Analysis | Translate report | Translate condensed report summary | FastAPI + Sarvam | Conditional on server API key; deterministic fallback exists for selected summaries |
-| Analysis | Play voice briefing | Generate and play translated speech | FastAPI Bulbul TTS | API/player contract fixed on this branch; real speech requires `SARVAM_API_KEY`; silent fixture is never played as speech |
-| Theme | Light/dark toggle | Persist theme and apply before paint | Local storage + root theme attribute | Implemented on this branch; awaiting CI |
+| Analysis | Play voice briefing | Generate and play translated speech | FastAPI Bulbul TTS | API/player contract fixed in merged PR #131; this branch also gates the button on `sarvam_audio_tts`; real speech requires `SARVAM_API_KEY` and silent fixture is never played as speech |
+| Theme | Light/dark toggle | Persist theme and apply before paint | Local storage + root theme attribute | Implemented in merged PR #131; persistent selection and pre-paint bootstrap are deployed |
 | Missing | PDF export | Generate downloadable PDF | Not implemented | Missing |
 | Missing | Password reset/email resend | Recover/verify account | No complete flow found | Missing |
 | Missing | Settings/profile/security/notifications | Save account preferences | No settings route/API found | Missing |
@@ -51,4 +51,4 @@ This inventory records the interactive surface discovered in the current React a
 
 ## Branch remediation notes
 
-The current branch additionally corrects the comparison query to use `result_json`, scopes both run lookups to the authenticated owner, refuses fabricated telemetry defaults, requires completed runs and shared measured metrics, and aligns the comparison response shape with the UI. It fixes the Sarvam audio response contract and refuses silent fixture audio as a voice briefing. The evaluator tour now reads the API's `items` envelope and is mounted on Overview; scenario logs and metrics are explicitly marked as fixtures.
+The current branch additionally corrects the comparison query to use `result_json`, scopes both run lookups to the authenticated owner, refuses fabricated telemetry defaults, requires completed runs and shared measured metrics, and aligns the comparison response shape with the UI. It fixes the Sarvam audio response contract and refuses silent fixture audio as a voice briefing. The evaluator tour reads the API's `items` envelope and is mounted on Overview by merged PR #131; scenario logs and metrics are explicitly marked as fixtures.
