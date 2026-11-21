@@ -1,3 +1,9 @@
+**Current release decision — 2026-11-21:** Controlled-beta / not production accepted. The current main SHA `2c754dcb` failed its Vercel build; the feature branch preview builds and serves the SPA, but its `/health/ready` endpoint is HTTP 503. Live capability checks show database persistence, private APK upload, worker dispatch, Android execution, run comparison and Sarvam TTS unavailable. The current branch corrects misleading capability flags and UI claims, but it cannot provision external infrastructure or secrets. Keep arbitrary public APK execution disabled.
+
+**Current required server environment:** `BHARATSIM_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`), `BHARATSIM_AUTH_REQUIRED=true`, and `BHARATSIM_STORAGE_BUCKET=bharatsim-private`. Add `BHARATSIM_WORKER_TOKEN` only after an isolated worker host is provisioned. Keep `BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED`, `BHARATSIM_WORKER_ISOLATION_ATTESTED`, and `BHARATSIM_WORKER_EGRESS_RESTRICTED` false until independently verified. Add `SARVAM_API_KEY` only if provider-backed translation/TTS is required.
+
+---
+
 # Production release gates
 
 ## Live follow-up — 2026-11-02, post-cutover smoke verification
