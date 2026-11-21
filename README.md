@@ -1,164 +1,184 @@
 # BharatSim 🇮🇳 — The Cheap Phone Test
 
-**Android resilience testing, with evidence you can act on.** Ensuring Android applications work reliably on low-end devices and under real-world Indian network conditions by simulating device and network constraints and identifying performance and connectivity failures.
+**Android resilience testing with evidence you can act on.** BharatSim combines Android log analysis, risk planning, controlled emulator execution, and evidence-backed reports for apps intended to work on low-end devices and unstable Indian networks.
 
-Live Deployment: [https://bharat-sim-81g2.vercel.app](https://bharat-sim-81g2.vercel.app)  
-Grand Finale Showcase: hackFront India Grand Finale · IIIT Delhi (21–22 November 2026)
+- Product: https://bharat-sim-81g2.vercel.app
+- Repository: https://github.com/kaustubhdua/Bharat-Sim
+- Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Current acceptance status: [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md)
+- Judge demo: [docs/finale/JUDGE_DEMO_SCRIPT.md](docs/finale/JUDGE_DEMO_SCRIPT.md)
 
----
-
-## Evaluator Quick Tour (fixture-based analysis)
-
-BharatSim includes curated Android logcat examples for demonstrating the log-analysis UI. These are **illustrative fixtures**, not APK installations, Android device telemetry, or production test executions.
-
-1. Open the public product tour at `/landing`, or enter the workspace using an authenticated account.
-2. Select a labelled evaluator fixture (for example, a timeout or out-of-memory logcat sample).
-3. Review findings and source-line evidence returned by the analysis endpoint. Classifier output is a triage hint from the current small curated model, not independently validated diagnosis.
-4. Provider-backed translation and Bulbul speech are available only when the backend has a valid `SARVAM_API_KEY`; do not expect audio or a translated result when that capability is disabled.
-
-APK upload, persistent history and actual Android execution require production PostgreSQL, private Storage and an independently isolated Android worker. See [production readiness](docs/PRODUCTION_READINESS.md) and [known limitations](docs/KNOWN_LIMITATIONS.md).
+> **Release status:** BharatSim is a controlled-beta engineering prototype, not yet accepted for public customer APK execution. Production database identity, private Storage round-trip, live tenant-isolation tests and a separately isolated worker host remain release gates. Public APK execution must remain disabled until those gates are independently verified.
 
 ---
 
-## 🚀 Key Features Implemented
+## What is implemented
 
-### 1. Machine Learning Failure Classifier
-- **Zero-DLL Portable Centroid Vector Architecture**: Runs seamlessly in <1ms across Vercel serverless, Windows sandboxes, and Linux workers.
-- **Trained on 58 authentic Android logcat failure traces**: Classifies crashes, ANRs, OOMs, network failures, and storage pressure with **100.0% accuracy** and calibrated softmax probability distributions.
-- See [`docs/ML_PIPELINE.md`](docs/ML_PIPELINE.md).
+### Risk planning
+- API-backed, deterministic risk ranking for general, e-commerce, fintech, social, education, delivery and media apps.
+- Editable critical user journeys, persona selection and JSON export.
+- Planning is not execution. A generated plan does not mean the app was installed, tested or failed.
 
-### 2. Multivariate Telemetry Anomaly Detection
-- Compares baseline (unconstrained) vs. persona-constrained executions across 4 key dimensions:
-  - Cold-start latency (ms)
-  - Jank frame percentage (gfxinfo 16.6ms threshold)
-  - Peak memory footprint (dumpsys meminfo PSS)
-  - Round-trip network latency (ms)
-- Emits covariance divergence scores and actionable regression verdicts (`/api/v1/runs/compare`).
+### Logcat analysis and evidence
+- Deterministic crash, ANR, OOM, network and storage signal detection.
+- Source-line-linked findings, normalized Failure DNA groups, recommendations and a transparent heuristic BharatScore.
+- PDF and JSON report export.
+- Findings are diagnostic signals, not confirmed root causes. Absence of a marker does not prove app health.
 
-### 3. Sarvam AI Multi-Modal Integration
-- **Indic Translation**: Translates diagnostic findings into Hindi (`hi-IN`), Tamil (`ta-IN`), and Marathi (`mr-IN`).
-- **Bulbul TTS Audio Synthesis**: Generates voice briefings directly playable in the dashboard via `/api/v1/translate/audio`.
-- **Developer Remediation**: Generates plain-language root causes and defensive code remedies (e.g. `BitmapFactory.Options.inSampleSize`, `ExponentialBackoffRetry`).
+### Android execution workers
+Two distinct worker modes exist:
 
-### 4. Bounded Android Automation & Telemetry Extraction
-- Worker (`worker/runner.py`) uses bounded `adb shell monkey` exploration (`--pct-touch 70 --pct-motion 20 --pct-syskeys 0 --pct-appswitch 0 --throttle 250`).
-- Subsystem telemetry parsing:
-  - `dumpsys gfxinfo`: Total frames and jank frame percentage.
-  - `dumpsys meminfo`: Dalvik, Native, Total PSS, and Private Dirty pages.
-- See [`docs/ANDROID_WORKER_SETUP.md`](docs/ANDROID_WORKER_SETUP.md).
+- **Legacy smoke mode (default):** install/launch, bounded observation, Logcat collection, emulator-console latency/bandwidth control readback, battery-saver and bounded storage-pressure controls where supported.
+- **Full engine mode:** set `BHARATSIM_WORKER_ENGINE=engine` to run baseline and persona passes, collect startup/frame/memory/log evidence, and route traffic using the host shaping proxy. The proxy can apply latency, bandwidth, packet-loss stalls, connection resets and offline periods to traffic that actually uses the Android system proxy. Each report records proxy connections/bytes and states when no app traffic traversed the proxy.
 
-### 5. ArgosX Security Hardening & Zero-Vulnerability Gate
-- Clean ArgosX security scan status with strict CORS origins, security response headers (`nosniff`, `DENY`), ZIP magic byte signature validation, and database Row-Level Security (RLS).
-- See [`docs/ARGOSX_REMEDIATION.md`](docs/ARGOSX_REMEDIATION.md).
+The engine's proxy is not a universal VPN. Apps that bypass Android's system proxy are not shaped. CPU throttling is unsupported. RAM behavior depends on emulator provisioning; a profile target is not proof of a live RAM cap. A smoke run is not proof that all app journeys pass.
+
+See [worker/README.md](worker/README.md), [docs/ANDROID_NETWORK_SHAPING.md](docs/ANDROID_NETWORK_SHAPING.md) and [docs/WORKER_HOST_SETUP.md](docs/WORKER_HOST_SETUP.md).
+
+### Speak-to-Test and Sarvam
+- Text and optional voice requests can be converted into a validated scenario plan.
+- Executable scenario IDs are allowlisted server-side; the included BharatPay APKs are controlled fixtures.
+- Real Sarvam interpretation, translation and Bulbul speech require a server-side `SARVAM_API_KEY`. Fallback behavior must be labelled as fallback, not presented as live provider output.
+- The BharatPay fixture journey is not a payment gateway integration and does not move real money.
+
+### Persistence, upload and worker protocol
+- APK validation includes archive/manifest checks, bounded metadata extraction and SHA-256.
+- Signed/resumable private Storage upload code, PostgreSQL persistence, owner-scoped access, worker leases, heartbeats and authenticated result callbacks are implemented and covered by automated tests.
+- CI applies the complete isolated BharatSim migration chain to a clean PostgreSQL service and tests persistence across API restarts.
+- Production use still requires the correct Supabase/PostgreSQL target and credentials, a real private-bucket round-trip, and live two-user isolation evidence.
 
 ---
 
-## What works in this repository
+## ML and score limitations — read before quoting metrics
 
-- Four named Bharat test personas, a category-aware deterministic risk planner with editable critical user journeys (e-commerce, fintech, social, education, delivery, media and general), and pairwise condition-interaction hypotheses surfaced in the dashboard. The planner prioritizes tests; it does not execute them. See [docs/PLANNER.md](docs/PLANNER.md) for scoring and limitations.
-- APK upload size limits, APK-like ZIP structure checks, bounded archive metadata, and SHA-256 fingerprinting.
-- FastAPI endpoints with SQLite persistence for direct local Python development; the Docker Compose workflow now starts a private PostgreSQL 17 service by default and automatically initializes the reviewed BharatSim schema. An opt-in PostgreSQL adapter and isolated Supabase migration exist. Vercel serverless connections use the Supabase Transaction pooler with psycopg prepared statements disabled and transaction-local `SET LOCAL search_path` (no session-level state). When private Storage is configured, the dashboard uploads APK bytes directly using short-lived signed TUS capabilities in retryable 6 MiB chunks (bypassing Vercel's 4.5 MB function body limit and recovering from unstable networks); the API verifies object size before queueing and the worker independently checks SHA-256. On Vercel/AWS serverless deployments, APK uploads are disabled until both persistent PostgreSQL and private Storage are configured; the API never falls back to an ephemeral function filesystem. Local development without Storage credentials retains filesystem uploads. The `common 1` Supabase project now has a verified private `bharatsim-private` Storage bucket; when the server-only `SUPABASE_SECRET_KEY` (preferred) or legacy `SUPABASE_SERVICE_ROLE_KEY` is configured, APK uploads are streamed into generated object paths, workers retrieve them only through lease-authenticated proxy downloads, and terminal results delete the input object. Local development without Storage credentials retains filesystem uploads. Worker reports/logcat remain bounded inline JSON; durable report artifact storage and background retention scheduling are still outstanding. The `common 1` project has the `bharatsim` schema and private grants; the core migration filename matches its remote `20261027054905_bharatsim_core` history. A clean PostgreSQL 17 CI job applies the core, foreign-key-index, and signed-upload metadata migrations from zero and verifies restart persistence, per-user quota enforcement, and signed-upload metadata. The additive foreign-key-index migration is applied to `common 1` at remote version `20261027061609_bharatsim_fk_indexes`, and the repository migration filename now matches that history. The application has not yet been verified using its live server-side database URL. Worker heartbeat history and full report/artifact durability across restarts are not yet proven.
-- Worker queue with authenticated job claims, short-lived leases, heartbeats, lease-bound APK downloads, SHA-256 evidence matching (completed results must include the matching APK hash), result callbacks, stale-result rejection, and bounded inline report JSON. Protocol tests cover lease renewal, expired-lease reclamation, stale-token rejection, retry exhaustion, and duplicate result rejection.
-- Optional polling worker that refuses credential-bearing HTTP redirects, enforces same-origin `/internal/worker/` paths for job URLs, verifies APK hashes, and runs an explicitly enabled ADB smoke test against a configured disposable Android device. APK-derived package names are validated before use in ADB shell commands, the runner attempts package cleanup after execution, and common secret patterns are redacted from report text before persistence (best effort, not exhaustive).
-- Deterministic logcat signal analysis, failure fingerprints, evidence-linked findings, and a transparent heuristic BharatScore. Worker reports also include bounded, line-addressable crash, ANR, OOM, network, and storage marker excerpts from actual collected logcat; markers remain diagnostic signals, not confirmed root causes.
-- Cross-source evidence synthesis on each run detail and report export correlates logcat markers with condition-manager verification, network control/data-plane evidence, and ADB step outcomes. It emits only low/medium unconfirmed hypotheses, distinguishes pre-existing from applied conditions, and hashes derived diagnostics separately from the original worker report. See [docs/EVIDENCE_SYNTHESIS.md](docs/EVIDENCE_SYNTHESIS.md); the fail-closed review pattern was informed by `jai-hack` without importing its cybersecurity classifiers.
-- React/Vite dashboard with searchable/filterable run history, live capability status, worker heartbeat status, log analysis, report inspection, owner-scoped run deletion, and on-demand JSON report export with SHA-256 integrity metadata. Report JSON remains in the database; this export is not separate durable object storage.
-- Docker Compose setup for local API/dashboard deployment, with a loopback-only web binding by default and a private PostgreSQL 17 service. Set a unique `BHARATSIM_LOCAL_POSTGRES_PASSWORD` before startup; see [the local PostgreSQL quickstart](docs/LOCAL_POSTGRES_DEVELOPMENT.md).
-- CI for backend tests, frontend production build, real-browser Playwright E2E against a live local FastAPI instance (API/profile loading, source-line log analysis, and disabled run registration until an APK is selected), worker safety guards, container builds, and scheduled/PR-triggered Python and JavaScript dependency vulnerability audits. The audit workflow passed on the merged revision; passing an audit is not a full security certification. The dashboard labels worker `completed` states as `smoke completed`, not as a product-health pass.
-- Dedicated Android emulator workflow that builds a known-good fixture APK, exercises the real local API → queue → worker → ADB → callback → saved-report path, and runs an Appium UI assertion. The Appium fixture binds its HTTPS socket to the active Android Network and routes it through a host-side allowlisted CONNECT proxy pinned to the CI-resolved raw.githubusercontent.com IPv4 address. The proxy preserves end-to-end TLS, records tunnel bytes/timings, applies a 384 kbps per-direction cap or a 150 ms initial round-trip setup delay, and verifies control readback and reset. Each measurement downloads a bounded 64,000-byte range from a 256,000-byte repository fixture. A separate Linux network-namespace test measures real ping traffic through a shaped veth. Verified in CI run 41480040855 on the active Wi-Fi transport: three repeated baseline, bandwidth-only and latency-only HTTPS range samples, pinned upstream IP 185.199.111.133, 64,000 response bytes per sample, 384 kbps median slowdown of 1,286 ms (observed diagnostic delta, not a deterministic threshold), 150.41–151.47 ms injected latency telemetry, execution report `constraints_applied: false`, and verified reset. This pass proves only the source-built fixture's path, not arbitrary uploaded APK traffic.
+BharatSim has separate backend and worker classifier paths:
 
-## What is not complete
+- The backend portable TF-IDF centroid model is generated from 58 curated examples. Its recorded 100% score is training-set/resubstitution accuracy, **not** an independent holdout or field-accuracy result. Softmax-like outputs are ranking scores, not calibrated probabilities.
+- The worker classifier is trained on a mixed dataset of LogHub Android logs weakly labelled by rules, templated failure lines and optional locally labelled worker lines. Its recorded 5-fold GroupKFold metrics are 0.7843 accuracy and 0.7707 macro-F1 on that mixed dataset. They are not field accuracy and still need independent label-quality/leakage review.
+- The anomaly detector uses explicit thresholds and a fixed-reference z-score heuristic. It is not a validated covariance model or a trained production anomaly detector.
+- BharatScore is a heuristic summary, not a certification or probability that an app will work on a specific device.
 
-- The unified customer-facing Vercel project `bharat-sim-81g2` is deployed from the current release line and its stable domain serves the app. The latest main-branch commit `c54c48503cad52ce669bd3c1c719c01df0d27965` has a READY Vercel deployment and all seven GitHub CI jobs passed on that exact SHA. Live route smoke checks passed for the app shell, liveness, capabilities, personas, SPA deep links and API docs. This is not full production acceptance: `/health/ready` remains HTTP 503 because `BHARATSIM_DATABASE_URL` and a server-only Supabase secret/service-role credential are not configured in Vercel. Authenticated production report analysis and persistent run/upload round trips remain unverified.
-- The current candidate uses a repository fixture asset over raw.githubusercontent.com HTTPS, transferring 64 KB per measurement through an allowlisted CONNECT proxy with a 384 kbps per-direction rate cap or 150 ms initial round-trip setup delay. CI run 41331104452 passed repeated real HTTPS baseline, latency-only and bandwidth-only fixture measurements, including 64,000-byte responses, pinned upstream IP 185.199.111.133, measured 150.41–150.43 ms injected delay, bandwidth slowdown, and reset verification. This validates only the source-built fixture path; it does not validate arbitrary third-party APKs or production isolation.
-- Appium/UiAutomator2 is integrated for a fixture-app primary-action journey. Product-specific test-flow authoring, broader assertion coverage, and arbitrary-app compatibility remain incomplete.
-- Emulator console latency and upload/download bandwidth controls are wired to the worker and read back from the emulator. Battery-saver and bounded storage-pressure simulation are wired for disposable emulator targets with cleanup/readback evidence. Packet loss and CPU throttling remain unsupported, RAM is report-only, and arbitrary app traffic is not proven.
-- Supabase Auth JWT verification, per-user run/analysis ownership, and per-user run quotas (10 per UTC day, 2 active by default) are implemented behind `BHARATSIM_AUTH_REQUIRED=true`; the frontend includes optional email/password sign-in. Owner-scoped run deletion and report export are also implemented and covered by cross-user regression tests. However, live Supabase Auth provider/redirect settings, server-side `BHARATSIM_DATABASE_URL`, Storage service credentials, and an actual application read/write test against `common 1` remain unverified. The isolated `bharatsim` schema and private APK bucket exist in `common 1`, but the application has not been shown to use them at runtime. Per-user daily/active run quotas are implemented (10 per UTC day, 2 active by default); per-user upload-frequency/byte limits, production-grade disposable-VM sandbox isolation, egress restrictions, and durable report/log/screenshot object storage are not implemented.
-- Optional Sarvam AI translation for condensed finding summaries in Hindi, Tamil, and Marathi. It is opt-in, sends no raw logcat, uses a server-only `SARVAM_API_KEY`, and remains disabled until that credential is configured. See [`docs/SARVAM_TRANSLATION.md`](docs/SARVAM_TRANSLATION.md).
+See [docs/ML_PIPELINE.md](docs/ML_PIPELINE.md) and [docs/READINESS_SCORE_VALIDATION.md](docs/READINESS_SCORE_VALIDATION.md).
 
-## Architecture
+---
 
-- backend/: FastAPI API, SQLite local persistence plus opt-in PostgreSQL adapter, upload handling, log analysis, cross-source evidence fusion, run/job lifecycle, and worker callbacks.
-- supabase/: isolated BharatSim schema migration and local CLI configuration; this schema is not exposed to browser clients.
-- frontend/: Vite + React dashboard.
-- backend/tests/: backend, upload-security, and worker-protocol tests.
-- worker/agent.py: authenticated polling worker using Python's standard library.
-- worker/runner.py: bounded ADB install/launch/logcat smoke runner with guarded Android Emulator console latency/bandwidth controls, exact control-plane readback, and reset verification.
-- worker/condition_planner.py: persona-to-condition planning with explicit supported, control-plane-verifiable, report-only, and unsupported classifications.
-- worker/condition_applicator.py: reversible battery-saver/storage-pressure application, RAM readback, structured condition evidence, and cleanup/reset handling.
-- worker/network_shaper.py: guarded Linux tc/netem prototype; not integrated into Android job execution. `scripts/ci/network-shaper-e2e.sh` measures traffic across an isolated shaped veth in CI.
-- docs/: architecture, API, security, evidence-synthesis method, open-source references, and roadmap.
+## Network and device support truth
+
+| Condition | Legacy smoke worker | Full engine worker | Evidence boundary |
+|---|---|---|---|
+| Latency / bandwidth | Emulator control-plane readback | Host proxy for proxy-routed app traffic | Readback or proxy counters must be inspected per run |
+| Packet-loss stalls / resets | Unsupported | Proxy-supported | Only connections through Android system proxy are affected |
+| Network outage / recovery | Not a general verified control | Airplane-mode drop/recovery journey | Per-run device/process evidence required |
+| Battery saver / storage pressure | Supported on disposable emulators with readback/cleanup | Supported where emulator controls succeed | Report only what was applied and reset |
+| RAM | Report-only / provisioning dependent | AVD provisioning dependent | Do not claim a dynamic per-app RAM cap |
+| CPU throttling | Unsupported | Unsupported | Never claim it was applied |
+| Arbitrary APK traffic path | Not verified | Not guaranteed | Apps may bypass the system proxy |
+
+The CI HTTPS proxy experiment validates a source-built fixture's route and measured transfer behavior. It does not prove arbitrary uploaded APK traffic, production isolation or physical-device fidelity.
+
+---
 
 ## Run locally
 
-### Backend
+### Requirements
+- Python 3.11+ (CI currently tests Python 3.12)
+- Node.js 22+
+- Docker Engine + Docker Compose plugin for the full PostgreSQL stack
+- Android SDK / ADB / disposable emulator only if running an Android worker
 
-    cd backend
-    python -m venv .venv
-    source .venv/bin/activate  # Windows: .venv\Scripts\activate
-    pip install -r requirements.txt
-    uvicorn app.main:app --reload --port 8000
+### Full local stack (recommended)
+From the repository root, set a unique local PostgreSQL password and start the stack:
 
-Open http://localhost:8000/docs and http://localhost:8000/health/ready.
+```bash
+# macOS/Linux
+export BHARATSIM_LOCAL_POSTGRES_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+docker compose up --build
+```
 
-### Frontend
+Windows PowerShell:
 
-    cd frontend
-    npm install
-    npm run dev
+```powershell
+$env:BHARATSIM_LOCAL_POSTGRES_PASSWORD = python -c "import secrets; print(secrets.token_urlsafe(32))"
+docker compose up --build
+```
 
-The frontend uses same-origin API requests by default. Set VITE_API_BASE_URL=http://localhost:8000 in frontend/.env.local only if needed. Never put private keys in VITE_* variables.
+Open:
+- Dashboard: http://127.0.0.1:8080
+- API docs: http://127.0.0.1:8080/docs
+- Liveness: http://127.0.0.1:8080/health/live
+- Readiness: http://127.0.0.1:8080/health/ready
 
-### Docker Compose
+This is a local development stack, not a multi-tenant production sandbox. It does not provision a disposable Android emulator.
 
-See docs/DEPLOYMENT.md and docs/WORKER_HOST_SETUP.md for local deployment and isolated Android worker host setup. The local stack runs with `docker compose up --build -d` and serves the dashboard at `http://127.0.0.1:8080`. It does not provision an Android emulator and is not safe for public multi-user APK execution.
+### Backend only
+```bash
+cd backend
+python -m venv .venv
+# Windows: .venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload --port 8000
+```
 
-### Worker
+### Frontend only
+```bash
+cd frontend
+npm ci
+npm run dev
+```
 
-See worker/README.md. Configure BHARATSIM_WORKER_TOKEN on the API and worker, provide an HTTPS BHARATSIM_API_URL, configure an explicit disposable ANDROID_SERIAL, and opt in with BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true. Do not run unknown APKs on a personal device or an unisolated host.
+By default, Vite proxies API requests to the local backend. See [frontend/.env.example](frontend/.env.example) before overriding the API base URL.
 
-### Tests
+### Optional Android worker
+Use only a disposable emulator on a dedicated, restricted development host. Configure a unique `BHARATSIM_WORKER_TOKEN`, `ANDROID_SERIAL`, `BHARATSIM_API_URL`, and `BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true`. For full engine mode also set `BHARATSIM_WORKER_ENGINE=engine`. Do not run untrusted APKs on a personal phone or a host containing sensitive credentials. See [worker/README.md](worker/README.md).
 
-    cd backend
-    pip install -r requirements-dev.txt
-    pytest -q
-    cd ..
-    python -m unittest worker.tests.test_network_shaper
-    python -m py_compile worker/agent.py worker/runner.py
-    cd frontend
-    npm install
-    npm run build
-    npx playwright install chromium
-    npm run test:e2e
-    cd ..
-    docker compose config --quiet
-    docker build -f backend/Dockerfile -t bharatsim-api:local .
-    docker build -f frontend/Dockerfile -t bharatsim-web:local .
+---
 
-## API and execution truth
+## Validation commands
 
-- /health/live reports process liveness; /health/ready checks database availability.
-- /api/v1/capabilities reports implemented features and limitations.
-- /api/v1/workers reports worker heartbeats seen in the last 90 seconds.
-- Runs remain queued/awaiting a worker until the worker claims them. A run becomes completed or failed only after an authenticated worker result is accepted.
-- A completed smoke run means the runner finished install/launch/observation/log collection; it is not proof of broad app correctness.
-- Emulator condition simulation: network latency and download/upload bandwidth controls have emulator control-plane readback; battery saver and bounded storage pressure have readback/cleanup evidence on disposable emulators. The CI fixture now has a verified HTTPS download data path through the host CONNECT proxy; this is fixture-only and does not establish arbitrary uploaded-app traffic.
-- Upload bandwidth remains control-plane verified only; the current 64 KB fixture experiment verifies download shaping, not a large upload throughput path.
-- Emulator control-plane verification does not automatically prove arbitrary application data-plane traffic traversed the shaped network.
-- Packet loss, dynamic RAM restriction, and CPU throttling remain unsupported/report-only and are never faked.
+```bash
+# Backend tests
+cd backend
+pip install -r requirements-dev.txt
+pytest -q
+cd ..
+
+# Worker tests and syntax
+python -m unittest discover -s worker/tests
+python -m py_compile worker/agent.py worker/runner.py worker/engine.py worker/shaper.py
+
+# Frontend unit tests and production build
+cd frontend
+npm ci
+npm test
+npm run build
+
+# Browser E2E
+npx playwright install chromium
+npm run test:e2e
+cd ..
+
+# Compose and container checks
+docker compose config --quiet
+docker build -f backend/Dockerfile -t bharatsim-api:local .
+docker build -f frontend/Dockerfile -t bharatsim-web:local .
+```
+
+GitHub Actions also runs a clean PostgreSQL migration/persistence job, worker guards, unified Vercel build, container smoke and a separate Android emulator fixture workflow. A green CI run proves the checked-in test scope, not production acceptance.
 
 ## Production release gates
 
-See [`docs/PRODUCTION_RELEASE_GATES.md`](docs/PRODUCTION_RELEASE_GATES.md) for the evidence-based checklist covering tenant isolation, Android execution, constraint verification, and deployment. The current Vercel/common1 environment contract and remaining credentials are documented in [`docs/VERCEL_DEPLOYMENT.md`](docs/VERCEL_DEPLOYMENT.md). Public APK execution remains blocked until the critical safety and operational gates are satisfied.
+Before calling BharatSim fully complete, the following must be evidenced against the intended production environment:
 
-### Private single-tenant API gate
+1. Reconcile browser Auth/Storage project and server-side PostgreSQL project IDs; protect shared GenomeGuard data.
+2. Apply reviewed migrations to the confirmed BharatSim database and prove persistence across independent API invocations.
+3. Verify private APK upload, size/hash validation, worker download, signed retrieval, deletion and retention.
+4. Run a real two-user matrix for every private API route, report, run and artifact.
+5. Provision and attest a dedicated per-job isolated Android worker with default-deny egress, resource limits and teardown.
+6. Complete a real authenticated APK → report → reopen/export journey.
+7. Independently validate engine network conditions and Failure DNA/FixProof across repeated runs.
+8. Verify live Sarvam provider paths if those are part of the judge claims.
+9. Complete manual accessibility, screen-reader, keyboard and responsive checks.
+10. Verify the exact merged SHA is deployed and healthy on the canonical origin.
 
-The local Compose stack can optionally require `BHARATSIM_REQUIRE_API_KEY=true` and a random `BHARATSIM_API_KEY` of at least 32 characters. Nginx injects this key server-side for same-origin API calls; it is not shipped in the frontend bundle. This protects a private single-operator instance only—it is not multi-user authentication or a substitute for tenant isolation. Setup instructions are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
-
-## Security
-
-Treat every uploaded APK as untrusted code. APK archive checks are not malware scanning or sandboxing. Keep execution on an isolated disposable worker with restricted egress, no production secrets, resource/time limits, and cleanup. The shared API/worker tokens are machine-to-machine credentials, not multi-user authentication. Do not expose public APK execution until identity/ownership, quotas, storage retention, and host isolation have been reviewed. See [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [worker/README.md](worker/README.md).
-
-## License
-
-MIT — see LICENSE.
+See [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) and [docs/PRODUCTION_RELEASE_GATES.md](docs/PRODUCTION_RELEASE_GATES.md). Public arbitrary APK execution must remain disabled until the isolation, ownership and egress gates pass.
