@@ -21,6 +21,7 @@ export function isDemoMode(): boolean {
 export function enterDemoMode(): void {
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.setItem(DEMO_MODE_KEY, "1");
+  window.dispatchEvent(new Event("bharatsim:demo-mode"));
 }
 
 export function exitDemoMode(): void {
