@@ -616,7 +616,7 @@ export default function App() {
             {/* Settings route */}
             <Route
               path="/settings"
-              element={<SettingsView />}
+              element={<SettingsView capabilities={capabilities} apiStatus={apiStatus} />}
             />
 
             {/* Test runs list route */}
