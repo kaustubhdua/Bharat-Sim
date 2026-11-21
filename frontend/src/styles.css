@@ -2920,3 +2920,15 @@ svg { flex-shrink: 0; }
 }
 
 
+
+/* The mobile sidebar becomes a top navigation row; remove the desktop sidebar offset. */
+@media (max-width: 720px) {
+  .main,
+  .main.sidebar-collapsed {
+    margin-left: 0 !important;
+    width: 100%;
+    min-width: 0;
+  }
+  .app-shell { width: 100%; min-width: 0; overflow-x: clip; }
+  .content { min-width: 0; }
+}
