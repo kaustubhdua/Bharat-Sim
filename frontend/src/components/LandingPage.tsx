@@ -289,7 +289,7 @@ export default function LandingPage({
           <div className="workflow-step-card">
             <span className="step-num">03</span>
             <h4>Inspect Findings & Listen to Audio</h4>
-            <p>Review failure attributions, compare baseline regressions, and listen to Sarvam AI voice briefings in regional Indian languages.</p>
+            <p>When configured, use provider-backed report translation and Bulbul voice briefings. Without the server key, these controls remain unavailable rather than playing sample audio.</p>
           </div>
         </div>
       </section>
