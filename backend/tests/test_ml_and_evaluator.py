@@ -83,7 +83,7 @@ def test_anomaly_detector_regressions():
     assert result["regression_count"] >= 2
     assert 0 <= result["anomaly_score"] <= 100
     memory_anomaly = next(item for item in result["anomalies"] if item["metric"] == "peak_memory_mb")
-    assert memory_anomaly["delta_pct"] == 222.2
+    assert memory_anomaly["delta"] == 205
     metrics = [a["metric"] for a in result["anomalies"]]
     assert "cold_start_ms" in metrics
     assert "jank_percentage" in metrics
