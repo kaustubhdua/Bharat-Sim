@@ -1,7 +1,7 @@
 # BharatSim — Production Readiness
 
 **Audit date:** 2026-11-21 (IST)  
-**Candidate branch (latest SHA):** `86ea86eb9df8cfaa450ef8bbad7303aa5fcb239c`  
+**Candidate branch:** `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb`  
 **Application code tested by green CI:** `4546d9330f24dacda803cbc887d7bd737dfd2f72`  
 **Production URL:** https://bharat-sim-81g2.vercel.app  
 **Decision: NO-GO for public APK testing. Controlled preview only.**
@@ -36,7 +36,7 @@
 - **ML:** Heuristic/class-centroid code exists; independent holdout evaluation absent.
 - **Sarvam:** Provider credential required; no live output verified.
 - **Security:** Dependency audit only; tenant isolation and sandbox egress need independent acceptance.
-- **Reporting:** JSON export paths exist; PDF and durable report library/share are incomplete.
+- **Reporting:** Analysis-level JSON and PDF export implementations exist. The new PDF export has dedicated artifact-content and pagination unit tests; persistent report library, run-level PDF and sharing remain incomplete. Exact latest-SHA E2E/integration status must be checked independently.
 - **Performance/accessibility:** No controlled load benchmark or full WCAG audit recorded.
 
 ## Manual infrastructure actions required
