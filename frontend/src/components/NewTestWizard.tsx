@@ -46,14 +46,20 @@ export default function NewTestWizard({
   const validateAndSetFile = async (file: File) => {
     setValidationError(null);
     setFileSha(null);
+    setApkFile(null);
+
+    if (!uploadAvailable) {
+      setValidationError(lockedReason || "APK registration is unavailable on this deployment.");
+      return;
+    }
 
     if (!file.name.toLowerCase().endsWith(".apk")) {
       setValidationError("File must be an Android APK package (.apk extension).");
       return;
     }
 
-    if (file.size > 100 * 1024 * 1024) {
-      setValidationError("File exceeds maximum allowed upload size of 100 MB.");
+    if (file.size > 150 * 1024 * 1024) {
+      setValidationError("File exceeds maximum allowed upload size of 150 MB.");
       return;
     }
 
@@ -143,13 +149,24 @@ export default function NewTestWizard({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={uploadAvailable ? 0 : -1}
+            aria-label="Choose Android APK file"
+            aria-disabled={!uploadAvailable}
+            onKeyDown={(event) => {
+              if (uploadAvailable && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            onClick={() => { if (uploadAvailable) fileInputRef.current?.click(); }}
           >
             <input
               ref={fileInputRef}
               type="file"
               accept=".apk"
               style={{ display: "none" }}
+              disabled={!uploadAvailable}
               onChange={handleFileChange}
             />
 
@@ -202,9 +219,11 @@ export default function NewTestWizard({
 
           <div className="wizard-persona-grid">
             {personas.map((p) => (
-              <div
+              <button
+                type="button"
                 key={p.id}
                 className={"wizard-persona-card " + (selectedPersona === p.id ? "selected" : "")}
+                aria-pressed={selectedPersona === p.id}
                 onClick={() => onSelectPersona(p.id)}
               >
                 <div className="persona-top">
@@ -235,9 +254,12 @@ export default function NewTestWizard({
                     <b>{p.packet_loss_pct}%</b>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
+          <p className="worker-defaults-note">
+            Persona values are requested targets, not proof that every condition is applied. The worker verifies supported latency/bandwidth and reversible battery/storage controls; packet loss and CPU throttling are unsupported, while RAM is report-only.
+          </p>
         </div>
 
         {/* Step 3: Exploration & Telemetry Options */}
