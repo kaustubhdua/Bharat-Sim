@@ -9,8 +9,10 @@ import "./theme.css";
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthGate><App /></AuthGate>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthGate><App /></AuthGate>
+      </BrowserRouter>
+    </ThemeProvider>
   </React.StrictMode>
 );
