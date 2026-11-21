@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import AuthGate from "./AuthGate";
+import { ThemeProvider } from "./theme";
 import "./styles.css";
 import "./theme.css";
 
