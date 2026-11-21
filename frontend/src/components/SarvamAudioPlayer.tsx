@@ -14,7 +14,10 @@ function getTtsAvailability(): Promise<boolean> {
   if (!ttsCapabilityPromise) {
     ttsCapabilityPromise = api<Capabilities>("/api/v1/capabilities")
       .then((capabilities) => capabilities.sarvam_audio_tts === true)
-      .catch(() => false);
+      .catch(() => {
+        ttsCapabilityPromise = null;
+        return false;
+      });
   }
   return ttsCapabilityPromise;
 }
