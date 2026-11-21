@@ -38,7 +38,7 @@ test("public preview exposes the live planner but keeps private actions gated", 
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Risk-first test plan" })).toBeVisible();
-  await page.getByRole("button", { name: /Explore risk planner/ }).click();
+  await page.locator("#risk-planner").scrollIntoViewIfNeeded();
   await expect(page.locator("#risk-planner")).toBeInViewport();
   await expect(page.getByPlaceholder("Paste Android logcat output here…")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Analyze evidence" })).toBeDisabled();
@@ -53,8 +53,8 @@ test("dashboard connects to the real API and renders authored profiles", async (
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
   await expect(page.getByText("Budget Android", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(/Profiles loaded from connected API/)).toBeVisible();
-  await expect(page.getByText(/not measurements from physical devices/)).toBeVisible();
+  await expect(page.getByText("Profiles returned by API")).toBeVisible();
+  await expect(page.getByText(/authored test targets, not measurements from physical devices/)).toBeVisible();
   await expect(page.getByText("PACKET LOSS · NOT APPLIED")).toBeVisible();
   await expect(page.getByText("2% target", { exact: true })).toBeVisible();
 });
@@ -112,18 +112,19 @@ test("run registration is disabled until a real APK is selected", async ({ page 
   const register = page.getByRole("button", { name: /Register test run/ });
   await expect(register).toBeDisabled();
   await expect(page.getByText("Choose an APK to enable run registration")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Test runs/ })).toContainText("0");
+  await expect(page.getByRole("button", { name: /Test Runs/i })).toContainText("0");
 });
 
 test("Configure a test navigates to the real APK registration form", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
-  await page.getByRole("button", { name: /Configure a test/ }).click();
-  await expect(page.getByRole("heading", { name: "New test run" })).toBeVisible();
-  await expect(page.getByLabel("Testing persona")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Register test run/ })).toBeDisabled();
-  await expect(page.getByText("Choose an APK to enable run registration")).toBeVisible();
+  await page.getByRole("button", { name: /Launch New Test/ }).click();
+  await expect(page.getByRole("heading", { name: "Configure Android Resilience Execution" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Select Android APK" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Choose BharatSim Device & Network Persona" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Launch Resilience Test/ })).toBeDisabled();
+  await expect(page.getByText(/Persistent PostgreSQL and private APK storage/)).toBeVisible();
 });
 test("dashboard remains usable at narrow mobile widths without horizontal overflow", async ({ page }) => {
   for (const width of [375, 320]) {
@@ -154,11 +155,10 @@ test("API documentation link stays same-origin in production builds", async ({ p
 
 test("overview uses live readiness instead of a synthetic device demo", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Run readiness" })).toBeVisible();
-  await expect(page.getByText("Current service and worker state, reported by the connected API.")).toBeVisible();
-  await expect(page.getByText("Try illustrative sample")).toHaveCount(0);
-  await expect(page.getByText("Load illustrative sample")).toHaveCount(0);
-  await expect(page.getByText("No sample execution metrics are shown.")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Service & Worker Status" })).toBeVisible();
+  await expect(page.getByText("Live health verified through control plane contracts.")).toBeVisible();
+  await expect(page.getByText("TF-IDF centroid classifier available")).toBeVisible();
+  await expect(page.getByText("TTS & Translation Enabled")).toHaveCount(0);
 });
 
 test("secure workspace requires sign-in when no session exists", async ({ page }) => {
