@@ -88,7 +88,7 @@ function buildLines(report: Analysis): PdfLine[] {
       add("Source evidence:", { bold: true });
       evidence.slice(0, 12).forEach(item => add("Line " + item.line + ": " + item.text));
     }
-    if (finding.sarvam_explanation?.developer_fix) add("Developer guidance: " + finding.sarvam_explanation.developer_fix);
+    if (finding.sarvam_explanation?.remediation) add("Developer guidance: " + finding.sarvam_explanation.remediation);
     blank();
   });
 
