@@ -11,7 +11,7 @@ This is a repository and evidence audit. It does not imply access to private Ver
 
 BharatSim is materially beyond a static hackathon mock-up. It contains a React 19/Vite dashboard, FastAPI API, Supabase Auth integration, PostgreSQL adapter and migrations, private APK storage/signing flow, lease-based worker protocol, Android ADB smoke runner with bounded monkey exploration and gfxinfo/meminfo collection, persona/risk planner, evidence-linked log analysis, a portable TF-IDF centroid classifier, statistical baseline comparison, Sarvam text translation/TTS endpoints, evaluator fixtures, run-comparison UI, Playwright tests, PostgreSQL integration tests and dependency audits.
 
-The key issue is not absence of all engineering. It is the gap between a carefully guarded controlled-beta application and the production product described in the completion brief. The public deployment was explicitly configured to fail closed where server-side persistence and worker isolation are unavailable. That is correct security behaviour, but it means the full customer journey is not presently enabled.
+The key issue is not absence of all engineering. It is the gap between a carefully guarded controlled-beta application and the production product described in the completion brief. The public deployment was explicitly configured to fail closed where server-side persistence and worker isolation are unavailable. Live capability inspection confirms `database_persistence=false`, `apk_upload=false`, `direct_apk_upload=false`, `analysis_persistence=false`, `android_execution=false`, `worker_dispatch=false`, and `network_shaping=false`. Risk planning, personas and stateless log analysis remain available. Authentication is configured. The main capability payload incorrectly advertised TTS and run comparison as enabled despite missing provider/database dependencies; this branch corrects those capability flags. That is correct security behaviour, but it means the full customer journey is not presently enabled.
 
 ## Repository and delivery baseline
 
@@ -25,7 +25,7 @@ The key issue is not absence of all engineering. It is the gap between a careful
 | Dependency audit | Run #44906460952 completed successfully 2026-11-21; Python and JavaScript dependency jobs succeeded. | Verified on audited main |
 | Android emulator CI | Latest main emulator smoke #44906616568 passed 2026-11-21 on a fixture APK with Appium/UiAutomator2 and a verified network-shaping path in CI. | Earlier fixture only; current run unverified |
 | Main deployment status | Vercel status for audited SHA `5ab14c8` reports deployment completed successfully. This proves provider deployment status, not live application health or full product readiness. | Deployment reported successful |
-| Current live HTTP | Direct live HTTP inspection was not available in this audit environment. Do not infer live health from GitHub CI or deployment metadata. | Unverified |
+| Current live HTTP | Production homepage returns HTTP 200; `/api/v1/personas` and `/api/v1/capabilities` return 200. `/health/ready` returns 503: database and private storage unavailable, worker not configured, execution disabled. Preview deployment returns the same readiness result. | Runtime inspected; not ready |
 
 ## Feature audit
 
