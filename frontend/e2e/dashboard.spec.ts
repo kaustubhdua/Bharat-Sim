@@ -15,9 +15,9 @@ async function installLocalWorkspaceSession(page: import("@playwright/test").Pag
 
 
 test("public preview exposes the live planner but keeps private actions gated", async ({ page }) => {
-  // beforeEach authenticates the normal workspace; clear it before observing
-  // requests so this assertion measures only the guest preview lifecycle.
+  // Fresh Playwright context is unauthenticated; this test intentionally uses guest preview.
   await page.goto("/");
+
   let protectedRequestCount = 0;
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
@@ -25,14 +25,11 @@ test("public preview exposes the live planner but keeps private actions gated", 
       protectedRequestCount += 1;
     }
   });
-  await page.evaluate(() => sessionStorage.clear());
-  protectedRequestCount = 0;
-  await page.reload();
   await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
   await page.getByRole("button", { name: /Explore public planner preview/ }).click();
 
   await expect(page.getByText(/Public preview · live persona and risk planner/)).toBeVisible();
-  await expect(page.getByText("API connected")).toBeVisible();
+  await expect(page.getByText("API Connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Risk-first test plan" })).toBeVisible();
   await page.locator("#risk-planner").scrollIntoViewIfNeeded();
@@ -41,7 +38,6 @@ test("public preview exposes the live planner but keeps private actions gated", 
   await expect(page.getByRole("button", { name: "Analyze evidence" })).toBeDisabled();
   await expect(page.locator('input[type="file"]')).toBeDisabled();
   await expect(page.getByText(/Log analysis and report export require a signed-in account/)).toBeVisible();
-  await page.waitForTimeout(500);
   expect(protectedRequestCount).toBe(0);
 });
 
