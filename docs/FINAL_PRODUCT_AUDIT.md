@@ -27,7 +27,7 @@ This audit distinguishes implemented code from verified runtime behavior. Fixtur
 | Android execution / worker dispatch | `false` | Disabled |
 | Network shaping | `false` | Not enabled for production runs |
 | Sarvam translation | `false` | Provider key not configured |
-| Vercel deployment for main `2c754dc` | Build failed in `python build_frontend.py` | Failed |
+| Vercel deployment for main `2c754dc` | Build failed in `python build_frontend.py` due unused App theme imports/state and the JSX-in-`.ts` theme provider | Failed |\n| Feature preview `963351d` | Vercel READY; homepage HTTP 200; capabilities correctly report TTS and run comparison unavailable; `/health/ready` remains HTTP 503 | Preview deployed; infrastructure not ready |\n| PR #134 checks on `963351d` | Backend, frontend build/typecheck, PostgreSQL integration, worker guards and unified Vercel build passed; E2E, container and emulator smoke were still running at audit update | Partial; final checks pending |
 | Main CI run `44908756056` | Backend, PostgreSQL integration and worker guards passed; frontend, unified build and container build failed; E2E had a failing analysis journey | Mixed / blocked |
 | Dependency audit | Completed successfully; 0 vulnerabilities reported by the Vercel build's npm audit | Passed |
 
