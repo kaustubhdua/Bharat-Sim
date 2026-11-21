@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 async function installLocalWorkspaceSession(page: import("@playwright/test").Page) {
@@ -102,6 +103,24 @@ test("log analysis reports findings from submitted evidence and preserves source
   await expect(page.getByText(/SOURCE EVIDENCE/).first()).toBeVisible();
   await expect(page.getByText(/FATAL EXCEPTION/).first()).toBeVisible();
   await expect(page.getByText(/Findings are heuristic signals, not confirmed root causes/)).toBeVisible();
+
+  const pdfDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const pdfDownload = await pdfDownloadPromise;
+  expect(pdfDownload.suggestedFilename()).toMatch(/^bharatsim-analysis-[a-f0-9]{8}\\.pdf$/);
+  const pdfPath = await pdfDownload.path();
+  expect(pdfPath).not.toBeNull();
+  const pdfBytes = await readFile(pdfPath!);
+  expect(pdfBytes.subarray(0, 8).toString("ascii")).toBe("%PDF-1.4");
+
+  const jsonDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export JSON" }).click();
+  const jsonDownload = await jsonDownloadPromise;
+  expect(jsonDownload.suggestedFilename()).toMatch(/^bharatsim-analysis-[a-f0-9]{8}\\.json$/);
+  const jsonPath = await jsonDownload.path();
+  expect(jsonPath).not.toBeNull();
+  const jsonPayload = JSON.parse(await readFile(jsonPath!, "utf8"));
+  expect(jsonPayload).toHaveProperty("findings");
 });
 
 test("run registration is disabled until a real APK is selected", async ({ page }) => {
