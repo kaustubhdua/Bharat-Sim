@@ -311,3 +311,10 @@ class AgentPersonaPassingAndTimeoutTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_worker_and_runner_share_the_500_mib_upload_contract():
+    from worker import agent, runner
+
+    assert agent.MAX_APK_BYTES == 500 * 1024 * 1024
+    assert runner.MAX_APK_BYTES == agent.MAX_APK_BYTES
