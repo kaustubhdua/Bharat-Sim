@@ -66,10 +66,11 @@ The consolidation branch includes the PR #138 CI fixes and updates the stale Spe
 
 The latest connected read-only infrastructure audit in [Production Readiness](PRODUCTION_READINESS.md) found:
 
-- The browser `VITE_SUPABASE_URL` reference and the Supabase project available to the connected account did not match.
+- The browser `VITE_SUPABASE_URL` points to `gpkyzastnibffyuxhtix`, which is not present in the connected Supabase project list. The available active project is `common 1` (`hkyieaovolkethovyenb`); they are not confirmed to be the same target.
 - The available `common 1` project contains both `bharatsim` and `genomeguard` schemas. It is shared; do not blindly apply BharatSim migrations there.
-- Its migration history and live `bharatsim.runs` schema lag the repository's newer persona/scenario/worker migrations.
-- Vercel contains masked database/Supabase environment entries, but the actual server-side targets and connectivity were not verified. No secret values were read.
+- Its migration history has four of the repository's nine BharatSim migrations. It is missing the custom-persona, worker-claiming-status, run-scenario, large-APK-parts and personal-worker migrations. The live `runs` table lacks `persona_json`, `apk_meta_json`, `scenario_json`; the `workers` table lacks personal-worker owner/key fields.
+- The private `bharatsim-private` bucket exists on that shared project (150 MiB object limit), but the bucket contains zero objects and `bharatsim.runs` contains zero rows.
+- Vercel contains sensitive `BHARATSIM_DATABASE_URL` and `SUPABASE_URL` entries, but their values were not decrypted; actual server-side targets and connectivity remain unverified. The complete visible environment listing has no `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`, so private Storage is not demonstrated as enabled. The lower-case `sarvam_api` key is supported by code as a compatibility alias, but its secret value/provider health was not verified. No secret values were read.
 - Production flags remain fail-closed: public APK execution false, worker isolation attestation false and worker egress restriction false.
 - The connected Render workspace showed legacy API/web services, not a dedicated isolated Android worker.
 - No live production private-Storage upload/download/delete round-trip or two-account tenant-isolation matrix has been accepted.
