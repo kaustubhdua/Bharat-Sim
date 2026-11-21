@@ -126,3 +126,32 @@ The latest connected read-only infrastructure audit in [Production Readiness](PR
 - “ML, Failure DNA, anomaly and BharatScore outputs are triage evidence, not certified diagnoses or field-accuracy guarantees.”
 
 **Release decision:** no-go for public arbitrary APK execution until production persistence, tenant isolation, private storage, per-job worker isolation and egress controls pass independent acceptance.
+
+
+## 2026-11-22 follow-up — verified actions and remaining blockers
+
+### Actions actually completed
+1. Confirmed the connected active Supabase project is `common 1` (`hkyieaovolkethovyenb`). It already contained the BharatSim-only `bharatsim` schema, a private APK bucket and the first four BharatSim migrations. The project is shared with GenomeGuard, so changes were confined to BharatSim's namespace.
+2. Applied the five missing BharatSim migrations. The connected project now records all nine repository BharatSim migrations.
+3. Executed a synthetic PostgreSQL insert/read/delete smoke test against `bharatsim.runs`; the persisted metadata read back correctly and the test row was deleted. The final run count is zero.
+4. Confirmed `bharatsim-private` is a private bucket with a 150 MiB object limit. The upload implementation uses 45 MiB chunks for a 500 MiB total APK.
+5. Updated Vercel environment values for the next deployment: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, server-side `SUPABASE_URL`, and `BHARATSIM_MAX_UPLOAD_MB=500`. Existing deployed Production and preview instances do not change until redeployed.
+6. Aligned the worker download and runner size checks with the 500 MiB API contract.
+7. Added regression coverage for sanitized readiness diagnostics, a 48-case curated ML holdout, repeated Failure DNA fingerprints, repeated FixProof verdicts, worker upload-limit alignment and baseline accessibility semantics.
+
+### Production status remains no-go
+- The connected database accepts SQL and has the full migration chain, but the Vercel Production readiness endpoint last returned `database=unavailable`. The sensitive `BHARATSIM_DATABASE_URL` value could not be inspected through the connector, so its exact host/database/credentials are not confirmed to match this Supabase project.
+- The Vercel environment inventory does not contain `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`. The backend requires one of these server-only credentials for private Storage. The bucket is private but has zero APK objects; no real upload/download/delete round-trip has passed.
+- No live two-account test has been performed. Existing automated tests exercise owner scoping with isolated test users/tokens.
+- The Android CI workflow performs a real local API → worker lease → APK download/install/launch → report callback journey for a source-built fixture. It does not execute a customer APK against Production or prove a per-job microVM boundary.
+- No production KVM/Firecracker worker host is deployed. The repository has a host bootstrap and architecture guide; actual provisioning requires a cloud account, KVM-capable instance and explicit recurring-cost approval.
+- The checked-in Sarvam live evidence demonstrates real non-fallback provider calls on 2026-11-21, including Hindi/Tamil TTS/STT. A fresh live call through the Production Vercel endpoint has not been made.
+- Responsive Playwright coverage exists at 320–1440px. Manual screen-reader, keyboard, focus, contrast and physical-device checks are not complete.
+
+### Deployment and validation constraints
+- The Vercel preview for commit `13a8294` built successfully and served the UI. The preview readiness endpoint returned 503 because Production-only DB credentials and the server Storage key are not copied into Preview (intentionally).
+- Vercel's deployment API rejected the next deployment with a 402 rate-limit response: more than 100 deployments in the free daily allowance; retry after 24 hours or resolve the plan limit. No Production redeploy was attempted.
+- GitHub Actions' last fully green CI/security/Android evidence is for commit `13a829407433a24a9cd3f508fe0a41ed4838b6d4`. The later changes in this appendix still need a fresh CI run before merge.
+- Local execution remains unverified in this environment because GitHub DNS/clone access failed and Docker is unavailable.
+
+**Release decision remains NO-GO for public arbitrary APK execution.** Do not merge/enable it until the database URL is confirmed and reachable from Production, a server-only Storage key is installed, private artifact lifecycle and live tenant isolation pass, and a dedicated KVM-backed per-job worker with default-deny egress is deployed and independently verified.
