@@ -318,3 +318,51 @@ test("public product landing is reachable without signing in", async ({ page }) 
   await expect(page.getByRole("heading", { name: /Test Android Apps Under/ })).toBeVisible();
   await expect(page.getByText(/BHARATSIM 2.0 · THE CHEAP PHONE TEST/)).toBeVisible();
 });
+
+
+test("primary workspace controls expose accessible names and images have alt text", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
+  await page.goto("/");
+  await expect(page.getByText("API connected")).toBeVisible();
+
+  const audit = await page.evaluate(() => {
+    const visible = (element: Element) => {
+      const node = element as HTMLElement;
+      const style = getComputedStyle(node);
+      const rect = node.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+    };
+    const controls = Array.from(document.querySelectorAll<HTMLElement>(
+      'button, a[href], input:not([type="hidden"]), select, textarea'
+    )).filter(visible);
+    const unnamedControls = controls.filter((element) => {
+      const labelledBy = element.getAttribute("aria-labelledby");
+      const labelledByText = labelledBy
+        ? labelledBy.split(/\\s+/).map((id) => document.getElementById(id)?.textContent || "").join(" ").trim()
+        : "";
+      const text = element.innerText?.trim() || element.textContent?.trim() || "";
+      const associatedLabel = "labels" in element
+        ? Array.from((element as HTMLInputElement).labels || []).some((label) => label.textContent?.trim())
+        : false;
+      return !(
+        element.getAttribute("aria-label")?.trim() ||
+        labelledByText ||
+        text ||
+        element.getAttribute("title")?.trim() ||
+        associatedLabel
+      );
+    }).map((element) => element.outerHTML.slice(0, 180));
+    const imagesWithoutAlt = Array.from(document.querySelectorAll<HTMLImageElement>("img"))
+      .filter((image) => visible(image) && !image.hasAttribute("alt"))
+      .map((image) => image.outerHTML.slice(0, 180));
+    return {
+      mainLandmarks: document.querySelectorAll("main").length,
+      unnamedControls,
+      imagesWithoutAlt,
+    };
+  });
+
+  expect(audit.mainLandmarks).toBe(1);
+  expect(audit.unnamedControls, JSON.stringify(audit.unnamedControls)).toEqual([]);
+  expect(audit.imagesWithoutAlt, JSON.stringify(audit.imagesWithoutAlt)).toEqual([]);
+});
