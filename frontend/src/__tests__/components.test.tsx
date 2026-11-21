@@ -565,6 +565,25 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("No personas available");
   });
 
+  it("PersonaPanel explains engine-only network shaping and unsupported CPU throttling", async () => {
+    await act(async () => {
+      root.render(
+        <PersonaPanel
+          personas={fallbackPersonas}
+          selected="budget-android"
+          setSelected={vi.fn()}
+          apiStatus="online"
+          loading={false}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain("BHARATSIM_WORKER_ENGINE=engine");
+    expect(container.textContent).toContain("Only app traffic that uses the Android system proxy is shaped");
+    expect(container.textContent).toContain("CPU throttling is unsupported");
+    expect(container.textContent).toContain("default legacy smoke worker");
+  });
+
   it("PersonaPanel displays clear error message when api is offline", async () => {
     await act(async () => {
       root.render(
