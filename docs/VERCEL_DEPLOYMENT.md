@@ -1,3 +1,7 @@
+> **Current deployment note — 2026-11-21:** The canonical Vercel project is the unified `bharat-sim-81g2` project; it serves the frontend and FastAPI API from one origin. The older two-project environment inventory below is historical and must not be copied blindly into the current project. The last successful production deployment is an earlier SHA; main `2c754dcb` failed its Vercel build. The current feature preview builds successfully, but `/health/ready` returns HTTP 503 because production PostgreSQL and private Storage are unavailable. Before production acceptance, configure `BHARATSIM_DATABASE_URL` (common1 Transaction Pooler URI with TLS), server-only `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`), `SUPABASE_URL`, `BHARATSIM_AUTH_REQUIRED=true`, and `BHARATSIM_STORAGE_BUCKET=bharatsim-private`. Do not expose these values to the browser or chat. A worker requires `BHARATSIM_WORKER_TOKEN`, a dedicated isolated host, and independently verified default-deny egress; keep the public execution/isolation flags false until that review passes. `SARVAM_API_KEY` is optional and only enables provider-backed translation/TTS. For the current unified layout, follow `docs/DEPLOYMENT.md` and `docs/WORKER_HOST_SETUP.md` first.
+
+---
+
 # Vercel deployment and common1 Supabase wiring
 
 This runbook describes the two existing Vercel projects and the environment contract expected by the code. It does not contain credentials.
