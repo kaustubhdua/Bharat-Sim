@@ -75,15 +75,26 @@ class ProbeParsingTests(unittest.TestCase):
 
 
 class ProxyPathTests(unittest.TestCase):
-    def test_preflight_enables_network_and_requires_healthy_proxy(self):
+    def test_preflight_requires_active_network_route_and_host_proxy_tcp(self):
+        def adb_side_effect(*args, **kwargs):
+            if args[:4] == ("shell", "dumpsys", "connectivity"):
+                return "Cellular active networks: {100}"
+            if args[:4] == ("shell", "ip", "route", "get"):
+                return "10.0.2.2 dev eth0 src 10.0.2.15"
+            if args[:4] == ("shell", "toybox", "nc", "-z"):
+                return ""
+            return ""
+
         with (
-            patch.object(journey, "adb", return_value="Cellular active networks: {100}") as adb,
+            patch.object(journey, "adb", side_effect=adb_side_effect) as adb,
             patch.object(journey, "proxy_request", return_value={"status": "ok"}) as proxy,
         ):
             evidence = journey.prepare_proxy_path()
 
         self.assertEqual(evidence["status"], "ready")
         self.assertTrue(evidence["active_transport_network_present"])
+        self.assertEqual(evidence["host_proxy_tcp_probe"], "connected")
+        self.assertIn("10.0.2.2", evidence["host_gateway_route"])
         self.assertEqual(evidence["proxy_health"], {"status": "ok"})
         adb.assert_has_calls([
             call("shell", "settings", "put", "global", "airplane_mode_on", "0"),
@@ -91,8 +102,38 @@ class ProxyPathTests(unittest.TestCase):
             call("shell", "svc", "wifi", "enable"),
             call("shell", "svc", "data", "enable"),
             call("shell", "dumpsys", "connectivity", timeout=8),
+            call("shell", "ip", "route", "get", "10.0.2.2", timeout=5),
+            call("shell", "toybox", "nc", "-z", "-w", "2", "10.0.2.2", "8888", timeout=5),
         ])
         proxy.assert_called_once_with("GET", "/health")
+
+    def test_preflight_waits_until_host_gateway_and_proxy_are_reachable(self):
+        attempts = {"route": 0, "proxy": 0}
+
+        def adb_side_effect(*args, **kwargs):
+            if args[:3] == ("shell", "dumpsys", "connectivity"):
+                return "WiFi active networks: {101}"
+            if args[:4] == ("shell", "ip", "route", "get"):
+                attempts["route"] += 1
+                if attempts["route"] == 1:
+                    raise RuntimeError("Network is unreachable")
+                return "10.0.2.2 dev eth0 src 10.0.2.15"
+            if args[:4] == ("shell", "toybox", "nc", "-z"):
+                attempts["proxy"] += 1
+                if attempts["proxy"] == 1:
+                    raise RuntimeError("Connection refused")
+                return ""
+            return ""
+
+        with (
+            patch.object(journey, "adb", side_effect=adb_side_effect),
+            patch.object(journey, "proxy_request", return_value={"status": "ok"}),
+            patch.object(journey.time, "sleep"),
+        ):
+            evidence = journey.prepare_proxy_path()
+
+        self.assertEqual(evidence["status"], "ready")
+        self.assertEqual(attempts, {"route": 3, "proxy": 2})
 
     def test_preflight_fails_if_no_android_network_is_active(self):
         with (
@@ -101,7 +142,7 @@ class ProxyPathTests(unittest.TestCase):
             patch.object(journey.time, "monotonic", side_effect=[0, 61]),
             patch.object(journey.time, "sleep"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "no active network"):
+            with self.assertRaisesRegex(RuntimeError, "no usable route"):
                 journey.prepare_proxy_path()
         proxy.assert_not_called()
 

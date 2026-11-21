@@ -24,8 +24,8 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
         </div>
         <div className="finding-badges">
           {f.ml_classification && (
-            <span className="ml-badge" title={`Confidence: ${(f.ml_classification.confidence * 100).toFixed(1)}%`}>
-              <Brain size={12} /> ML: {String(f.ml_classification.category || "other").toUpperCase()} ({Math.round(f.ml_classification.confidence * 100)}%)
+            <span className="ml-badge" title={`Relative model score: ${(f.ml_classification.confidence * 100).toFixed(1)} / 100; not calibrated confidence`}>
+              <Brain size={12} /> ML triage: {String(f.ml_classification.category || "other").toUpperCase()} ({Math.round(f.ml_classification.confidence * 100)} / 100 score)
             </span>
           )}
           {f.occurrence_count ? <span className="occurrence-badge">{f.occurrence_count} occurrence{f.occurrence_count === 1 ? "" : "s"}</span> : null}
@@ -65,11 +65,12 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
         <div className="sarvam-explanation-card">
           <div className="sarvam-exp-header">
             <Sparkles size={14} />
-            <span>SARVAM AI DIAGNOSTIC & DEVELOPER REMEDY</span>
+            <span>DEVELOPER GUIDANCE · RULE-BASED TEMPLATE</span>
           </div>
           <div className="sarvam-exp-body">
-            <p><strong>Root Cause:</strong> {f.sarvam_explanation.root_cause}</p>
-            <p><strong>Impact:</strong> {f.sarvam_explanation.impact}</p>
+            <p><strong>Typical failure pattern:</strong> {f.sarvam_explanation.root_cause}</p>
+            <p><strong>Potential impact:</strong> {f.sarvam_explanation.impact}</p>
+            <small>Template guidance is a starting point, not a confirmed root cause.</small>
             {fix && <p><strong>Fix:</strong> {fix}</p>}
             {f.sarvam_explanation.hindi_explanation && (
               <div className="hindi-briefing-box" lang="hi">

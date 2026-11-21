@@ -90,16 +90,27 @@ jobs:
           CREATE ROLE service_role NOLOGIN BYPASSRLS;
           CREATE SCHEMA auth;
           CREATE TABLE auth.users (id uuid PRIMARY KEY);
+          -- Supabase Storage owns this schema in production. Model only the
+          -- bucket metadata columns used by BharatSim's idempotent migration.
+          CREATE SCHEMA storage;
+          CREATE TABLE storage.buckets (
+            id text PRIMARY KEY,
+            name text NOT NULL,
+            public boolean NOT NULL DEFAULT false,
+            file_size_limit bigint,
+            allowed_mime_types text[]
+          );
           SQL
         env:
           PGPASSWORD: postgres
           BHARATSIM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
-      - name: Apply isolated BharatSim migrations from a clean database
+      - name: Apply every isolated BharatSim migration from a clean database
         run: |
-          psql "$BHARATSIM_DATABASE_URL" -v ON_ERROR_STOP=1 \
-            -f supabase/migrations/20261027054905_bharatsim_core.sql \
-            -f supabase/migrations/20261027061609_bharatsim_fk_indexes.sql \
-            -f supabase/migrations/20261101042942_bharatsim_signed_upload_sizes.sql
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "Applying $migration"
+            psql "$BHARATSIM_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done
         env:
           PGPASSWORD: postgres
           BHARATSIM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable

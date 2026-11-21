@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import http.client
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -42,6 +43,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 APP_DIR = Path(__file__).resolve().parent
+LOGGER = logging.getLogger("bharatsim")
 
 
 def default_data_dir() -> Path:
@@ -831,8 +833,10 @@ def db():
         try:
             validate_database_configuration(DATABASE_URL, APP_ENV)
             raw = psycopg.connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None)
-        except Exception:
-            # Connection strings and provider diagnostics must never reach API responses.
+        except Exception as exc:
+            # Log only the exception class: connection strings, hostnames, users and
+            # provider messages must never enter logs or API responses.
+            LOGGER.error("PostgreSQL connection failed (%s)", type(exc).__name__)
             raise HTTPException(
                 status_code=503,
                 detail="Persistent PostgreSQL is unavailable.",
@@ -1212,7 +1216,7 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
             "validation_steps": validation,
             "status": "unconfirmed",
         }
-        # Enrich with ML classification & Sarvam AI developer explanation
+        # Enrich with ML classification & deterministic developer-guidance templates
         ev_sample = group["evidence"][0]["text"] if group["evidence"] else ""
         group["sarvam_explanation"] = explain_failure_with_sarvam(group["kind"], ev_sample, persona["name"])
         matched_confs = [m["confidence"] for m in ml_matches if m["category"] == group["kind"]]
@@ -1340,12 +1344,15 @@ def health_ready():
     worker_online = False
     production = APP_ENV in {"production", "prod"}
     database_ok = False
+    database_reason = "not_checked"
     try:
         # Production must never report a temporary local SQLite file as its
         # persistence layer. Verify the configured Postgres schema as well as
         # basic connectivity before advertising readiness.
         if requires_persistent_database() and not DATABASE_URL:
+            database_reason = "database_url_missing"
             raise RuntimeError("Persistent PostgreSQL URL is not configured for this serverless deployment")
+        database_reason = "connection_failed"
         validate_database_configuration(DATABASE_URL, APP_ENV)
         with db() as conn:
             conn.execute("SELECT 1").fetchone()
@@ -1358,6 +1365,7 @@ def health_ready():
                 if not schema or not all(schema[key] for key in ("runs", "run_events", "audit_events")):
                     raise RuntimeError("BharatSim production schema is incomplete")
             database_ok = True
+            database_reason = "connected"
             if worker_configured:
                 rows = conn.execute("SELECT last_seen,status FROM workers ORDER BY last_seen DESC LIMIT 50").fetchall()
                 now = datetime.now(timezone.utc)
@@ -1371,12 +1379,22 @@ def health_ready():
                             break
                     except (TypeError, ValueError):
                         continue
-    except Exception:
+    except Exception as exc:
+        # Expose only a stable exception class in health output, never exception
+        # text that might contain connection metadata or credentials.
+        database_reason = type(exc).__name__
+        LOGGER.warning("Readiness check: PostgreSQL unavailable (%s)", database_reason)
         database_ok = False
         worker_online = False
 
     auth_configured = AUTH_REQUIRED and SUPABASE_URL.startswith("https://")
     storage_configured = STORAGE_ENABLED and SUPABASE_URL.startswith("https://")
+    storage_reason = (
+        "configured" if storage_configured
+        else "server_storage_credential_missing" if not STORAGE_API_KEY
+        else "supabase_url_missing" if not SUPABASE_URL.startswith("https://")
+        else "storage_not_enabled"
+    )
     auth_required = production or AUTH_REQUIRED
     storage_required = requires_persistent_database()
     auth_ok = auth_configured if auth_required else True
@@ -1395,7 +1413,9 @@ def health_ready():
         "api_readiness": "ready" if api_ready else "not_ready",
         "execution_readiness": "ready" if api_ready and worker_online else "not_ready",
         "database": "available" if database_ok else "unavailable",
+        "database_reason": database_reason,
         "authentication": "configured" if auth_configured else "unavailable",
+        "private_storage_reason": storage_reason,
         "authentication_required": auth_required,
         "private_storage": "configured" if storage_configured else "unavailable",
         "private_storage_required": storage_required,
@@ -2417,7 +2437,7 @@ def translate_report(payload: SarvamTranslationRequest):
     """Translate a user-requested, condensed report summary via Sarvam AI."""
     if not payload.text.strip():
         raise HTTPException(status_code=422, detail="Translation text cannot be blank.")
-    if len(os.getenv("SARVAM_API_KEY", "").strip()) < 16:
+    if len(get_sarvam_api_key()) < 16:
         raise HTTPException(status_code=503, detail="Sarvam translation is not configured on this server.")
     try:
         return {
@@ -2448,14 +2468,14 @@ def text_to_speech(payload: SarvamAudioRequest):
 
 @app.post("/api/v1/explain/failure")
 def explain_failure(payload: ExplainFailureRequest):
-    """Generate plain-language developer remediation and code fixes using Sarvam AI."""
+    """Return deterministic developer guidance templates; optional Hindi text may be translated by Sarvam."""
     persona_name = PERSONAS.get(payload.persona_id, {}).get("name", "Budget Android")
     return explain_failure_with_sarvam(payload.category, payload.evidence, persona_name, payload.language_code)
 
 
 @app.get("/api/v1/evaluator/scenarios")
 def list_evaluator_scenarios():
-    """Return pre-packaged, authenticated demonstration scenarios for rapid evaluation."""
+    """Return the allowlisted scenario catalog with executable/planned status."""
     return {"items": get_all_scenarios()}
 
 

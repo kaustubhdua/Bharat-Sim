@@ -300,3 +300,96 @@ def test_capabilities_disable_unconfigured_provider_and_database_features(monkey
     assert data["apk_upload"] is False
     assert data["max_upload_mb"] == main_module.MAX_UPLOAD_BYTES // (1024 * 1024)
     assert data["android_execution"] is False
+
+
+def test_backend_classifier_on_independent_curated_holdout():
+    """Small hand-authored holdout; deliberately separate from generated training templates."""
+    from app.ml_classifier import classify_log_snippet
+
+    cases = {
+        "crash": [
+            "E AndroidRuntime: FATAL EXCEPTION: main",
+            "Process in.bharatsim.paymock has died: fg TOP",
+            "java.lang.NullPointerException: Attempt to invoke virtual method on a null object reference",
+            "Fatal signal 11 (SIGSEGV), code 1, fault addr 0x0 in tid 1201",
+            "Unable to start activity ComponentInfo{in.example/.CheckoutActivity}",
+            "java.lang.IllegalStateException: Fragment not attached to a context",
+            "ActivityManager: Force finishing activity in.example/.MainActivity",
+            "java.lang.ClassCastException: android.widget.TextView cannot be cast to android.widget.Button",
+        ],
+        "anr": [
+            "ActivityManager: ANR in in.example (in.example/.MainActivity)",
+            "Input dispatching timed out: Window is not responding",
+            "Application Not Responding: input event dispatch timeout",
+            "Reason: Input dispatching timed out while waiting for focused window",
+            "ActivityManager: Timeout executing service ServiceRecord",
+            "WindowManager: ANR detected for package in.example",
+            "Broadcast of Intent android.intent.action.BOOT_COMPLETED timed out",
+            "main thread blocked for 5000ms; app not responding",
+        ],
+        "network": [
+            "java.net.SocketTimeoutException: timeout while reading response",
+            "java.net.UnknownHostException: Unable to resolve host api.example.in",
+            "java.net.ConnectException: Failed to connect to server port 443",
+            "javax.net.ssl.SSLHandshakeException: handshake failed",
+            "java.net.NoRouteToHostException: No route to host",
+            "java.io.IOException: unexpected end of stream on connection",
+            "HTTP FAILED: java.net.SocketException: Connection reset",
+            "ETIMEDOUT while connecting to payments.example.in",
+        ],
+        "oom": [
+            "java.lang.OutOfMemoryError: Failed to allocate 52428800 bytes",
+            "lmkd: Kill 'in.example' to free 51200kB because system is low on memory",
+            "Low on memory: reclaiming cached processes",
+            "GC_FOR_ALLOC freed 0K, 51200K until OOM",
+            "ActivityManager: Killing process due to memory pressure",
+            "onTrimMemory level=80, releasing image cache",
+            "Failed to allocate a 64MB byte allocation with 8MB free",
+            "Process killed by lowmemorykiller oom_adj 900",
+        ],
+        "storage": [
+            "java.io.IOException: write failed: ENOSPC (No space left on device)",
+            "android.database.sqlite.SQLiteFullException: database or disk is full",
+            "File system full: cannot create cache entry",
+            "java.io.IOException: No space left on device while writing /data/user/0",
+            "StorageManager: low storage threshold reached",
+            "open failed: EIO (I/O error) while writing file",
+            "DiskFullException: insufficient free blocks",
+            "SQLite database cannot grow because volume is full",
+        ],
+        "normal": [
+            "I ActivityTaskManager: Displayed in.example/.MainActivity for user 0",
+            "I Choreographer: Skipped 2 frames! The application may be doing too much work",
+            "D ConnectivityService: Network capabilities changed",
+            "I ActivityManager: Start proc in.example for activity",
+            "D ViewRootImpl: View layout completed in 18ms",
+            "I InputMethodManager: showSoftInput() view=EditText",
+            "D OkHttp: response received with status 200",
+            "I JobScheduler: Job finished successfully",
+        ],
+    }
+
+    confusion = {label: {pred: 0 for pred in cases} for label in cases}
+    total = correct = 0
+    for expected, lines in cases.items():
+        for line in lines:
+            predicted = classify_log_snippet(line)["category"]
+            assert predicted in cases
+            confusion[expected][predicted] += 1
+            total += 1
+            correct += predicted == expected
+
+    f1_scores = []
+    for label in cases:
+        true_positive = confusion[label][label]
+        false_positive = sum(confusion[other][label] for other in cases if other != label)
+        false_negative = sum(confusion[label][other] for other in cases if other != label)
+        precision = true_positive / (true_positive + false_positive or 1)
+        recall = true_positive / (true_positive + false_negative or 1)
+        f1_scores.append(2 * precision * recall / (precision + recall or 1))
+
+    accuracy = correct / total
+    macro_f1 = sum(f1_scores) / len(f1_scores)
+    assert total == 48
+    assert accuracy >= 0.75, f"curated holdout accuracy regressed: {accuracy:.3f}"
+    assert macro_f1 >= 0.75, f"curated holdout macro-F1 regressed: {macro_f1:.3f}"

@@ -3491,8 +3491,61 @@
 .connect-key{display:block}
 .connect-command{user-select:all;max-height:none}
 
+
 /* Diagnose a problem */
 .diagnosis-panel{margin:14px 0}
 .symptom-block span{display:block;color:var(--text-primary);font-size:14px;margin-bottom:6px}
 .symptom-block small{color:var(--text-muted)}
 .recommendation ol{margin:6px 0 0;padding-left:18px}
+
+/* Final responsive overrides: keep these after the collapsible-sidebar tokens
+   and after main-branch diagnosis styles so mobile layout wins. */
+@media (max-width: 720px) {
+  .app-shell {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+  .sidebar,
+  .sidebar.collapsed {
+    position: relative !important;
+    inset: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    padding: 13px 15px !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--border-subtle, #1A2540);
+  }
+  .sidebar nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+  }
+  .nav-item {
+    min-width: 0;
+    justify-content: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+  .main,
+  .main.sidebar-collapsed {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0 !important;
+    overflow-x: clip;
+  }
+  .content {
+    width: 100%;
+    min-width: 0;
+  }
+}
+@media (max-width: 360px) {
+  .metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

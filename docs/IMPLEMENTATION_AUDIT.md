@@ -1,3 +1,5 @@
+> Historical implementation snapshot (21 Nov 2026). Several statuses in this matrix are obsolete (including ML, TTS, exploration and production persistence). Do not use it as the current feature inventory. See [docs/MASTER_FEATURE_INVENTORY.md](MASTER_FEATURE_INVENTORY.md) and [docs/FINAL_PRODUCT_AUDIT.md](FINAL_PRODUCT_AUDIT.md) for current audited status.
+
 # BharatSim — Full Implementation Audit & Feature Status Matrix
 
 **Date:** 21 November 2026  

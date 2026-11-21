@@ -28,6 +28,8 @@ if str(_REPO_ROOT) not in sys.path:
 from worker.condition_planner import plan_conditions
 from worker.condition_applicator import ConditionManager
 
+MAX_APK_BYTES = 500 * 1024 * 1024
+
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -163,9 +165,12 @@ def apply_emulator_network_profile(
         evidence.update({"control_plane": {"status": "unsupported", "reason": "Target is not an Android Emulator serial"}})
         return evidence
 
+    # Android Emulator's documented unrestricted profile is "full", not
+    # a zero-kbps cap. Zero/zero is the baseline persona's no-throttling sentinel.
+    speed_profile = "full" if down_kbps == 0 and up_kbps == 0 else f"{up_kbps}:{down_kbps}"
     commands = [
         ("delay", ["adb", "-s", serial, "emu", "network", "delay", str(latency_ms) if latency_ms else "none"]),
-        ("speed", ["adb", "-s", serial, "emu", "network", "speed", f"{up_kbps}:{down_kbps}"]),
+        ("speed", ["adb", "-s", serial, "emu", "network", "speed", speed_profile]),
     ]
     command_evidence: dict[str, object] = {}
     for name, command in commands:
@@ -330,8 +335,8 @@ def main() -> int:
     apk = args.apk.resolve()
     if not apk.is_file() or apk.suffix.lower() != ".apk":
         parser.error("APK path must be an existing .apk file")
-    if apk.stat().st_size > 150 * 1024 * 1024:
-        parser.error("APK exceeds 150 MiB limit")
+    if apk.stat().st_size > MAX_APK_BYTES:
+        parser.error("APK exceeds 500 MiB limit")
     if shutil.which("adb") is None or shutil.which("aapt") is None:
         parser.error("adb and aapt must both be available on PATH")
     with apk.open("rb") as stream:

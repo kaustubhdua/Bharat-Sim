@@ -116,3 +116,52 @@ def test_vercel_rewrites_browser_deep_links_to_the_fastapi_frontend():
         for source, _ in route_pairs
         if isinstance(source, str)
     )
+
+
+def test_health_readiness_exposes_only_sanitized_database_failure(monkeypatch):
+    from contextlib import contextmanager
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(main, "APP_ENV", "production")
+    monkeypatch.setattr(main, "AUTH_REQUIRED", True)
+    monkeypatch.setattr(main, "SUPABASE_URL", "https://project.supabase.co")
+    monkeypatch.setattr(main, "STORAGE_API_KEY", "s" * 40)
+    monkeypatch.setattr(main, "STORAGE_ENABLED", True)
+    monkeypatch.setattr(main, "DATABASE_URL", "postgresql://secret-user:secret-password@private-host/db?sslmode=require")
+    monkeypatch.setattr(main, "requires_persistent_database", lambda: True)
+    monkeypatch.setattr(main, "validate_database_configuration", lambda *_: None)
+
+    @contextmanager
+    def unavailable_database():
+        raise OSError("secret-password private-host")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(main, "db", unavailable_database)
+    response = TestClient(main.app).get("/health/ready")
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["database"] == "unavailable"
+    assert payload["database_reason"] == "OSError"
+    assert payload["private_storage"] == "configured"
+    assert "secret-password" not in response.text
+    assert "private-host" not in response.text
+
+
+def test_health_readiness_reports_missing_private_storage_credential(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(main, "APP_ENV", "development")
+    monkeypatch.setattr(main, "AUTH_REQUIRED", False)
+    monkeypatch.setattr(main, "SUPABASE_URL", "https://project.supabase.co")
+    monkeypatch.setattr(main, "STORAGE_API_KEY", "")
+    monkeypatch.setattr(main, "STORAGE_ENABLED", False)
+    monkeypatch.setattr(main, "DATABASE_URL", "")
+    monkeypatch.setattr(main, "requires_persistent_database", lambda: False)
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "readiness.sqlite3")
+    response = TestClient(main.app).get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["database_reason"] == "connected"
+    assert response.json()["private_storage"] == "unavailable"
+    assert response.json()["private_storage_reason"] == "server_storage_credential_missing"

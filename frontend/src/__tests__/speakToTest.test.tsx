@@ -79,8 +79,11 @@ describe("Speak-to-Test", () => {
     expect(text).toContain("machine-checked");
     expect(text).toContain("not machine-verified");
     expect(text).toContain("Interpreted by Sarvam sarvam-105b");
-    expect(text).toContain("RUNS NOW");
-    expect(text).toContain("Needs a fixture");
+    expect(text).toContain("Run BharatPay Mock 1.0 (original)");
+    expect(text).toContain("Run BharatPay Mock 1.1 (fixed)");
+    expect(text).not.toContain("Needs a fixture");
+    expect(text).not.toContain("JANJEEVAN SCENARIO PACKS");
+    expect(container.querySelector(".pack-grid")).toBeNull();
     const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/speak/interpret"));
     expect(JSON.parse(String(call![1]?.body))).toEqual({ text: "Mera payment app retry par double charge karta hai" });
 

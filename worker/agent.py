@@ -37,6 +37,7 @@ from worker.condition_applicator import reset_target_safely
 
 RUNNER = ROOT / "worker" / "runner.py"
 MAX_RESPONSE_BYTES = 300_000
+MAX_APK_BYTES = 500 * 1024 * 1024
 
 
 def log_worker(level: str, message: str) -> None:
@@ -112,8 +113,8 @@ def download_apk(base_url: str, token: str, job: dict[str, Any], target: Path) -
             if not chunk:
                 break
             total += len(chunk)
-            if total > 150 * 1024 * 1024:
-                raise WorkerError("Downloaded APK exceeds the 150 MiB worker limit")
+            if total > MAX_APK_BYTES:
+                raise WorkerError("Downloaded APK exceeds the 500 MiB worker limit")
             digest.update(chunk)
             output.write(chunk)
     if total == 0:
@@ -239,10 +240,14 @@ def persona_network_cli_args(job: dict[str, Any]) -> list[str]:
         raise WorkerError("persona profile is missing valid network target values") from exc
     if not 0 <= latency <= 2000:
         raise WorkerError("persona latency target is outside the supported 0–2000 ms range")
-    if not 1 <= down <= 1_000_000 or not 1 <= up <= 1_000_000:
-        raise WorkerError("persona throughput target is outside the supported 1–1000000 kbps range")
     if not 0 <= loss <= 100:
         raise WorkerError("persona packet-loss target must be between 0 and 100 percent")
+    if down == 0 and up == 0:
+        # Zero/zero is the authored baseline sentinel for unrestricted speed,
+        # not a request to apply a zero-kbps network cap.
+        return []
+    if not 1 <= down <= 1_000_000 or not 1 <= up <= 1_000_000:
+        raise WorkerError("persona throughput target is outside the supported 1–1000000 kbps range")
     return [
         "--network-latency-ms", str(latency),
         "--network-down-kbps", str(down),
@@ -387,12 +392,12 @@ def run_job_smoke(base_url: str, token: str, serial: str, job: dict[str, Any], d
 
                 required_profile_values = ("latency_ms", "down_kbps", "up_kbps")
                 if all(isinstance(profile.get(key), (int, float)) for key in required_profile_values):
-                    runner_command.extend([
-                        "--network-latency-ms", str(int(profile["latency_ms"])),
-                        "--network-down-kbps", str(int(profile["down_kbps"])),
-                        "--network-up-kbps", str(int(profile["up_kbps"])),
-                        "--network-loss-pct", str(float(profile.get("packet_loss_pct", 0))),
-                    ])
+                    # A baseline persona uses zero bandwidth targets to mean
+                    # "unshaped/full speed". The runner's explicit CLI overrides
+                    # accept only positive caps, so omit those overrides for the
+                    # baseline and let the full persona profile drive condition
+                    # planning (which records the control-plane reset/readback).
+                    runner_command.extend(persona_network_cli_args(job))
             try:
                 completed = subprocess.run(
                     runner_command, env=env, capture_output=True, text=True, timeout=360, check=False,

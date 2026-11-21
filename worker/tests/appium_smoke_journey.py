@@ -108,16 +108,37 @@ def capture_screenshot(session_path: str, destination: Path) -> None:
 
 
 def prepare_proxy_path() -> dict:
-    """Keep a real Android network active and verify the host CONNECT proxy is ready."""
+    """Keep Android online and prove its host-gateway route reaches the CONNECT proxy.
+
+    ConnectivityManager can report an active transport before the emulator has
+    installed a usable route to the host gateway. That false-ready state caused
+    the CI fixture to fail later inside the app with ENETUNREACH. Require both
+    an IP route and a TCP connection to the allowlisted proxy before Appium
+    starts the network probe.
+    """
     adb("shell", "settings", "put", "global", "airplane_mode_on", "0")
     adb("shell", "cmd", "connectivity", "airplane-mode", "disable")
     adb("shell", "svc", "wifi", "enable")
     adb("shell", "svc", "data", "enable")
     last_connectivity = ""
+    last_route = ""
+    last_proxy_probe = ""
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         last_connectivity = adb("shell", "dumpsys", "connectivity", timeout=8)
         if has_active_network(last_connectivity):
+            try:
+                last_route = adb("shell", "ip", "route", "get", "10.0.2.2", timeout=5)
+                if "unreachable" in last_route.lower():
+                    raise RuntimeError("Android route to emulator host gateway is unreachable")
+                last_proxy_probe = adb(
+                    "shell", "toybox", "nc", "-z", "-w", "2",
+                    "10.0.2.2", "8888", timeout=5,
+                )
+            except Exception as exc:
+                last_proxy_probe = str(exc)
+                time.sleep(1)
+                continue
             health = proxy_request("GET", "/health")
             if health.get("status") != "ok":
                 raise RuntimeError(f"HTTPS shaping proxy is not healthy: {health}")
@@ -125,12 +146,15 @@ def prepare_proxy_path() -> dict:
                 "status": "ready",
                 "active_transport_network_present": True,
                 "connectivity_tail": last_connectivity[-1800:],
+                "host_gateway_route": last_route[-500:],
+                "host_proxy_tcp_probe": "connected",
                 "proxy_health": health,
             }
         time.sleep(1)
     raise RuntimeError(
-        "Android emulator has no active network for the CONNECT proxy path; "
-        f"connectivity={last_connectivity[-4000:]!r}"
+        "Android emulator has no usable route to the host CONNECT proxy; "
+        f"connectivity={last_connectivity[-2500:]!r}; "
+        f"route={last_route[-500:]!r}; proxy_probe={last_proxy_probe[-1000:]!r}"
     )
 
 

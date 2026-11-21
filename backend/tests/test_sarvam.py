@@ -9,11 +9,40 @@ from app import main, sarvam
 
 def test_translation_request_is_rejected_without_provider_key(monkeypatch):
     monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.delenv("sarvam_api", raising=False)
     response = TestClient(main.app).post(
         "/api/v1/translate/report",
         json={"text": "Payment retry failed.", "target_language_code": "hi-IN"},
     )
     assert response.status_code == 503
+
+
+def test_translation_accepts_legacy_lowercase_sarvam_api_alias(monkeypatch):
+    monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.setenv("sarvam_api", "test-legacy-server-key-123456")
+
+    class FakeResponse(io.BytesIO):
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.close()
+
+    monkeypatch.setattr(
+        sarvam,
+        "urlopen",
+        lambda request, timeout: FakeResponse(json.dumps({"translated_text": "नमस्ते"}).encode("utf-8")),
+    )
+    response = TestClient(main.app).post(
+        "/api/v1/translate/report",
+        json={"text": "Hello", "target_language_code": "hi-IN"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["translated_text"] == "नमस्ते"
+    assert response.json()["provider"] == "sarvam"
 
 
 @pytest.mark.parametrize("language", ["hi-IN", "ta-IN", "mr-IN"])

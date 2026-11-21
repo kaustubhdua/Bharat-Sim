@@ -1,44 +1,42 @@
-# BharatSim — Final Production Readiness Evaluation (Phase 2)
+# BharatSim — current production readiness decision
 
-**Deployment URL:** [https://bharat-sim-81g2.vercel.app](https://bharat-sim-81g2.vercel.app)  
-**Evaluation Standard:** Commercial MVP Production Release Gates  
+Status: NOT production-ready for public arbitrary APK execution.
+Audit date: 22 November 2026.
 
----
+> This file replaces the older Phase-2 readiness snapshot. Earlier all-gates-verified, ASVS Level 2, 100% ML accuracy, all-worker packet-loss support and fully-working-production statements were not supported by current evidence and must not be repeated.
 
-## 1. Acceptance Gates Verification (Gates A – H)
+## Current decision
 
-### Gate A — Infrastructure: IMPLEMENTED, VERIFIED ON CI / AUTOMATED FOR PRODUCTION
-- Automated turnkey bootstrap script (`deploy/worker/setup-worker-host.sh`) verifies `kvm-ok`, creates systemd units, installs Android SDK, and builds AVD.
-- CI workflow (`.github/workflows/android-emulator-smoke.yml`) boots Android 35 emulator on Ubuntu runner and runs end-to-end smoke tests.
-- Production host connection instructions documented for Google Cloud Platform (`n2-standard-4`) and Hetzner Bare-Metal.
+BharatSim is a controlled-beta prototype with substantial implemented features and automated CI coverage. The full feature matrix and current evidence are maintained in:
+- [Master Feature Inventory](MASTER_FEATURE_INVENTORY.md)
+- [Final Product Audit](FINAL_PRODUCT_AUDIT.md)
+- [Production Readiness](PRODUCTION_READINESS.md)
+- [Production Release Gates](PRODUCTION_RELEASE_GATES.md)
+- [Security Control Review](SECURITY_AUDIT.md)
 
-### Gate B — Worker Subsystem: VERIFIED
-- Worker daemon protocol (`worker/agent.py`), token authentication (`BHARATSIM_WORKER_TOKEN`), lease timeouts, consecutive heartbeat failure alerts, and `SIGTERM`/`SIGINT` graceful teardown verified by 17 unit tests.
-- Idempotency verified: duplicate completions are cleanly acknowledged.
+## Release blockers
 
-### Gate C — Execution Engine: VERIFIED
-- APK installation, launcher intent execution, monkey exploration, and process monitoring verified.
-- Negative tests for signature conflicts and corrupt manifests fail safely and report clear Android OS error text.
+1. Vercel browser Supabase URL points to gpkyzastnibffyuxhtix, absent from the connected Supabase project list. The available active common 1 project is shared with GenomeGuard; owner confirmation is required before migrations.
+2. The connected common 1 database has only four of nine BharatSim migrations; live runs and workers tables lack newer columns. It currently has zero BharatSim run rows and zero private APK objects.
+3. Vercel sensitive BHARATSIM_DATABASE_URL and SUPABASE_URL values were not decrypted. No SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY appears in the complete visible Production environment inventory; private Storage is not demonstrated as enabled.
+4. Production upload cap is 50 MB even though code supports 500 MB multipart uploads.
+5. Production public execution, worker isolation and worker egress flags are all false. Personal laptop workers are not per-job isolation.
+6. No production authenticated APK → isolated worker → persisted report → reopen/export acceptance journey has been proven.
+7. ML/anomaly/BharatScore are heuristics/triage aids and lack independent field validation.
+8. Manual accessibility and cross-platform installer acceptance remain.
 
-### Gate D — Network Simulation: VERIFIED
-- Latency (35ms–450ms), download bandwidth (256kbps–12Mbps), upload bandwidth (96kbps–3Mbps), and packet loss parameters verified across 5 Indian personas.
-- Teardown guaranteed: reset commands execute in `finally` blocks and verify readback before run closure.
+## What is verified in code/CI
 
-### Gate E — Intelligence & Analytics: VERIFIED
-- Pure-Python TF-IDF centroid classifier verified with 0.956 F1 score on real Android crash, ANR, OOM, network, and storage traces.
-- Multivariate Z-score anomaly detector verified with zero-regression boundary handling.
-- Bharat Readiness Score accurately reflects stability, jank, and startup latency on 2 GB Android Go devices.
+- JWT verification, owner-scoped API queries, quotas, signed upload code, worker lease/heartbeat/hash protocol and PostgreSQL adapter are implemented and tested.
+- Timestamped migrations are exercised against clean PostgreSQL in CI.
+- Backend, frontend, worker guard, frontend E2E, unified build and container checks passed on the earlier PR #138 base; final consolidated PR checks must pass on their own head.
+- Android emulator CI validates a controlled fixture path; it is not proof of arbitrary APK traffic or production isolation.
 
-### Gate F — Product & User Experience: VERIFIED
-- Linear/Vercel-grade SaaS user interface, dark and light theme tokens, responsive navigation, and error skeletons verified.
-- Complete user journey from registration to APK upload, persona selection, run details, finding expansion, translation, audio playback, and PDF/JSON export verified.
-- Zero fake metrics or mock success indicators in production.
+## Required guardrails
 
-### Gate G — Security & Multi-Tenancy: VERIFIED
-- OWASP ASVS Level 2 compliance verified for JWT session validation, parameterized `owner_id` query scoping, and Zip-Slip/Zip-Bomb upload protection.
-- Worker daemon sandboxed with systemd strict filesystem protection. Zero secrets committed.
+Keep all three flags false until independent acceptance:
+- BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED=false
+- BHARATSIM_WORKER_ISOLATION_ATTESTED=false
+- BHARATSIM_WORKER_EGRESS_RESTRICTED=false
 
-### Gate H — Deployment: VERIFIED
-- Vercel frontend and FastAPI backend deployed at `https://bharat-sim-81g2.vercel.app`.
-- All single-page application routes mapped in `vercel.json` rewrites.
-
+A READY Vercel deployment, green CI or connected personal laptop is not a production security boundary.

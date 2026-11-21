@@ -119,6 +119,17 @@ class PersonaNetworkArgumentTests(unittest.TestCase):
         self.assertEqual(persona_network_cli_args({"persona_id": "legacy"}), [])
         self.assertEqual(persona_network_cli_args({"persona_profile": {}}), [])
 
+    def test_zero_throughput_baseline_does_not_create_zero_kbps_overrides(self):
+        self.assertEqual(persona_network_cli_args({
+            "persona_id": "baseline",
+            "persona_profile": {
+                "latency_ms": 0,
+                "down_kbps": 0,
+                "up_kbps": 0,
+                "packet_loss_pct": 0,
+            },
+        }), [])
+
     def test_rejects_invalid_or_out_of_range_network_targets(self):
         invalid_profiles = [
             {"latency_ms": 2001, "down_kbps": 1000, "up_kbps": 1000, "packet_loss_pct": 0},
@@ -300,3 +311,10 @@ class AgentPersonaPassingAndTimeoutTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_worker_and_runner_share_the_500_mib_upload_contract():
+    from worker import agent, runner
+
+    assert agent.MAX_APK_BYTES == 500 * 1024 * 1024
+    assert runner.MAX_APK_BYTES == agent.MAX_APK_BYTES

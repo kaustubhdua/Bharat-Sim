@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, Download, FlaskConical, RefreshCw } from "lucide-react";
+import { Download, RefreshCw } from "lucide-react";
 import { api, cls, type PlanResponse } from "../api";
 
 const FLOW_PRESETS = {
@@ -93,9 +93,9 @@ export default function PlannerPanel({ selected }: { selected: string }) {
     <section className="panel planner-panel" id="risk-planner">
       <div className="panel-heading">
         <div>
-          <div className="section-kicker">02B / INTERACTION HUNTER</div>
+          <div className="section-kicker">02B / RISK PLANNER</div>
           <h2>Risk-first test plan</h2>
-          <p>Choose the app's critical journeys; the planner ranks them against persona constraints and paired conditions.</p>
+          <p>Choose the app's critical journeys; the planner ranks them against persona constraints.</p>
         </div>
         {plan && <button type="button" className="text-button" onClick={exportPlan}><Download size={14} /> Export plan JSON</button>}
       </div>
@@ -139,11 +139,6 @@ export default function PlannerPanel({ selected }: { selected: string }) {
           <span>Deterministic heuristic · not failure probability</span>
           <span>Generated {new Date(plan.generated_at).toLocaleString()}</span>
         </div>
-        <div className="planner-stats">
-          <div><b>{plan.total_candidates}</b><span>candidate scenarios</span></div>
-          <div><b>{plan.interaction_hunter.candidate_pairwise_interactions}</b><span>pairwise interactions examined</span></div>
-          <div><b>{plan.interaction_hunter.selected_scenario_interactions}</b><span>interactions in selected plan</span></div>
-        </div>
         <div className="scenario-list">
           {plan.scenarios.map((scenario, index) => (
             <article className="scenario-card" key={scenario.id}>
@@ -159,17 +154,9 @@ export default function PlannerPanel({ selected }: { selected: string }) {
                 {scenario.requested_conditions.map((condition) => <span key={condition.id}>{condition.label}: {condition.target}</span>)}
                 {scenario.category_flow_sensitive ? <span className="scenario-category-match">Category-sensitive flow</span> : null}
               </div>
-              {scenario.interaction_hypotheses.slice(0, 3).map((interaction) => (
-                <div className="interaction-item" key={interaction.conditions.join("+")}>
-                  <span><Activity size={13} /> {interaction.labels.join(" × ")}</span>
-                  <p>{interaction.hypothesis}</p>
-                  <small>{interaction.validation}</small>
-                </div>
-              ))}
             </article>
           ))}
         </div>
-        <div className="planner-caveat"><FlaskConical size={14} /> {plan.interaction_hunter.warning} This ranks tests; it does not execute them or claim a failure.</div>
       </> : null}
       {!loading && !error && !plan ? <div className="planner-empty">No scenarios returned for this persona.</div> : null}
     </section>

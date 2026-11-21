@@ -139,6 +139,25 @@ class EmulatorNetworkProfileTests(unittest.TestCase):
         self.assertEqual(run.call_args_list[0].args[0][-1], "180")
         self.assertEqual(run.call_args_list[1].args[0][-1], "350:1200")
 
+    def test_zero_zero_baseline_uses_full_speed_and_verifies_unrestricted_readback(self):
+        ok = CompletedProcess(args=[], returncode=0, stdout="OK\\n", stderr="")
+        full_speed = CompletedProcess(
+            args=[], returncode=0,
+            stdout="""Current network status:
+ download speed: 0 bits/s (0.0 KB/s)
+ upload speed: 0 bits/s (0.0 KB/s)
+ minimum latency: 0 ms
+ maximum latency: 0 ms
+ OK
+""", stderr=""
+        )
+        with patch("worker.runner.run_cmd", side_effect=[ok, ok, full_speed]) as run:
+            evidence = apply_emulator_network_profile("emulator-5554", 0, 0, 0, 0)
+        self.assertEqual(evidence["control_plane"]["status"], "verified")
+        self.assertTrue(evidence["network_constraints_applied"])
+        self.assertEqual(run.call_args_list[0].args[0][-1], "none")
+        self.assertEqual(run.call_args_list[1].args[0][-1], "full")
+
     def test_parse_fixture_probe_from_filtered_logcat(self):
         for status in (200, 206):
             with self.subTest(status=status):

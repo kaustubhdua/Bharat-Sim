@@ -1,104 +1,51 @@
-# Vercel deployment and common1 Supabase wiring
+# BharatSim — current Vercel deployment and environment audit
 
-This runbook describes the two existing Vercel projects and the environment contract expected by the code. It does not contain credentials.
+Audit date: 22 November 2026
+Project: bharat-sim-81g2 (unified frontend + FastAPI runtime)
+Stable alias: https://bharat-sim-81g2.vercel.app
 
-## Existing projects (audited 2026-11-01)
+## Deployment status
 
-| Role | Vercel project | Framework | Stable project alias |
-|---|---|---|---|
-| Dashboard | `bharat-sim-81g2` | Vite | `https://bharat-sim-81g2.vercel.app` |
-| API | `bharat-sim` | FastAPI | `https://bharat-sim-bay.vercel.app` |
+- Latest inspected Production deployment is READY on commit 76f5b7e67d7dd400be9a0e3e7900907e77b0611f.
+- Current GitHub main is ccb85d56a88299bd9cbc33da6c153a47645ccc83, two commits ahead of that deployment.
+- Refresh deployment after final PR merges. Verify exact deployed SHA and run live/readiness/authenticated browser smoke; READY alone is not acceptance.
 
-Both projects report Vercel SSO protection enabled for non-custom domains. The frontend Production deployment is READY at commit `3ed44668d4d13c49648337aaba7e098f26e07045`, which contains the current application code; the backend Production deployment is still at `2b125971f8ab6c7c0e943d57790b4ae631021dbd`. The frontend and backend therefore are not a same-commit release. A direct Vercel deployment request was rejected with HTTP 402 `api-deployments-free-per-day` after the team exceeded 100 deployments/day; retry-after was 24 hours. Keep SSO enabled and do not call this an operational full-stack deployment. A READY build is not proof of an authenticated, persistent, working application. Keep SSO protection enabled until the app-level authentication and persistence checks below pass.
+## Environment metadata
 
-## Environment-variable audit
+Sensitive values were not decrypted.
 
-The latest environment inspection (2026-11-01) confirms that the public frontend variable names are now aligned:
+### Present in visible Production inventory
+- BHARATSIM_ENV=production
+- BHARATSIM_AUTH_REQUIRED=true
+- BHARATSIM_STORAGE_BUCKET=bharatsim-private
+- BHARATSIM_DATABASE_URL (sensitive; value/target unverified)
+- SUPABASE_URL (sensitive; value/target unverified)
+- VITE_SUPABASE_URL=https://gpkyzastnibffyuxhtix.supabase.co
+- VITE_SUPABASE_PUBLISHABLE_KEY
+- sarvam_api (sensitive; code explicitly supports this lowercase compatibility alias as well as SARVAM_API_KEY)
+- BHARATSIM_MAX_UPLOAD_MB=50
 
-- Dashboard: `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured for Production and Preview. The Production API base URL is correct. The current Preview API base URL still points to an older `feat/tus-resumable-apk-upload` branch alias; refresh it only after a matching backend preview deployment is available, and do not treat it as a validated preview.
-- API: `SUPABASE_URL`, `BHARATSIM_ENV`, `BHARATSIM_AUTH_REQUIRED`, `BHARATSIM_STORAGE_BUCKET`, and `BHARATSIM_CORS_ORIGINS` are configured. Preview uses development mode with ephemeral SQLite; Production is set to production mode.
-- API credentials `BHARATSIM_DATABASE_URL` and `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`) are not present in the inspected environment. `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured.
-- Never rename a server secret to a `NEXT_PUBLIC_*` or `VITE_*` variable. Only the Supabase publishable key belongs in the browser.
+### Missing from complete visible Production inventory
+- SUPABASE_SECRET_KEY
+- SUPABASE_SERVICE_ROLE_KEY
 
-## Dashboard project variables
+The backend enables private Storage only when SUPABASE_URL, one server-only secret/service-role key and the bucket name are present. Do not substitute the browser publishable key.
 
-Configure these on the `bharat-sim-81g2` Vercel project for Production and Preview:
+## Supabase project reconciliation
 
-| Variable | Value |
-|---|---|
-| `VITE_API_BASE_URL` (Production) | `https://bharat-sim-bay.vercel.app` |
-| `VITE_API_BASE_URL` (Preview) | The matching backend branch alias, currently `https://bharat-sim-git-feat-tus-resumable-apk-upload-jyc-website.vercel.app` |
-| `VITE_SUPABASE_URL` | The HTTPS project URL for common1 |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | The common1 publishable key (the code also accepts the legacy `VITE_SUPABASE_ANON_KEY`) |
+The browser URL references project gpkyzastnibffyuxhtix, absent from the connected Supabase project list. The only active/healthy project in that list is common 1 (hkyieaovolkethovyenb), shared with GenomeGuard. Its private bharatsim-private bucket exists, but its BharatSim migration history is only 4/9, live runs/workers schemas lack newer columns, and there are zero run rows and zero APK objects.
 
-The current frontend defaults `VITE_API_BASE_URL` to an empty string. Because the dashboard and API are separate Vercel projects, leaving it empty sends requests to the dashboard origin rather than the FastAPI project. Production and Preview use separate values so a preview dashboard does not accidentally call the production API.
+Do not change VITE_SUPABASE_URL, server-side SUPABASE_URL, or apply migrations until the owner confirms the authoritative project and backup/restore plan. Never paste service credentials into GitHub, frontend variables or chat.
 
-## API project variables
+## Upload limit
 
-Configure these on the `bharat-sim` Vercel project. Keep every value server-side:
+The API code supports APKs up to 500 MB using 45 MB parts, but Production currently sets BHARATSIM_MAX_UPLOAD_MB=50. Raise it only after server-side Storage credentials, correct project identity and multipart upload/download/delete tests pass. The bucket's 150 MiB limit applies per object; 45 MB parts stay below that cap.
 
-| Variable | Requirement |
-|---|---|
-| `BHARATSIM_ENV` | `production` |
-| `BHARATSIM_DATABASE_URL` | common1 Supabase **Transaction pooler** URI from the dashboard Connect panel, with `sslmode=require` |
-| `SUPABASE_URL` | common1 HTTPS project URL |
-| `SUPABASE_SECRET_KEY` | common1 modern `sb_secret_...` server-only key (preferred); sent in `apikey` only. Legacy `SUPABASE_SERVICE_ROLE_KEY` JWT is supported as fallback. |
-| `BHARATSIM_AUTH_REQUIRED` | `true` |
-| `BHARATSIM_STORAGE_BUCKET` | `bharatsim-private` |
-| `BHARATSIM_CORS_ORIGINS` | Exact dashboard origin(s), comma-separated; include the production dashboard aliases and the active preview dashboard branch alias; remove stale branch aliases when preview deployments are retired |
-| `BHARATSIM_WORKER_TOKEN` | Strong random value of at least 32 characters, only after the isolated worker is provisioned |
-| `SARVAM_API_KEY` | Optional server-only key; required to enable the Sarvam capability |
+## Worker safety
 
-The API's production startup requires PostgreSQL, verified Supabase Auth, and the server-side Storage credential. When Storage is enabled, the dashboard requests a short-lived signed upload capability and transfers APK bytes directly to the private bucket using the TUS resumable protocol in 6 MiB chunks; this bypasses Vercel Functions' 4.5 MB request-body cap and supports retries after unstable-network interruptions. The API checks the stored object size before queueing, and the worker independently checks the SHA-256. Without Storage configured, the production UI blocks files larger than 4 MB rather than letting Vercel return a 413. The API uses `/tmp/bharatsim` as writable scratch space on Vercel. The optional shared `BHARATSIM_API_KEY` is not required for a Supabase-authenticated browser application and must not be placed in frontend code. Leave `BHARATSIM_REQUIRE_API_KEY=false` unless a private server-side gateway is deliberately configured to inject it.
+The following Production flags are present and false:
+- BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED
+- BHARATSIM_WORKER_ISOLATION_ATTESTED
+- BHARATSIM_WORKER_EGRESS_RESTRICTED
 
-### Why transaction pooler mode
-
-Vercel functions are short-lived/serverless. Supabase recommends the shared Transaction pooler for serverless application traffic. The backend's psycopg connection sets `prepare_threshold=None`, because transaction pooler mode does not support prepared statements. It applies `SET LOCAL search_path TO bharatsim, public` inside every transaction rather than relying on session-level state, which transaction poolers do not preserve. Use the exact URI shown by common1's Connect panel rather than guessing a pooler hostname or region. Keep SSL enabled.
-
-## Supabase prerequisites
-
-1. Confirm the `bharatsim` schema and the `bharatsim-private` bucket exist in common1. The bucket must remain private.
-2. Confirm the core, foreign-key-index, and signed-upload size migrations are present in remote migration history.
-3. Enable the email/password Auth provider if password sign-in is the selected onboarding method.
-4. Set the allowed redirect URLs for the dashboard's production and preview origins.
-5. Never grant browser roles direct access to the private `bharatsim` schema or any server-side Supabase secret key.
-
-## Environment state observed during the 2026-11-01 integration pass
-
-The following non-secret configuration has been applied directly to the two Vercel projects:
-
-- Frontend: `VITE_API_BASE_URL` is split by target (production API alias for Production, matching feature-branch API alias for Preview); common1 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured for both.
-- Backend: `SUPABASE_URL`, `BHARATSIM_AUTH_REQUIRED=true`, `BHARATSIM_STORAGE_BUCKET=bharatsim-private`, and explicit CORS origins are configured for both.
-- Backend: `BHARATSIM_ENV=production` is Production-only. Preview uses `BHARATSIM_ENV=development` and is for protected UI/integration smoke tests only; its SQLite `/tmp` database is ephemeral and must not be used for real user data.
-
-The following required values are not present in the inspected Vercel environment and must be added before production can start: `BHARATSIM_DATABASE_URL`, `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`). `BHARATSIM_WORKER_TOKEN` and `SARVAM_API_KEY` are also not configured. The production API deliberately fails closed without the database and server-only Storage credential. Vercel Production deployment artifacts exist, but no operational production release, live common1 persistence, real APK upload, or Android worker execution is claimed.
-## Deployment audit observed on 2026-11-01
-
-- The latest frontend Production deployment is READY at commit `3ed44668d4d13c49648337aaba7e098f26e07045`; the backend Production deployment is still at `2b125971f8ab6c7c0e943d57790b4ae631021dbd`. GitHub `main` contains merged PRs #97 (Android CONNECT path), #100 (configurable planner), and #96 (owner-scoped audit timeline); the latest passing CI/test commit is `e24a7872f7a306ee67ebd5044fd17aa0601ea572`. Later main updates are documentation and frontend test-only changes; no application runtime code changed. The backend Production alias does not yet include the latest API code.
-- The frontend's most recent preview build for an intermediate TUS-fix commit failed because its tests still expected the old `/storage/v1/upload/resumable/sign` path. The tests and implementation were corrected, the corresponding GitHub CI build passed, and the fix was merged into `main`. That earlier failed Vercel preview is not the current main build.
-- The last recorded Vercel deployment attempt was rejected with HTTP 402 `api-deployments-free-per-day` (100 deployments/day; retry-after 24 hours). The frontend Production deployment already includes the current application code; the missing Production deployment is the updated backend API. Do not repeatedly retry or bypass the account's limit.
-- Both projects still have SSO protection enabled for non-custom domains and report `live=false`. The frontend alias is on the current application code; the backend alias remains on the older API commit. The backend is also missing required production database and Storage credentials, so READY must not be interpreted as an operational API. The production worker safety flags are explicitly present and false; worker dispatch remains closed until a disposable VM and default-deny egress policy are independently verified.
-
-The frontend has a READY preview for the audit branch, while the latest backend preview is still from the planner branch; they are not a same-commit full-stack preview. The frontend Production deployment has now advanced to the current application code, but the backend Production alias remains stale. Once the build-rate limit permits deployments, deploy a Preview from current `main`, inspect build logs and the protected preview, and deploy Production only after the missing database and Storage credentials have been added.
-
-## Safe rollout order
-
-1. Add the missing server-only API variables directly in Vercel; the frontend variable names are already aligned. Do not expose service-role, database, worker, or Sarvam secrets to the browser.
-2. Verify the API starts with PostgreSQL and that `/health/ready` reports database readiness. Confirm a create/read/delete run round trip persists across separate API invocations.
-3. Verify sign-up/sign-in, refresh, expiry, sign-out, and cross-user 404/denial behavior against common1.
-4. Verify private APK upload, lease-authorized worker download, terminal cleanup, and object deletion.
-5. Configure `VITE_API_BASE_URL` and exact CORS origins; test dashboard API requests with an authenticated user.
-6. Provision the worker on a disposable VM with strict egress and resource limits; then add `BHARATSIM_WORKER_TOKEN` and verify a real upload-to-report journey.
-7. Add `SARVAM_API_KEY` only if the Sarvam partner feature is required; verify a real Hindi, Tamil, and Marathi translation call.
-8. Only after these checks pass, review whether Vercel SSO protection can be disabled for the production aliases. Application-level Supabase Auth must remain enabled.
-
-## Current blockers
-
-The Vercel variable audit confirms that the public frontend variable names and non-secret backend settings are aligned. The backend Production environment is missing `BHARATSIM_DATABASE_URL` (the Supabase common 1 Transaction Pooler URI) and `SUPABASE_SECRET_KEY` (the server-only Supabase secret key). No database password or Supabase secret/service-role credential is available through project inspection; the project owner must add these values directly in Vercel and must not paste them into GitHub or chat. `BHARATSIM_REQUIRE_API_KEY` is an optional additional shared-key gate, not a required production setting when Supabase JWT authentication is enabled. The production API currently fails startup/readiness because the database URL and server-side secret are absent. `BHARATSIM_WORKER_TOKEN` is also absent; the production worker isolation and default-deny egress attestations remain false. A dedicated isolated Android worker host is not provisioned/attested, so production APK execution must remain fail-closed. The projects remain SSO-protected. Until the credentials are added, a deployment is permitted, and production API plus worker readiness are verified, the production dashboard must not be considered end-to-end live.
-
-### Deployment-volume protection
-
-Both Vercel projects (bharat-sim-81g2 frontend and bharat-sim backend) have affected-project deployments enabled. With their monorepo root directories configured, Vercel skips a project deployment when a commit does not affect that project. This prevents CI-only, Android-fixture and documentation changes from consuming deployment quota.
-
-At the last rejected deployment attempt, Vercel returned HTTP 402 `api-deployments-free-per-day` after the team exceeded its 100-deployments-per-day allowance. New preview/production deployments may remain blocked until the 24-hour quota window resets (or the plan limit is raised). The CORS environment changes are saved but are not active in existing deployments until redeployed.
-
+Personal laptop workers are owner-scoped convenience workers, not per-job microVM isolation. Keep public arbitrary APK execution disabled until a dedicated worker host and default-deny egress are independently accepted.
