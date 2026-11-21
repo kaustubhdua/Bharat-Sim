@@ -75,7 +75,7 @@ export default function LandingPage({
     {
       icon: <Mic size={22} />,
       title: "Speak-to-Test",
-      desc: "Describe the bug in Hindi, Hinglish or Tamil by voice or text. Sarvam turns it into a validated test plan and tells you what the emulator cannot simulate."
+      desc: "When configured, describe the bug in Hindi, Hinglish or Tamil by voice or text. Sarvam turns it into a validated test plan and tells you what the selected worker cannot simulate."
     },
     {
       icon: <ShieldCheck size={22} />,
@@ -87,7 +87,7 @@ export default function LandingPage({
   const workflowSteps = [
     { num: "1", title: "Upload APK or Submit Logcat", desc: "Upload your Android APK for emulator testing, or paste logcat output directly for instant ML analysis." },
     { num: "2", title: "Select Device Persona", desc: "Choose Budget Android, Edge Village, Crowded Station, Congested Urban 4G, or build a custom persona." },
-    { num: "3", title: "Configure Network Environment", desc: "Latency, bandwidth, packet loss, resets and outages are applied through a shaping proxy, then compared with a baseline run." },
+    { num: "3", title: "Configure Network Environment", desc: "In full engine mode, latency/bandwidth and packet-loss stalls/resets use the host proxy for proxy-routed traffic; outage/recovery uses a separate airplane-mode check. Compare with baseline and inspect the report's traffic evidence." },
     { num: "4", title: "Execute & Collect Telemetry", desc: "BharatSim runs your app on a real emulator, collects network traces, logcat and performance signals." },
     { num: "5", title: "Review Failure Analysis", desc: "ML classifier categorizes failures. Each finding links to source evidence in the actual logcat." },
     { num: "6", title: "Get Bharat Readiness Score", desc: "Transparent score computed from real measurements. Actionable recommendations with multilingual audio support." }
@@ -139,12 +139,12 @@ export default function LandingPage({
           <Marquee speed={32} pauseOnHover={true}>
             {[
               { tag: "Hardware", text: "Budget Android · 2GB RAM · 720p · Android 11" },
-              { tag: "Rural 2G", text: "Edge Village · 450ms Latency · 8% Packet Loss" },
+              { tag: "Rural 2G", text: "Edge Village · 450ms latency target · 8% loss target" },
               { tag: "Transit", text: "Crowded Railway Station · 320ms Latency · 3G Cell" },
               { tag: "ML Engine", text: "Zero-DLL TF-IDF Failure Classifier · < 1ms Inference" },
-              { tag: "Sarvam AI", text: "Bulbul TTS · Hindi · Tamil · Telugu · Kannada" },
+              { tag: "Sarvam AI", text: "Bulbul TTS · Hindi · Tamil · Marathi · English" },
               { tag: "Scoring", text: "Bharat Readiness Score · Evidence-Based · Transparent" },
-              { tag: "Network", text: "Shaping proxy · Bandwidth cap · Jitter · Packet loss · Outages" },
+              { tag: "Network", text: "Engine mode · proxy-routed shaping · outage/recovery check" },
             ].map((item) => (
               <span key={item.tag} className="marquee-pill">
                 <span className="pill-tag">{item.tag}</span>
