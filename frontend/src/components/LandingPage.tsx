@@ -306,6 +306,15 @@ export default function LandingPage({
             <div
               key={index}
               className={"faq-item " + (activeFaq === index ? "open" : "")}
+              role="button"
+              tabIndex={0}
+              aria-expanded={activeFaq === index}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setActiveFaq(activeFaq === index ? null : index);
+                }
+              }}
               onClick={() => setActiveFaq(activeFaq === index ? null : index)}
             >
               <div className="faq-question">
