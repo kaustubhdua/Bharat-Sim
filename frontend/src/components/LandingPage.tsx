@@ -25,7 +25,7 @@ export default function LandingPage({
   const faqs = [
     {
       q: "How does BharatSim simulate real Indian network conditions?",
-      a: "Every app is run twice on a real Android emulator: once on a normal connection, once on the persona's network. The persona run goes through a shaping proxy that adds latency, caps bandwidth, drops packets and can cut the connection, and the report says whether the app's traffic actually passed through it. CPU throttling is not applied."
+      a: "When full engine mode is selected, the worker attempts baseline and persona passes on an Android emulator. Its host proxy can shape latency, bandwidth, packet-loss stalls and resets for traffic that uses Android's system proxy; the outage/recovery check uses airplane mode. The default legacy smoke worker has a narrower control set. Reports distinguish requested controls from applied controls and observed app traffic. CPU throttling is unsupported; RAM depends on emulator provisioning."
     },
     {
       q: "What is the Bharat Readiness Score?",
@@ -37,7 +37,7 @@ export default function LandingPage({
     },
     {
       q: "How is Sarvam AI integrated into the testing workflow?",
-      a: "Sarvam is in the core flow. Speak-to-Test sends your voice note to Saaras (speech-to-text) and your request to sarvam-105b, which returns a structured test plan that BharatSim validates and capability-checks before anything runs. After a run, Sarvam explains the measured evidence for a developer, product manager or public-service official, translates it (Hindi, Tamil, Marathi) and reads it aloud with Bulbul. Raw logcat is never sent; secrets and personal data are redacted first."
+      a: "When configured, Speak-to-Test sends a voice note to Saaras (speech-to-text) and a request to sarvam-105b for a structured test plan that BharatSim validates and capability-checks before anything runs. After a run, a separate provider-backed explanation flow can summarize selected measured evidence for a developer, product manager or public-service official, translate it (Hindi, Tamil, Marathi) and read it aloud with Bulbul. Only bounded, user-selected and redacted evidence is sent; raw logcat is not sent."
     }
   ];
 
@@ -45,22 +45,22 @@ export default function LandingPage({
     {
       icon: <Smartphone size={22} />,
       title: "Realistic Device Personas",
-      desc: "Test on emulated budget Android profiles: 2 GB RAM, 2 cores, 720p, battery saver and nearly full storage, like the phones many Indian users own."
+      desc: "Use authored budget-device targets such as 2 GB RAM, 2 cores, 720p, battery saver and storage pressure. Actual RAM/CPU provisioning is emulator-dependent and must be read back; CPU frequency throttling is not applied."
     },
     {
       icon: <Wifi size={22} />,
       title: "Network Condition Simulation",
-      desc: "Inject real-world network impairments: 2G edge latency, rural packet loss, crowded transit 3G. See how your app behaves."
+      desc: "In full engine mode, apply latency/bandwidth and proxy-based packet-loss stalls/resets to traffic using Android's system proxy. Apps may bypass that proxy; reports state whether traffic was observed. Outage/recovery is a separate airplane-mode check."
     },
     {
       icon: <Brain size={22} />,
       title: "ML Failure Classification",
-      desc: "Zero-dependency TF-IDF classifier categorizes logcat failures — crash, ANR, OOM, network — in under 1ms with evidence links."
+      desc: "Portable TF-IDF triage categories help group crash, ANR, OOM, network and storage signals. Scores are investigation hints, not confirmed diagnoses or field-accuracy guarantees."
     },
     {
       icon: <Activity size={22} />,
       title: "Bharat Readiness Score",
-      desc: "A transparent, evidence-based score computed from actual telemetry. No synthetic metrics. No imputed data. Know exactly what it means."
+      desc: "A transparent heuristic based only on signals present in logcat or worker evidence. Missing telemetry is not a pass; the score is not a certification or success probability."
     },
     {
       icon: <Terminal size={22} />,
@@ -70,7 +70,7 @@ export default function LandingPage({
     {
       icon: <Sparkles size={22} />,
       title: "Sarvam AI Integration",
-      desc: "Findings explained for developers, product managers or public-service officials, in Hindi, Tamil or Marathi, with Bulbul voice."
+      desc: "Provider-backed explanations of selected measured evidence, translation and Bulbul voice when the server-side Sarvam credential is configured. Raw logcat is not sent."
     },
     {
       icon: <Mic size={22} />,
