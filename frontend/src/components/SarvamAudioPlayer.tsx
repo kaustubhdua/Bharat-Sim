@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX, LoaderCircle } from "lucide-react";
-import { synthesizeSpeechAudio } from "../api";
+import { api, synthesizeSpeechAudio, type Capabilities } from "../api";
 
 interface SarvamAudioPlayerProps {
   text: string;
   defaultLang?: string;
   label?: string;
+}
+
+let ttsCapabilityPromise: Promise<boolean> | null = null;
+
+function getTtsAvailability(): Promise<boolean> {
+  if (!ttsCapabilityPromise) {
+    ttsCapabilityPromise = api<Capabilities>("/api/v1/capabilities")
+      .then((capabilities) => capabilities.sarvam_audio_tts === true)
+      .catch(() => false);
+  }
+  return ttsCapabilityPromise;
 }
 
 const LANGUAGES = [
@@ -25,8 +36,17 @@ export default function SarvamAudioPlayer({
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ttsAvailable, setTtsAvailable] = useState<boolean | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getTtsAvailability().then((available) => {
+      if (active) setTtsAvailable(available);
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -36,6 +56,10 @@ export default function SarvamAudioPlayer({
   }, []);
 
   const handlePlay = async () => {
+    if (ttsAvailable !== true) {
+      setError("Speech generation is unavailable. Configure SARVAM_API_KEY in the server environment.");
+      return;
+    }
     if (playing && audioRef.current) {
       audioRef.current.pause();
       setPlaying(false);
@@ -126,8 +150,8 @@ export default function SarvamAudioPlayer({
           type="button"
           className={"audio-play-button " + (playing ? "playing" : "")}
           onClick={() => void handlePlay()}
-          disabled={loading || !text.trim()}
-          title={playing ? "Pause briefing" : "Generate and play voice briefing"}
+          disabled={ttsAvailable !== true || loading || !text.trim()}
+          title={ttsAvailable === true ? (playing ? "Pause briefing" : "Generate and play voice briefing") : "Sarvam speech generation is not configured"}
         >
           {loading ? (
             <LoaderCircle size={15} className="spin" />
@@ -136,10 +160,11 @@ export default function SarvamAudioPlayer({
           ) : (
             <Volume2 size={15} />
           )}
-          <span>{loading ? "Generating audio…" : playing ? "Pause audio" : audioUrl ? "Play audio" : "Generate voice briefing"}</span>
+          <span>{ttsAvailable === null ? "Checking voice availability…" : ttsAvailable === false ? "Voice unavailable" : loading ? "Generating audio…" : playing ? "Pause audio" : audioUrl ? "Play audio" : "Generate voice briefing"}</span>
         </button>
       </div>
 
+      {ttsAvailable === false && <span className="audio-error" role="status">Voice generation is not configured on this backend. Add SARVAM_API_KEY as a server-only environment variable.</span>}
       {error && <span className="audio-error" role="status">{error}</span>}
     </div>
   );
