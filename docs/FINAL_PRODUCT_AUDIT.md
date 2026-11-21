@@ -1,69 +1,114 @@
-# BharatSim: Comprehensive Product & Architecture Audit
+# BharatSim — Final Product Audit
 
-**Target URL:** [https://bharat-sim-81g2.vercel.app](https://bharat-sim-81g2.vercel.app)  
-**Repository:** [kaustubhdua/Bharat-Sim](https://github.com/kaustubhdua/Bharat-Sim)  
-**Audit Timestamp:** 2026-11-21T18:32:00+05:30  
-**Audit Author:** Senior Product Engineering Organization (Principal Architect, Lead Frontend/Backend, Security, ML, & Product Design)
+**Production URL:** https://bharat-sim-81g2.vercel.app  
+**Repository:** https://github.com/kaustubhdua/Bharat-Sim  
+**Audited main SHA:** `2c754dcb428fdbacc67da18d41fad3c1d0745c83`  
+**Working branch:** `fix/accurate-capabilities-and-product-evidence`  
+**Audit date:** 2026-11-21 (IST)
 
----
+## 1. Executive assessment
 
-## 1. Executive Summary
+BharatSim now has a substantially broader SaaS interface than the original dashboard: a product landing page, dashboard overview, test-configuration wizard, run comparison, run details, log analysis, evaluator fixtures, and settings. PR #131 was merged before the latest UI integration commit.
 
-BharatSim is an engineering observability and resilience testing platform designed to evaluate Android applications under severe real-world Indian device and network constraints.
+The product is **not production-ready for customer APK execution**. The live homepage has returned HTTP 200, but the production readiness endpoint returned HTTP 503. The latest main commit `2c754dc` also has a failed Vercel build. The last successful production deployment is an earlier commit; it does not prove the current main commit is deployable.
 
-Following rigorous technical audit across backend (`backend/app`), frontend (`frontend/src`), worker runner (`worker/runner.py`), and documentation (`docs/`), this audit provides the authoritative classification of all capabilities prior to the complete SaaS UI/UX transformation.
+This audit distinguishes implemented code from verified runtime behavior. Fixtures, static profile definitions, training-set results, provider fallbacks and CI-only emulator evidence are not represented as live customer execution.
 
----
+## 2. Live production and deployment evidence
 
-## 2. Feature-by-Feature Classification Table
+| Check | Observed result | Classification |
+|---|---|---|
+| Production homepage | HTTP 200 on the last successful production deployment | Responding |
+| `/api/v1/personas` | HTTP 200 | Available |
+| `/api/v1/capabilities` | HTTP 200 | Available, but the audited main payload over-reported some capabilities |
+| `/health/ready` | HTTP 503 | Not ready |
+| Production database persistence | `false` in the live capability response | Unavailable |
+| Private APK storage / upload | `false` | Unavailable |
+| Android execution / worker dispatch | `false` | Disabled |
+| Network shaping | `false` | Not enabled for production runs |
+| Sarvam translation | `false` | Provider key not configured |
+| Vercel deployment for main `2c754dc` | Build failed in `python build_frontend.py` | Failed |
+| Main CI run `44908756056` | Backend, PostgreSQL integration and worker guards passed; frontend, unified build and container build failed; E2E had a failing analysis journey | Mixed / blocked |
+| Dependency audit | Completed successfully; 0 vulnerabilities reported by the Vercel build's npm audit | Passed |
 
-| ID | Feature Area | Sub-Component | Classification | Evidence & Runtime Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| **F01** | **Authentication** | Email/Password Sign-In | **Fully working** | Handled via Supabase Auth with session refresh in `frontend/src/auth.ts` and `AuthGate.tsx`. |
-| **F02** | **Authentication** | Sign-Up & Email Verification | **Fully working** | Direct Supabase Auth API exchange; validates credentials and handles confirmation tokens. |
-| **F03** | **Authentication** | Session Persistence & Refresh | **Fully working** | Managed via local session storage with automatic proactive renewal before expiry. |
-| **F04** | **Authentication** | Password Reset / Recovery | **Partially working** | Backend supports Supabase Auth password recovery flows; needs dedicated modern UI modal/view. |
-| **F05** | **Auth Isolation** | Tenant Data Segregation & RLS | **Fully working** | Enforced via PostgreSQL schema Row-Level Security (`auth.uid() = user_id`) and JWT bearer verification. |
-| **F06** | **APK Ingestion** | Drag-and-drop & File Selection | **Fully working** | Implemented in `UploadPanel.tsx` with size thresholds and cancellation. |
-| **F07** | **APK Ingestion** | Magic Byte / Signature Validation | **Fully working** | Validates ZIP magic byte headers (`PK\x03\x04` / `0x04034b50`) on both server and client. |
-| **F08** | **APK Ingestion** | Manifest Metadata Extraction | **Fully working** | Package name, version, min/target SDK, and SHA-256 fingerprint extraction via `apkutils`/`zipfile`. |
-| **F09** | **APK Storage** | Signed Resumable TUS Uploads | **Awaiting external credentials** | Fully implemented in `storageUpload.ts` and `POST /api/v1/uploads/sign`; requires `SUPABASE_SECRET_KEY` in production Vercel. Local filesystem upload works seamlessly. |
-| **F10** | **Personas** | 4 Required Personas | **Fully working** | `budget-android`, `edge-village`, `crowded-station`, and `congested-urban-4g` fully defined in API and dashboard. |
-| **F11** | **Personas** | Baseline & Storage Pressure | **Fully working** | Baseline (ideal 6GB/5G) and Low Storage (180MB free) profiles available for regression analysis. |
-| **F12** | **ADB Runner** | Smoke Test Install & Launch | **Fully working** | `worker/runner.py` installs APK, discovers main launcher Activity, and executes smoke sequence. |
-| **F13** | **ADB Runner** | Bounded Monkey Exploration | **Fully working** | Automated UI interaction with throttled events (`--throttle 250 --pct-touch 70 --pct-syskeys 0`). |
-| **F14** | **Telemetry** | Jank Frames via `dumpsys gfxinfo`| **Fully working** | Gfxinfo parsing calculates total frames rendered and percentage exceeding the 16.6ms deadline. |
-| **F15** | **Telemetry** | Memory Footprint via `meminfo` | **Fully working** | Meminfo parsing extracts Native, Dalvik, Total PSS, and Private Dirty memory footprints. |
-| **F16** | **Network** | QEMU / Emulator Console Latency | **Fully working** | Injects latency and download/upload bandwidth caps with control-plane readback and cleanup. |
-| **F17** | **Network** | HTTP CONNECT Shaping Proxy | **Fully working** | Host-side proxy enforces 384kbps rate capping and 150ms handshake latency in CI. |
-| **F18** | **ML Pipeline** | Logcat Failure Classifier | **Fully working** | Portable zero-DLL TF-IDF centroid classifier with softmax calibration, achieving **100% accuracy** on Android failure traces (`failure_model.json`). |
-| **F19** | **ML Pipeline** | Anomaly Detection Divergence | **Fully working** | Multivariate covariance scoring comparing baseline vs. constrained telemetry metrics (`anomaly_detector.py`). |
-| **F20** | **Evaluator Tour** | Preloaded Scenarios A & B | **Fully working** | Scenario A (UPI Timeout) & Scenario B (Quick-Commerce OOM) with authentic Android telemetry. |
-| **F21** | **Sarvam AI** | Indic Report Translation | **Fully working** | `POST /api/v1/translate/report` translates summaries into Hindi, Tamil, and Marathi. |
-| **F22** | **Sarvam AI** | Bulbul TTS Voice Briefing | **Fully working** | `POST /api/v1/translate/audio` synthesizes audio (`bulbul:v1`) in Hindi, Tamil, Marathi, and English. |
-| **F23** | **Sarvam AI** | Developer Fix & Defensive Code | **Fully working** | Generates root causes, user impacts, fixes, and defensive code in English and Hindi. |
-| **F24** | **Security** | ArgosX Clean Scan Posture | **Fully working** | HSTS, CSP, nosniff, frame-options DENY, parameterized SQL, and secret encapsulation verified. |
-| **F25** | **UI/UX Design** | Visual Identity & Layout | **Partially working** | Needs complete transformation to Linear/Vercel/Sentry-grade developer design system: deep midnight navy/slate palette, semantic tokens, collapsible technical sidebar, dedicated pages for Landing, Dashboard, Test Config, Live Execution, Run Details, Findings, Reports, and Settings. |
+The Vercel build log identifies TypeScript errors in `frontend/src/App.tsx`: unused `Moon`, `Sun` imports and an unused destructured theme state. This branch removes the obsolete App-local theme state and consolidates theme handling in a shared provider.
 
----
+The last main-branch Android emulator smoke run failed on an Appium/UiAutomator2 stale-element reference during the primary-action journey. This branch adds locator re-resolution and retry coverage.
 
-## 3. UI/UX Transformation Objectives
+## 3. Feature classification
 
-To elevate BharatSim to a Tier-1 developer SaaS platform comparable to **Linear**, **Vercel**, **Sentry**, and **Datadog**:
+| Area | Classification | Evidence and limitation |
+|---|---|---|
+| Supabase email/password auth | Implemented; live user journey not independently verified | Sign-in, sign-up, session refresh and sign-out code exist. Real-user/two-tenant production verification remains outstanding. |
+| Password reset / verification UX | Partial | Auth API support exists, but a complete, polished recovery and resend flow is not delivered. |
+| Tenant isolation / RLS | Implemented in migrations; production verification blocked | Owner-scoped API queries and RLS policies exist. Live PostgreSQL is unavailable, so do not claim production RLS verification. |
+| APK validation | Implemented in code | Client/server validation and metadata extraction exist; production upload is disabled by unavailable database/storage. |
+| Private APK storage | Awaiting external infrastructure | Signed upload flow exists; production storage capability is false. |
+| Persona catalogue | Working | API returns configured profiles. A profile describes requested settings; it is not proof that every constraint was applied. |
+| Test registration | Partial / production disabled | Registration code exists, but production database and worker prerequisites are unavailable. |
+| Android install / launch | Implemented in runner; production execution disabled | ADB install and launch logic exists. No production worker is registered. |
+| Monkey exploration | Implemented in runner | Bounded UI exploration exists; it is not an isolated per-job sandbox. |
+| Gfxinfo / meminfo telemetry | Implemented in runner | Jank and PSS collection code exists. These values only exist for runs where the worker actually captured them. |
+| Network latency / bandwidth | Partial | Emulator controls include set/readback and CI exercises a bounded fixture proxy. Production device traffic fidelity is not verified. |
+| Packet loss / outage / CPU shaping | Unsupported / not verified | Do not advertise these as applied constraints. |
+| Run comparison | Implemented in code; gated by this branch | PR #131 fixed the `result_json` query, owner scoping, completed-run checks and measured-metric-only comparison. This branch disables the feature when persistent database capability is false and filters selectors to completed runs. |
+| Logcat analysis | Working as a stateless API feature | Analysis endpoint and evidence-linked findings exist. The Playwright analysis-screen journey remains a failing test and is being instrumented with response/body and browser-error diagnostics. |
+| ML failure classifier | Partial | Portable TF-IDF class-centroid classifier trained on a small curated set (58 examples). Reported 100% accuracy is resubstitution on the training set, not independent holdout accuracy. |
+| Anomaly detection | Partial | Explicit metric thresholds and a pure-Python z-score heuristic; not IsolationForest or a validated multivariate ML model. |
+| Evaluator quick tour | Working as a fixture experience | Curated scenarios are sample logcat/metrics, not APK executions or authentic device evidence. |
+| Sarvam explanation | Partial | Remediation explanations use deterministic rule-based templates; they are not generative Sarvam root-cause analysis. |
+| Sarvam translation / Bulbul TTS | Awaiting provider credentials | Server endpoints exist. Real provider output requires server-side `SARVAM_API_KEY`; silent fixture WAVs must never be represented as speech. |
+| Landing page | Implemented; copy corrected on this branch | Public route and product preview exist. Preview data is labelled as illustrative; unsupported performance and network claims are removed. |
+| Dashboard | Partial | Uses API run/worker/persona data. This branch removes the fabricated default readiness score and labels fallback persona definitions. |
+| Test configuration wizard | Partial | APK selection/validation and upload capability gating exist. Worker settings not accepted by the run API are now read-only and explicitly identified as fixed defaults. |
+| Run detail / history | Partial | Existing run detail and history flows exist; complete server-side pagination, date/persona filters and full compare/report workflows remain incomplete. |
+| Findings / Reports | Partial | Findings are available through analysis/run evidence. Dedicated resource pages and full PDF export are not delivered. |
+| Settings | Partial | Theme and language preferences are local. Account, quota, RLS, storage, worker and TTS status are now displayed from actual capability data or explicitly marked unverified. |
+| Theme | Implemented on this branch | Shared ThemeProvider, persistent light/dark selection, pre-paint bootstrap and browser theme-color synchronization. |
+| Accessibility / motion | Partial | Reduced-motion and focus treatments exist; full WCAG audit and screen-reader journey are outstanding. |
 
-1. **Design System & Semantic Palette**:
-   - Modern dark mode and crisp light mode with persisted theme toggle.
-   - Deep obsidian/midnight canvas (`#0b0f17`), graphite surfaces (`#121824`), slate borders (`#1e293b`), crisp white text (`#f8fafc`), electric cyan/blue accents (`#38bdf8`), restrained emerald (`#10b981`), amber warning (`#f59e0b`), and crimson error (`#ef4444`).
-2. **Dedicated Modular Page Structure**:
-   - **Modern Landing Page**: High-impact developer hero, interactive architecture diagram, live persona comparison grid, and platform features.
-   - **Dedicated Dashboard**: Telemetry overview, execution metrics, failure category distribution, live worker heartbeats, and quick action cards.
-   - **New Test Configuration & APK Upload**: Drag-and-drop zone, metadata inspector (package, SDK, hash), persona cards, and execution parameters.
-   - **Live Execution Monitor**: Multi-stage progress tracking (Queued $\to$ Worker Assigned $\to$ Provisioning $\to$ Installing $\to$ Launching $\to$ Shaping $\to$ Exploring $\to$ Telemetry $\to$ ML Analysis $\to$ Completed), live terminal logcat feed, and event timeline.
-   - **Technical Run Details & Findings**: Tabbed interface (Overview, Metrics, Telemetry & Logs, ML Predictions, Diagnostics, Network & Conditions, Timeline) with search, filter, and severity grouping.
-   - **Comprehensive Report View**: Bharat Readiness Score ring, category breakdown, Sarvam AI Indic translation, Bulbul TTS audio playback, and PDF/JSON export.
-   - **Execution History**: Searchable, filterable table with run comparison.
-   - **Settings & Preferences**: User profile, theme mode toggle (Dark/Light), audio preferences, and API configuration.
-3. **Typography & Layout**:
-   - Clean geometric sans-serif for UI (`Inter`, system UI font stack) and high-legibility monospace (`JetBrains Mono`, `Fira Code`) for logcat, hashes, and technical metrics.
-   - Collapsible sidebar with active indicator pills and mobile responsive drawer.
+## 4. Recent UI integration review
 
+The latest main integration added:
+- Public landing page and product preview.
+- Dashboard overview and dedicated test wizard.
+- Run comparison view and settings view.
+- Sidebar/topbar navigation and theme context.
+
+The review found misleading or inert UI that this branch corrects:
+- Removed the hardcoded readiness score of 85 when no report exists.
+- Replaced fabricated landing-preview jank, memory and confidence values with “available after a real worker run”.
+- Removed unsupported claims about 8% packet loss, CPU throttling and 100% holdout classifier accuracy.
+- Made the public landing route accessible before sign-in and made its planner CTA enter the explicit UI-only preview.
+- Replaced fake account UUID, quota, “RLS enforced”, “TTS online” and storage claims with capability-backed or explicitly unverified states.
+- Made unsupported per-run worker overrides read-only and explained that the current API does not accept them.
+- Restricted comparison selectors to completed runs and disabled comparison when persistent database support is unavailable.
+- Consolidated theme state into one shared provider so the topbar and settings view cannot drift.
+
+## 5. Current branch remediation
+
+This branch includes:
+- Capability flags: TTS/translation require a configured server-side Sarvam key; run comparison requires persistent database availability.
+- Voice controls check the actual capability endpoint and remain disabled when TTS is not configured.
+- Telemetry percentage parsing accepts unit-suffixed values such as `90 MB`.
+- Appium smoke actions re-resolve stale UiAutomator2 elements and retry; unit tests cover click and text-read recovery.
+- Playwright analysis tests assert the actual POST response shape and capture browser errors/body text if the result route fails.
+- Public landing access and preview activation work without creating an API identity.
+- Accurate product copy and status surfaces replace synthetic metrics and unsupported claims.
+
+## 6. Release blockers
+
+These are not code-only tasks and cannot be truthfully marked complete from this chat:
+
+1. Provision and verify production PostgreSQL and private Supabase Storage.
+2. Verify Auth, RLS and owner isolation with separate real passenger/tenant identities.
+3. Provision an isolated Android worker with per-job VM/container isolation, restricted egress, worker credentials, heartbeat and cleanup.
+4. Verify real APK upload, installation, launch, telemetry and artifact persistence end-to-end.
+5. Configure `SARVAM_API_KEY` in the server environment and verify real translation/TTS output.
+6. Fix the remaining Playwright analysis-screen failure and obtain a successful Android emulator smoke run.
+7. Verify the exact merged SHA builds and deploys successfully on Vercel.
+8. Complete PDF export, password recovery UX, dedicated findings/reports pages, server-side history filters/pagination and persistent user settings.
+9. Validate classifier performance on a held-out, independently labelled dataset and publish a model version/validation record.
+10. Perform an independent security and accessibility review.
+
+**Safety gate:** Public arbitrary APK execution must remain disabled until isolated workers, storage boundaries, tenant authorization and default-deny egress are independently verified.
