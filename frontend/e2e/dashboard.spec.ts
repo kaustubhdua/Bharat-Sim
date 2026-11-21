@@ -68,7 +68,13 @@ test("log analysis reports findings from submitted evidence and preserves source
     "01-01 00:00:01.001 100 100 E AndroidRuntime: java.lang.OutOfMemoryError: Failed allocation",
   ].join("\n");
   await page.getByPlaceholder("Paste Android logcat output here…").fill(input);
+  const analysisResponse = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/analyze/logs") && response.request().method() === "POST"
+  );
   await page.getByRole("button", { name: "Analyze evidence" }).click();
+  const response = await analysisResponse;
+  expect(response.status(), await response.text()).toBe(200);
+  await expect(page).toHaveURL(/\\/analysis$/);
 
   await expect(page.getByRole("heading", { name: "Log analysis results" })).toBeVisible();
   await expect(page.getByText("Signals detected in supplied logs")).toBeVisible();
