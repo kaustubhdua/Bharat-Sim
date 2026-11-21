@@ -11,7 +11,11 @@ import {
   type TestSpec
 } from "../speak";
 
-export type SubmitRunOptions = { personaId: string; scenario: ReturnType<typeof runScenarioPayload> };
+export type SubmitRunOptions = {
+  personaId: string;
+  customPersona?: Record<string, unknown> | null;
+  scenario: ReturnType<typeof runScenarioPayload>;
+};
 
 interface SpeakToTestViewProps {
   personas: Persona[];
@@ -116,6 +120,10 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
         setWorking("transcribe");
         try {
           const result = await transcribeVoice(blob);
+          if (!result.transcript.trim()) {
+            setError("Sarvam did not hear any speech in that recording. Check that the right microphone is selected, speak for a few seconds, then stop.");
+            return;
+          }
           setText(result.transcript);
           setTranscriptNote(`Sarvam ${result.model} heard ${result.language_code || "an Indian language"} in ${result.latency_ms} ms.`);
           if (result.transcript.trim().length >= 3) await interpret(result.transcript);
@@ -152,7 +160,11 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
 
   async function runOwnApk() {
     if (!spec || !ownApk) return;
-    await onSubmitRun(ownApk, { personaId: spec.execution.persona_id, scenario: runScenarioPayload(spec, spec.execution.scenario_id) });
+    await onSubmitRun(ownApk, {
+      personaId: spec.execution.persona_id,
+      customPersona: spec.execution.custom_persona ?? null,
+      scenario: runScenarioPayload(spec, spec.execution.scenario_id)
+    });
   }
 
   return (
@@ -248,6 +260,18 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
             </div>
           )}
 
+          {spec.symptom && spec.execution.mode !== "scenario" && (
+            <div className="spec-block symptom-block">
+              <b>Problem to check</b>
+              <span>{spec.symptom_label}</span>
+              <small>
+                {spec.symptom_checkable
+                  ? "After the run, BharatSim checks whether this actually happened, then explains why and how to fix it."
+                  : "This can't be detected automatically on any app; the run reports what it did observe and explains it."}
+              </small>
+            </div>
+          )}
+
           <div className="spec-grid">
             <div className="spec-block">
               <b>Conditions</b>
@@ -316,10 +340,10 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
           {spec.execution.eligible && (
             <div className="spec-run">
               <div>
-                <div className="section-kicker">YOUR OWN APK</div>
+                <div className="section-kicker">{spec.execution.mode === "scenario" ? "YOUR OWN APK" : "RUN IT ON YOUR APK"}</div>
                 <p>{spec.execution.mode === "scenario"
                   ? "Your APK gets the generic baseline vs persona run; the scenario assertions need the BharatPay Mock fixture and will be reported as blocked for other apps."
-                  : "Runs the baseline vs persona comparison on your APK with this plan attached to the report."}</p>
+                  : `Choose your APK. BharatSim runs it ${spec.execution.custom_persona ? "under the conditions you described" : "on the budget phone"}, compares it with a normal phone, then the run page shows whether the problem happened, why, and how to fix it.`}</p>
               </div>
               <div className="spec-run-actions">
                 <input type="file" accept=".apk,application/vnd.android.package-archive" aria-label="Choose your APK"
