@@ -50,7 +50,7 @@ import NewTestWizard from "./components/NewTestWizard";
 import CompareRunsView from "./components/CompareRunsView";
 import SettingsView from "./components/SettingsView";
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
-import { isDemoMode, readSession } from "./auth";
+import { enterDemoMode, isDemoMode, readSession } from "./auth";
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
 // API_DOCS_URL kept for future use
@@ -569,6 +569,7 @@ export default function App() {
                 <LandingPage
                   onStartTesting={() => navigate("/new-test")}
                   onExplorePlanner={() => {
+                    enterDemoMode();
                     navigate("/");
                     window.setTimeout(() => {
                       document.getElementById("risk-planner")?.scrollIntoView({ behavior: "smooth", block: "center" });
