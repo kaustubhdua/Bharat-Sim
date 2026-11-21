@@ -268,6 +268,23 @@ def test_run_comparison_rejects_missing_measured_metrics(monkeypatch):
     assert exc.value.status_code == 422
 
 
+def test_sarvam_key_supports_legacy_server_variable(monkeypatch):
+    monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.setenv("sarvam_api", "legacy-server-key-value-123")
+    assert main_module.get_sarvam_api_key() == "legacy-server-key-value-123"
+
+    monkeypatch.setenv("SARVAM_API_KEY", "preferred-server-key-value-456")
+    assert main_module.get_sarvam_api_key() == "preferred-server-key-value-456"
+
+
+def test_capabilities_enable_sarvam_when_legacy_server_key_is_configured(monkeypatch):
+    monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.setenv("sarvam_api", "legacy-server-key-value-123")
+    data = main_module.capabilities()
+    assert data["sarvam_translation"] is True
+    assert data["sarvam_audio_tts"] is True
+
+
 def test_capabilities_disable_unconfigured_provider_and_database_features(monkeypatch):
     monkeypatch.delenv("SARVAM_API_KEY", raising=False)
     monkeypatch.delenv("sarvam_api", raising=False)
