@@ -14,11 +14,11 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
           <CircleAlert size={17} />
         </span>
         <div className="finding-title">
-          <span className="finding-kind">{f.kind.toUpperCase() + " · " + f.id}</span>
+          <span className="finding-kind">{(f.kind || "finding").toUpperCase() + " · " + f.id}</span>
           <h3>{f.title}</h3>
         </div>
         <div className="finding-badges">
-          {f.ml_classification && (
+          {f.ml_classification && typeof f.ml_classification === "object" && f.ml_classification.category && (
             <span className="ml-badge" title={`Confidence: ${(f.ml_classification.confidence * 100).toFixed(1)}%`}>
               <Brain size={12} /> ML: {f.ml_classification.category.toUpperCase()} ({Math.round(f.ml_classification.confidence * 100)}%)
             </span>
@@ -35,7 +35,7 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
         <div>
           <FileSearch size={14} /> SOURCE EVIDENCE
         </div>
-        {f.evidence.map((ev, i) => (
+        {(Array.isArray(f.evidence) ? f.evidence : []).map((ev, i) => (
           <code key={i}>{"L" + ev.line + ": " + ev.text}</code>
         ))}
       </div>
@@ -52,7 +52,7 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
           <summary>Root-cause hypothesis · {f.root_cause_hypothesis.confidence} confidence</summary>
           <p>{f.root_cause_hypothesis.statement}</p>
           <b>Validation steps</b>
-          <ol>{f.root_cause_hypothesis.validation_steps.map((step) => <li key={step}>{step}</li>)}</ol>
+          <ol>{(f.root_cause_hypothesis.validation_steps || []).map((step) => <li key={step}>{step}</li>)}</ol>
         </details>
       ) : null}
 
