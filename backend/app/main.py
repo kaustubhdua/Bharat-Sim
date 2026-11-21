@@ -2395,7 +2395,7 @@ def translate_report(payload: SarvamTranslationRequest):
     """Translate a user-requested, condensed report summary via Sarvam AI."""
     if not payload.text.strip():
         raise HTTPException(status_code=422, detail="Translation text cannot be blank.")
-    if len(os.getenv("SARVAM_API_KEY", "").strip()) < 16:
+    if len(get_sarvam_api_key()) < 16:
         raise HTTPException(status_code=503, detail="Sarvam translation is not configured on this server.")
     try:
         return {
@@ -2426,14 +2426,14 @@ def text_to_speech(payload: SarvamAudioRequest):
 
 @app.post("/api/v1/explain/failure")
 def explain_failure(payload: ExplainFailureRequest):
-    """Generate plain-language developer remediation and code fixes using Sarvam AI."""
+    """Return deterministic developer guidance templates; optional Hindi text may be translated by Sarvam."""
     persona_name = PERSONAS.get(payload.persona_id, {}).get("name", "Budget Android")
     return explain_failure_with_sarvam(payload.category, payload.evidence, persona_name, payload.language_code)
 
 
 @app.get("/api/v1/evaluator/scenarios")
 def list_evaluator_scenarios():
-    """Return pre-packaged, authenticated demonstration scenarios for rapid evaluation."""
+    """Return the allowlisted scenario catalog with executable/planned status."""
     return {"items": get_all_scenarios()}
 
 
