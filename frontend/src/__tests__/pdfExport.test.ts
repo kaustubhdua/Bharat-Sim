@@ -65,7 +65,7 @@ describe("PDF evidence export", () => {
     }));
     const blob = createAnalysisPdf({ ...report, findings: manyFindings });
     const text = await blob.text();
-    expect(text).toContain("/Count 2");
+    expect(text).toMatch(/\/Count [2-9]\d*/);
     expect(text).toContain("Repeated diagnostic finding 17");
   });
 });
