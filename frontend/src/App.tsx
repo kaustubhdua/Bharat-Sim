@@ -606,10 +606,26 @@ export default function App() {
             <Route
               path="/compare"
               element={
-                <CompareRunsView
-                  runs={runs}
-                  onBack={() => navigate("/")}
-                />
+                previewMode ? (
+                  <section className="panel full-panel">
+                    <div className="empty-state">
+                      <ShieldCheck size={26} />
+                      <b>Private run comparison</b>
+                      <p>Sign in to compare owner-scoped completed runs.</p>
+                    </div>
+                  </section>
+                ) : capabilities?.run_comparison === true ? (
+                  <CompareRunsView runs={runs} onBack={() => navigate("/")} />
+                ) : (
+                  <section className="panel full-panel">
+                    <div className="empty-state">
+                      <CircleAlert size={26} />
+                      <b>Run comparison unavailable</b>
+                      <p>Persistent PostgreSQL is not configured for this deployment. Comparison is disabled rather than generating sample metrics.</p>
+                      <button type="button" className="secondary-button" onClick={() => navigate("/")}>Back to overview</button>
+                    </div>
+                  </section>
+                )
               }
             />
 
