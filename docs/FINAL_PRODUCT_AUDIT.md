@@ -27,6 +27,10 @@ This audit supersedes older product-status snapshots in this file. For detailed 
 - Controlled BharatPay original/fixed sample APKs.
 - Live Sarvam interpretation, translation and audio require a correctly configured server-side key and a real provider response. A fixture/fallback must not be described as live Sarvam output.
 
+### Personal laptop workers
+
+The current main line adds Connect a Laptop: signed-in users can mint a personal worker key, see connected laptops, revoke keys and use Windows/macOS/Linux installers. The supervisor restarts the emulator/worker process and defaults to the full engine mode. This improves the real user workflow and allows a user's laptop to run only that user's jobs, but it is still user-hosted execution—not per-job microVM isolation, a default-deny network boundary or proof of production safety. Installer/update integrity and cross-OS acceptance remain to be tested.
+
 ### Android worker
 Two modes must not be conflated:
 - Default legacy smoke mode installs/launches an APK and captures bounded logcat evidence. It has a narrower set of emulator control-plane features.
