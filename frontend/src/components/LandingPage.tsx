@@ -33,19 +33,19 @@ export default function LandingPage({
   const faqs = [
     {
       q: "How does BharatSim simulate real Indian network conditions?",
-      a: "BharatSim configures QEMU emulator console network latency and bandwidth shaping alongside host-side HTTP CONNECT proxy throttles (e.g. 450ms RTT, 256kbps bandwidth, and 8% packet drops for Edge Village; 250ms RTT for Crowded Station). Every condition is verified through control-plane readback."
+      a: "The current emulator controls can set and read back latency and bandwidth. Packet loss, outage/recovery and CPU constraints are not supported, and arbitrary APK traffic fidelity is not verified. CI also exercises a bounded fixture proxy path; that is not proof of production device traffic."
     },
     {
       q: "What is the Bharat Readiness Score?",
-      a: "The Bharat Readiness Score (0–100) is a transparent, evidence-derived heuristic evaluated from captured crash dumps, ANR traces, jank frame percentages (dumpsys gfxinfo), and peak PSS memory usage (dumpsys meminfo) under constrained hardware profiles."
+      a: "The Bharat Readiness Score is a transparent heuristic based only on signals actually present in submitted logcat or worker evidence. Missing telemetry is not imputed; it is not a certification or a prediction of real-world user impact."
     },
     {
       q: "How does the Machine Learning failure classifier work?",
-      a: "BharatSim uses a portable zero-DLL TF-IDF centroid vector classifier trained on authentic Android logcat failure signatures. It categorizes crashes, ANRs, OOMs, and network timeouts in sub-millisecond time with 100% precision on holdout traces."
+      a: "BharatSim uses a portable TF-IDF class-centroid classifier trained on a small curated set of Android logcat examples. The reported 100% figure is training-set resubstitution, not independent holdout accuracy. Treat the category as a triage hint and verify the linked source evidence."
     },
     {
       q: "How is Sarvam AI integrated into the testing workflow?",
-      a: "Sarvam AI translates diagnostic reports into regional Indian languages (Hindi, Tamil, Marathi) and generates audio diagnostic briefings via the Bulbul TTS speech synthesis engine (`bulbul:v1`), alongside automated defensive code remedies."
+      a: "Sarvam translation and Bulbul TTS are provider-backed features that require a server-side SARVAM_API_KEY. Remediation text currently comes from deterministic rule-based templates; BharatSim does not claim a generative Sarvam root-cause diagnosis."
     }
   ];
 
@@ -65,8 +65,7 @@ export default function LandingPage({
         </h1>
 
         <p className="landing-hero-subtitle">
-          Find crashes, slowdowns, and connectivity failures before your users do.
-          Simulate 2GB RAM budget hardware, rural 2G/3G connectivity, and peak urban cell tower congestion with genuine Android ADB automation.
+          Inspect Android logs and, when an isolated worker is configured, exercise APKs against supported device and network profiles. Review evidence from actual runs rather than synthetic dashboard metrics.
         </p>
 
         <div className="landing-cta-group">
@@ -117,7 +116,7 @@ export default function LandingPage({
             </div>
             <div className="preview-status-pill">
               <span className="pulse-green" />
-              <span>LIVE PIPELINE</span>
+              <span>INTERACTIVE PRODUCT PREVIEW · NO APK EXECUTION</span>
             </div>
           </div>
 
@@ -143,52 +142,50 @@ export default function LandingPage({
 
               <div className="constraint-readout-box">
                 <div className="readout-row">
-                  <span>RAM Ceiling:</span>
+                  <span>Target RAM profile:</span>
                   <strong>{selectedPersona.ram_mb} MB (2GB class)</strong>
                 </div>
                 <div className="readout-row">
-                  <span>Network Latency:</span>
-                  <strong className="text-warning">+{selectedPersona.latency_ms} ms injected</strong>
+                  <span>Target network latency:</span>
+                  <strong className="text-warning">+{selectedPersona.latency_ms} ms (applied only on a configured worker)</strong>
                 </div>
                 <div className="readout-row">
-                  <span>Throughput Cap:</span>
+                  <span>Target throughput:</span>
                   <strong>{selectedPersona.down_kbps} kbps down / {selectedPersona.up_kbps} kbps up</strong>
                 </div>
                 <div className="readout-row">
-                  <span>Packet Drop:</span>
-                  <strong className={selectedPersona.packet_loss_pct > 0 ? "text-danger" : ""}>
-                    {selectedPersona.packet_loss_pct}% loss
-                  </strong>
+                  <span>Packet loss:</span>
+                  <strong className="text-muted">Not applied by the current worker</strong>
                 </div>
                 <div className="readout-row">
-                  <span>Battery Saver:</span>
-                  <strong>{selectedPersona.battery_saver ? "Enabled (CPU Throttled)" : "Disabled"}</strong>
+                  <span>Battery-saver target:</span>
+                  <strong>{selectedPersona.battery_saver ? "Requested; CPU throttling not verified" : "Not requested"}</strong>
                 </div>
               </div>
             </div>
 
             <div className="preview-pane-right">
-              <h4>Real-Time Subsystem Telemetry</h4>
+              <h4>Telemetry available after a real worker run</h4>
               <div className="telemetry-display-grid">
                 <div className="telemetry-stat-card">
                   <span className="stat-label"><Gauge size={13} /> Jank Frames (gfxinfo)</span>
-                  <strong className="stat-value text-warning">28.4%</strong>
-                  <span className="stat-sub">&gt; 16.6ms UI frame deadline</span>
+                  <strong className="stat-value text-muted">—</strong>
+                  <span className="stat-sub">Available when gfxinfo is captured</span>
                 </div>
                 <div className="telemetry-stat-card">
                   <span className="stat-label"><Cpu size={13} /> Peak PSS Memory</span>
-                  <strong className="stat-value text-danger">342 MB</strong>
-                  <span className="stat-sub">High LMKD kill vulnerability</span>
+                  <strong className="stat-value text-muted">—</strong>
+                  <span className="stat-sub">Available when meminfo is captured</span>
                 </div>
                 <div className="telemetry-stat-card">
                   <span className="stat-label"><Brain size={13} /> ML Classification</span>
-                  <strong className="stat-value text-accent">NETWORK_TIMEOUT</strong>
-                  <span className="stat-sub">98.2% softmax confidence</span>
+                  <strong className="stat-value text-muted">—</strong>
+                  <span className="stat-sub">Classifier output appears after log analysis</span>
                 </div>
                 <div className="telemetry-stat-card">
                   <span className="stat-label"><Sparkles size={13} /> Sarvam AI Translation</span>
-                  <strong className="stat-value text-success">Hindi / Tamil / Marathi</strong>
-                  <span className="stat-sub">Bulbul TTS audio briefing</span>
+                  <strong className="stat-value text-muted">Provider gated</strong>
+                  <span className="stat-sub">Requires SARVAM_API_KEY</span>
                 </div>
               </div>
 
