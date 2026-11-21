@@ -55,7 +55,7 @@ Legend: **Working (bounded)** means code and automated evidence support the stat
 | Evaluator quick tour | Partial | Curated scenario fixture endpoint/component exists. The endpoint returns an `items` envelope while the original frontend expected `scenarios`, and the banner was not mounted. This branch corrects the response contract, mounts it and labels scenario content as fixtures. |
 | Run comparison | Partial | Modal and endpoint exist, but audited main queried a non-existent `report_json` column, lacked owner scoping, substituted invented metrics and returned a mismatched nested contract. This branch corrects these issues and refuses comparisons without shared persisted telemetry. |
 | Settings | Missing | No dedicated settings route for profile, security, notifications, language or account management was found. |
-| Theme | Partial on audited main | Main has a dark green/graphite style system but no persistent theme selector. This branch adds navy/graphite tokens, an electric-blue accent, a persisted light/dark toggle and pre-paint theme bootstrap. |
+| Theme | Working (UI) | Merged PR #131 adds navy/graphite/electric-blue tokens, a persisted light/dark toggle and pre-paint theme bootstrap. User-level server profile sync is not implemented. |
 | Responsive design | Partial | Responsive CSS exists, but breakpoint-by-breakpoint verification at the requested 360–1920px widths was not performed. |
 | Motion system | Partial | CSS transitions and loading indicators exist. No consistent route-transition/motion system or reduced-motion audit is established. |
 | Accessibility | Partial | Some labels, live regions, focus styling and semantic elements exist. Full keyboard, screen-reader, contrast and reduced-motion audit is outstanding. |
@@ -123,7 +123,7 @@ The CI Android emulator smoke is meaningful evidence: it covers a source-built f
 
 ## Design assessment
 
-Current frontend is a dark green/graphite engineering workspace with Manrope/DM Sans/DM Mono typography, a fixed sidebar, top bar, dense dashboard panels and responsive CSS. It has an intentional identity and is not a blank template. The audited main has no persistent light theme; this branch introduces navy/graphite/blue tokens and a persistent theme toggle. The overview remains a combined workflow screen rather than a complete SaaS information architecture. A proper redesign must preserve truthful capability gating and actual API data; never replace the existing live readiness card with decorative metrics or mock device activity.
+Current frontend is a navy/graphite engineering workspace with restrained electric-blue accents, Manrope/DM Sans/DM Mono typography, a fixed sidebar, top bar, dense dashboard panels and responsive CSS. Merged PR #131 adds persistent local light/dark selection and pre-paint theme initialization. The overview remains a combined workflow screen rather than a complete SaaS information architecture. The overview remains a combined workflow screen rather than a complete SaaS information architecture. A proper redesign must preserve truthful capability gating and actual API data; never replace the existing live readiness card with decorative metrics or mock device activity.
 
 Design work required:
 1. Separate public marketing/preview experience from the authenticated product shell.
