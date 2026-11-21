@@ -50,7 +50,7 @@ export default function SarvamTranslation({ enabled, text }: Props) {
       </div>
       {!enabled && (
         <p className="translation-unavailable" role="status">
-          Translation is not configured on this backend. Add SARVAM_API_KEY as a server-only environment variable to enable it.
+          Translation is not configured on this backend. Add SARVAM_API_KEY (or the legacy sarvam_api alias) as a server-only environment variable to enable it.
         </p>
       )}
       <div className="sarvam-controls">
