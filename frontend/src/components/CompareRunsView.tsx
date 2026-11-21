@@ -8,20 +8,27 @@ interface CompareRunsViewProps {
 }
 
 export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) {
-  const [baselineId, setBaselineId] = useState<string>(() => {
-    const base = runs.find((r) => r.persona_id === "baseline");
-    return base ? base.id : runs[0]?.id || "";
-  });
-  const [constrainedId, setConstrainedId] = useState<string>(() => {
-    const constr = runs.find((r) => r.persona_id !== "baseline");
-    return constr ? constr.id : runs[1]?.id || "";
-  });
+  const completedRuns = runs.filter((run) => run.status === "completed");
+  const [baselineId, setBaselineId] = useState<string>("");
+  const [constrainedId, setConstrainedId] = useState<string>("");
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!baselineId && completedRuns.length > 0) {
+      const baseline = completedRuns.find((run) => run.persona_id === "baseline") || completedRuns[0];
+      setBaselineId(baseline.id);
+    }
+    if (!constrainedId && completedRuns.length > 1) {
+      const constrained = completedRuns.find((run) => run.persona_id !== "baseline" && run.id !== baselineId)
+        || completedRuns.find((run) => run.id !== baselineId);
+      if (constrained) setConstrainedId(constrained.id);
+    }
+  }, [runs, baselineId, constrainedId]);
+
   const handleCompare = async () => {
-    if (!baselineId || !constrainedId) {
+    if (!baselineId || !constrainedId || baselineId === constrainedId) {
       setError("Please select both a baseline and a constrained run to compare.");
       return;
     }
@@ -37,12 +44,6 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
     }
   };
 
-  useEffect(() => {
-    if (baselineId && constrainedId) {
-      void handleCompare();
-    }
-  }, []);
-
   return (
     <div className="panel full-panel compare-view-panel">
       <div className="panel-heading">
@@ -53,7 +54,7 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
           <div className="section-kicker">COMPARATIVE TELEMETRY</div>
           <h2>Baseline vs. Constrained Anomaly Regression</h2>
           <p>
-            Evaluate performance degradation by comparing your app under normal conditions (Android 14, 6GB RAM, 4G) versus a target BharatSim constrained persona.
+            Compare only telemetry captured in two completed worker reports. Missing measurements are not imputed; comparison is unavailable when persistent run storage is offline.
           </p>
         </div>
         <div className="panel-icon">
@@ -61,6 +62,13 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
         </div>
       </div>
 
+      {completedRuns.length < 2 ? (
+        <div className="empty-state">
+          <div className="empty-icon"><GitCompare size={22} /></div>
+          <b>Two completed runs are required</b>
+          <p>Only worker-confirmed completed runs with shared measured telemetry can be compared.</p>
+        </div>
+      ) : (
       <div className="comparison-config-card">
         <div className="comparison-selectors">
           <div className="selector-group">
@@ -70,7 +78,7 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
               value={baselineId}
               onChange={(e) => setBaselineId(e.target.value)}
             >
-              {runs.map((r) => (
+              {completedRuns.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.apk_name || "APK"} · {r.persona_id} ({r.id.slice(0, 8)})
                 </option>
@@ -106,10 +114,11 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
             onClick={() => void handleCompare()}
           >
             {loading ? <LoaderCircle size={15} className="spin" /> : <GitCompare size={15} />}
-            {loading ? "Computing Covariance Scores…" : "Execute Multivariate Anomaly Comparison"}
+            {loading ? "Comparing measured telemetry…" : "Compare measured telemetry"}
           </button>
         </div>
       </div>
+      )}
 
       {error && <div className="alert error-alert">{error}</div>}
 
@@ -123,7 +132,7 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
               <h3>{result.verdict}</h3>
               <p>{result.details}</p>
               <small>
-                Multivariate statistical covariance divergence score: <b>{result.anomaly_score.toFixed(1)}</b> / 100
+                Statistical anomaly score: <b>{result.anomaly_score.toFixed(1)}</b> / 100
               </small>
             </div>
           </div>
@@ -153,6 +162,7 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
                   <TrendingUp size={12} />
                   <span>{an.delta_pct >= 0 ? `+${an.delta_pct}%` : `${an.delta_pct}%`} divergence</span>
                 </div>
+                {an.explanation && <p className="anomaly-explanation">{an.explanation}</p>}
               </div>
             ))}
           </div>
