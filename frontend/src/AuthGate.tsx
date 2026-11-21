@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Activity, ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
 import { authConfigured, enterDemoMode, exitDemoMode, isDemoMode, readSession, refreshSession, signIn, signOut, signUp, type UserSession } from "./auth";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const [session, setSession] = useState<UserSession | null>(() => authConfigured ? readSession() : null);
   const [demoMode, setDemoMode] = useState(() => isDemoMode());
   const [checking, setChecking] = useState(authConfigured);
@@ -45,6 +47,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [session]);
 
+  if (!session && location.pathname === "/landing") return <>{children}</>;
   if (!authConfigured) return <>{children}</>;
   if (checking) return <div className="auth-screen"><LoaderCircle className="auth-spin" /><p>Restoring secure session…</p></div>;
 
@@ -102,6 +105,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
           <button className="auth-submit" disabled={busy}>{busy ? <LoaderCircle className="auth-spin" size={17} /> : <>{signupMode ? "Create account" : "Sign in"} <ArrowRight size={16} /></>}</button>
         </form>
         <button className="auth-switch" onClick={() => { setSignupMode(!signupMode); setError(""); setNotice(""); }}>{signupMode ? "Already have an account? Sign in" : "New to BharatSim? Create an account"}</button>
+        <Link className="auth-landing-link" to="/landing">Explore the BharatSim product tour <ArrowRight size={14} /></Link>
         {!signupMode && <button className="auth-demo-button" onClick={() => { enterDemoMode(); setDemoMode(true); setError(""); }}>Explore public planner preview <ArrowRight size={15} /></button>}
         <small className="auth-foot">Your session is kept in this browser tab and refreshed before expiry. Never share your password or access token.</small>
       </section>
