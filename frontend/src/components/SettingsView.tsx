@@ -82,7 +82,7 @@ export default function SettingsView({ capabilities, apiStatus }: SettingsViewPr
             <h3>Sarvam AI Indic Language Preference</h3>
           </div>
           <p>
-            Select your default regional language for automated diagnostic briefings and Bulbul TTS voice synthesis.
+            Select the default language for provider-backed report translation and voice briefings when SARVAM_API_KEY is configured.
           </p>
           <div className="lang-options-grid">
             {[
