@@ -258,3 +258,18 @@ def test_run_comparison_rejects_missing_measured_metrics(monkeypatch):
             _comparison_request("owner-a"),
         )
     assert exc.value.status_code == 422
+
+
+def test_capabilities_disable_unconfigured_provider_and_database_features(monkeypatch):
+    monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.setattr(main_module, "requires_persistent_database", lambda: True)
+    monkeypatch.setattr(main_module, "database_is_available", lambda: False)
+    monkeypatch.setattr(main_module, "worker_dispatch_configured", lambda: False)
+    monkeypatch.setattr(main_module, "STORAGE_ENABLED", False)
+
+    data = main_module.capabilities()
+    assert data["sarvam_audio_tts"] is False
+    assert data["sarvam_translation"] is False
+    assert data["run_comparison"] is False
+    assert data["apk_upload"] is False
+    assert data["android_execution"] is False
