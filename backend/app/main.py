@@ -941,8 +941,20 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
         ev_sample = group["evidence"][0]["text"] if group["evidence"] else ""
         group["sarvam_explanation"] = explain_failure_with_sarvam(group["kind"], ev_sample, persona["name"])
         matched_confs = [m["confidence"] for m in ml_matches if m["category"] == group["kind"]]
-        group["ml_confidence"] = max(matched_confs) if matched_confs else 0.85
-        group["ml_classification"] = "ml-corroborated" if matched_confs else "heuristic-rule"
+        if matched_confs:
+            group["ml_confidence"] = max(matched_confs)
+            group["ml_classification"] = {
+                "category": group["kind"],
+                "confidence": group["ml_confidence"],
+                "algorithm": "TF-IDF weighted class-centroid classifier (portable pure Python)",
+            }
+            group["classification_method"] = "ml_corroborated"
+        else:
+            # Keep deterministic rule detections distinct from model output.
+            # Never invent a confidence value for an uncorroborated finding.
+            group["ml_confidence"] = None
+            group["ml_classification"] = None
+            group["classification_method"] = "deterministic_rule"
         findings.append(group)
 
     critical = sum(1 for item in findings if item["severity"] == "critical")
