@@ -42,7 +42,7 @@ The host proxy affects only traffic using Android's system proxy. A zero-connect
 
 ### PR #138 base verification
 - CI run [44957776493](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44957776493) passed all seven jobs: backend, PostgreSQL integration, worker guards, frontend, frontend E2E, unified build and container build.
-- Android emulator smoke [44957776524](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44957776524) passed on the same code line.
+- Android emulator smoke [44957776524](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44957776524) passed on the same code line. This workflow builds a source-built probe app and verifies proxy traffic; it does not run a customer APK through the full worker pipeline.
 - The PostgreSQL job now creates the minimal Supabase-compatible roles/storage metadata and applies every timestamped BharatSim migration from a clean database.
 - The Android preflight verifies route and TCP reachability to the host proxy, not merely that Android reports an active network.
 
