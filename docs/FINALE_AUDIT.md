@@ -1,3 +1,5 @@
+> Historical audit snapshot (21 Nov 2026). This file records evidence from a prior deployment and is not the current release decision. Its VERIFIED WORKING labels do not establish current production readiness. Use [docs/FINAL_PRODUCT_AUDIT.md](FINAL_PRODUCT_AUDIT.md), [docs/MASTER_FEATURE_INVENTORY.md](MASTER_FEATURE_INVENTORY.md) and [docs/PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for current status.
+
 # BharatSim finale audit (21 Nov 2026)
 
 Audited commit `9699864` on `kaustubhdua/Bharat-Sim` main, live at https://bharatsim.onrender.com.
