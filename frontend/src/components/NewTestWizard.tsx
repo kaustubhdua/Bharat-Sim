@@ -15,6 +15,7 @@ interface NewTestWizardProps {
   onSelectPersona: (id: string) => void;
   busy: boolean;
   uploadAvailable: boolean;
+  maxUploadMb?: number;
   lockedReason?: string;
   onSubmit: (apkFile: File) => Promise<void>;
   onCancel: () => void;
@@ -26,6 +27,7 @@ export default function NewTestWizard({
   onSelectPersona,
   busy,
   uploadAvailable,
+  maxUploadMb = 150,
   lockedReason,
   onSubmit,
   onCancel
@@ -58,8 +60,8 @@ export default function NewTestWizard({
       return;
     }
 
-    if (file.size > 150 * 1024 * 1024) {
-      setValidationError("File exceeds maximum allowed upload size of 150 MB.");
+    if (file.size > maxUploadMb * 1024 * 1024) {
+      setValidationError(`File exceeds the configured maximum upload size of ${maxUploadMb} MB.`);
       return;
     }
 
@@ -197,7 +199,7 @@ export default function NewTestWizard({
               <div className="upload-placeholder">
                 <Upload size={32} />
                 <b>Drag and drop your Android APK here, or click to browse</b>
-                <p>Supports .apk packages up to 150 MB. Binary signature is validated before upload.</p>
+                <p>Supports .apk packages up to {maxUploadMb} MB. Binary signature is validated before upload.</p>
               </div>
             )}
           </div>
