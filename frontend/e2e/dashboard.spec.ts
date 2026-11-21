@@ -60,6 +60,8 @@ test("dashboard connects to the real API and renders authored profiles", async (
 });
 
 test("log analysis reports findings from submitted evidence and preserves source lines", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.stack || error.message));
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
@@ -89,7 +91,14 @@ test("log analysis reports findings from submitted evidence and preserves source
   expect(analysisPayload, "Log analysis response must include evidence findings").toHaveProperty("findings");
 
   await expect(page).toHaveURL(new RegExp("/analysis$"));
-  await expect(page.getByRole("heading", { name: "Log analysis results" })).toBeVisible();
+  try {
+    await expect(page.getByRole("heading", { name: "Log analysis results" })).toBeVisible();
+  } catch (error) {
+    const bodyText = await page.locator("body").innerText().catch(() => "<body unavailable>");
+    throw new Error(
+      `Analysis result screen did not render. URL=${page.url()}\\nPage errors=${pageErrors.join("\\n")}\\nBody=${bodyText.slice(0, 3000)}\\nOriginal=${String(error)}`
+    );
+  }
   await expect(page.getByText("Signals detected in supplied logs")).toBeVisible();
   await expect(page.getByText(/SOURCE EVIDENCE/).first()).toBeVisible();
   await expect(page.getByText(/FATAL EXCEPTION/).first()).toBeVisible();
