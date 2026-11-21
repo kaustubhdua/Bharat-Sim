@@ -47,6 +47,7 @@ import Topbar from "./components/Topbar";
 import LandingPage from "./components/LandingPage";
 import DashboardOverview from "./components/DashboardOverview";
 import NewTestWizard from "./components/NewTestWizard";
+import { downloadAnalysisPdf } from "./pdfExport";
 import CompareRunsView from "./components/CompareRunsView";
 import SettingsView from "./components/SettingsView";
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
@@ -306,7 +307,12 @@ export default function App() {
     a.href = url;
     a.download = "bharatsim-analysis-" + analysis.id.slice(0, 8) + ".json";
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportReportPdf() {
+    if (!analysis) return;
+    downloadAnalysisPdf(analysis);
   }
 
   return (
@@ -724,9 +730,14 @@ export default function App() {
                       <p>Findings are heuristic signals, not confirmed root causes.</p>
                     </div>
                     {analysis && (
-                      <button className="secondary-button" onClick={exportReport}>
-                        <ArrowDownToLine size={15} /> Export JSON
-                      </button>
+                      <div className="report-export-actions">
+                        <button className="secondary-button" onClick={exportReportPdf}>
+                          <ArrowDownToLine size={15} /> Export PDF
+                        </button>
+                        <button className="secondary-button" onClick={exportReport}>
+                          <ArrowDownToLine size={15} /> Export JSON
+                        </button>
+                      </div>
                     )}
                   </div>
 
