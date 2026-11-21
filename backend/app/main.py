@@ -24,6 +24,7 @@ from .sarvam import (
     translate_report_text,
     generate_speech_audio,
     explain_failure_with_sarvam,
+    get_sarvam_api_key,
 )
 from .evidence_fusion import fuse_worker_report
 from .ml_classifier import classify_logcat_stream
@@ -2187,7 +2188,7 @@ def capabilities():
     persistent_database_required = requires_persistent_database()
     database_available = database_is_available() if persistent_database_required else True
     worker = worker_dispatch_configured()
-    sarvam_configured = len(os.getenv("SARVAM_API_KEY", "").strip()) >= 16
+    sarvam_configured = len(get_sarvam_api_key()) >= 16
     # Private APK intake can persist a run while it waits for an approved worker.
     # Execution remains independently gated by worker_dispatch_configured().
     upload_storage_available = STORAGE_ENABLED if persistent_database_required else True
