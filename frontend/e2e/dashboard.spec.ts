@@ -60,6 +60,8 @@ test("dashboard connects to the real API and renders authored profiles", async (
 });
 
 test("log analysis reports findings from submitted evidence and preserves source lines", async ({ page }) => {
+  page.on("pageerror", (error) => console.log("BROWSER PAGE ERROR:", error.stack || error.message));
+  page.on("console", (message) => { if (message.type() === "error") console.log("BROWSER CONSOLE ERROR:", message.text()); });
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
