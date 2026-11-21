@@ -3,6 +3,9 @@ import { expect, test } from "@playwright/test";
 async function installLocalWorkspaceSession(page: import("@playwright/test").Page) {
   // Non-production UI fixture, used only against the localhost E2E API.
   await page.addInitScript(() => {
+    // Seed once per isolated browser context. A localStorage sentinel survives
+    // reloads, allowing tests to clear sessionStorage and verify logout/guest gates.
+    if (localStorage.getItem("bharatsim.e2e.auth-seeded") === "1") return;
     sessionStorage.setItem("bharatsim.supabase.session", JSON.stringify({
       access_token: "playwright-local-test-token",
       refresh_token: "playwright-local-refresh-token",
@@ -10,6 +13,7 @@ async function installLocalWorkspaceSession(page: import("@playwright/test").Pag
       token_type: "bearer",
       user: { id: "11111111-1111-4111-8111-111111111111", email: "playwright@example.test" },
     }));
+    localStorage.setItem("bharatsim.e2e.auth-seeded", "1");
   });
 }
 
