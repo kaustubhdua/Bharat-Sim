@@ -250,6 +250,10 @@ export default function App() {
   }
 
   async function analyzeLogs(text = logText, personaId = selected) {
+    if (previewMode || (!readSession() && import.meta.env.PROD)) {
+      setError("Log analysis is a private workspace feature. Sign in to analyze logs and save or export reports.");
+      return;
+    }
     if (!text.trim()) {
       setError("Paste logcat output first.");
       return;
