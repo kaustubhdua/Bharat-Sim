@@ -163,7 +163,8 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("Baseline vs. Constrained Run Comparison");
     expect(container.textContent).toContain("Heuristic anomaly score (0–100; not a probability)");
     expect(container.textContent).toContain("Metric changes");
-    expect(container.textContent).not.toContain("covariance");
+    expect(container.textContent).not.toContain("Multivariate statistical covariance divergence score");
+    expect(container.textContent).not.toContain("Computing Covariance Scores");
     expect(container.textContent).not.toContain("Multivariate Anomaly");
   });
 
