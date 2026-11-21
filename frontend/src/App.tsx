@@ -965,6 +965,7 @@ export default function App() {
                       </div>
                       <SarvamTranslation
                         enabled={Boolean(capabilities?.sarvam_translation)}
+                        audioEnabled={Boolean(capabilities?.sarvam_audio_tts)}
                         text={[
                           "BharatScore: " + analysis.bharat_score.value + "/100 — " + analysis.bharat_score.label + ".",
                           ...analysis.findings.slice(0, 5).map((finding) => finding.severity + ": " + finding.title + ". " + finding.explanation + " Recommendation: " + finding.recommendation)
