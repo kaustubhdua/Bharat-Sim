@@ -238,6 +238,40 @@ def find_element(session: str, using: str, value: str, timeout: int = 25) -> str
     raise RuntimeError(f"Could not find element ({using}={value}) within {timeout}s: {last_error}")
 
 
+def click_fresh_element(session: str, using: str, value: str, timeout: int = 12) -> None:
+    """Re-resolve a locator when UiAutomator2 invalidates an element after a view update."""
+    deadline = time.monotonic() + timeout
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        element_id = find_element(session, using, value, timeout=min(5, max(1, int(deadline - time.monotonic()))))
+        try:
+            request("POST", f"/session/{session}/element/{element_id}/click", {})
+            return
+        except RuntimeError as exc:
+            if "stale element reference" not in str(exc).lower():
+                raise
+            last_error = exc
+            time.sleep(0.25)
+    raise RuntimeError(f"Could not click fresh element ({using}={value}): {last_error}")
+
+
+def read_fresh_element_text(session: str, using: str, value: str, timeout: int = 12) -> str:
+    """Read text through a freshly resolved locator, retrying stale UI references."""
+    deadline = time.monotonic() + timeout
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        element_id = find_element(session, using, value, timeout=min(5, max(1, int(deadline - time.monotonic()))))
+        try:
+            result = request("GET", f"/session/{session}/element/{element_id}/text", timeout=5)
+            return str(result.get("value", ""))
+        except RuntimeError as exc:
+            if "stale element reference" not in str(exc).lower():
+                raise
+            last_error = exc
+            time.sleep(0.25)
+    raise RuntimeError(f"Could not read fresh element text ({using}={value}): {last_error}")
+
+
 def parse_probe_text(text: str) -> dict[str, object] | None:
     match = PROBE_RE.fullmatch(text)
     if not match:
@@ -263,11 +297,11 @@ def network_probe_log_tail() -> str:
         return f"Could not collect device probe logcat: {exc}"
 
 
-def wait_for_probe(session: str, element_id: str, after_sequence: int, timeout: int = 60) -> dict:
+def wait_for_probe(session: str, using: str, value: str, after_sequence: int, timeout: int = 60) -> dict:
     deadline = time.monotonic() + timeout
     last_text = ""
     while time.monotonic() < deadline:
-        last_text = str(request("GET", f"/session/{session}/element/{element_id}/text", timeout=5).get("value", ""))
+        last_text = read_fresh_element_text(session, using, value, timeout=8)
         probe = parse_probe_text(last_text)
         if probe and int(probe["sequence"]) > after_sequence:
             if int(probe["bytes_read"]) != PROBE_BYTES:
@@ -333,10 +367,7 @@ def main() -> int:
         base = f"/session/{session_id}"
         dismiss_system_dialogs()
 
-        action_id = find_element(session_id, "accessibility id", "primary-action")
-        status_id = find_element(session_id, "accessibility id", "journey-status")
-        probe_id = find_element(session_id, "accessibility id", "network-probe-status")
-        status_text = request("GET", base + f"/element/{status_id}/text").get("value")
+        status_text = read_fresh_element_text(session_id, "accessibility id", "journey-status")
         if status_text != "Ready":
             raise RuntimeError(f"Fixture did not start in the expected Ready state: {status_text!r}")
 
@@ -349,11 +380,11 @@ def main() -> int:
             last_sequence = previous_sequence
             for _ in range(3):
                 before_event_id = int(proxy_metrics()["last_event_id"])
-                request("POST", base + f"/element/{action_id}/click", {})
-                status = request("GET", base + f"/element/{status_id}/text").get("value")
+                click_fresh_element(session_id, "accessibility id", "primary-action")
+                status = read_fresh_element_text(session_id, "accessibility id", "journey-status")
                 if status != "Primary action completed":
                     raise RuntimeError(f"Primary action state assertion failed during {label}: {status!r}")
-                probe = wait_for_probe(session_id, probe_id, after_sequence=last_sequence)
+                probe = wait_for_probe(session_id, "accessibility id", "network-probe-status", after_sequence=last_sequence)
                 if expected_transport is not None and probe["transport"] != expected_transport:
                     raise RuntimeError(f"{label} request changed Android transport: expected={expected_transport}, observed={probe}")
                 proxy_event = wait_for_proxy_event(before_event_id, int(profile["generation"]))
@@ -374,8 +405,8 @@ def main() -> int:
 
         # Exclude one cold-start download from all timing comparisons.
         before_warmup_event = int(proxy_metrics()["last_event_id"])
-        request("POST", base + f"/element/{action_id}/click", {})
-        warmup_probe = wait_for_probe(session_id, probe_id, after_sequence=0)
+        click_fresh_element(session_id, "accessibility id", "primary-action")
+        warmup_probe = wait_for_probe(session_id, "accessibility id", "network-probe-status", after_sequence=0)
         expected_transport = str(warmup_probe["transport"])
         warmup_event = wait_for_proxy_event(before_warmup_event, int(baseline_profile["generation"]))
         warmup_probe["proxy_event"] = warmup_event
