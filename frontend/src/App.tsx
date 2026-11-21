@@ -489,6 +489,7 @@ export default function App() {
                         </div>
                       )}
                       <textarea
+                        aria-label="Android logcat evidence"
                         disabled={previewMode}
                         value={logText}
                         onChange={(e) => setLogText(e.target.value)}
