@@ -155,6 +155,14 @@ export default function SettingsView({ capabilities, apiStatus }: SettingsViewPr
               <span>Artifact Storage:</span>
               <b>{capabilities?.apk_upload ? "Private APK storage available" : "Unavailable (production storage not configured)"}</b>
             </div>
+            <div className="info-row">
+              <span>Worker Dispatch:</span>
+              <b>{capabilities?.worker_dispatch ? "Worker registered and dispatch configured" : "No production worker configured"}</b>
+            </div>
+            <div className="info-row">
+              <span>APK Execution:</span>
+              <b>{capabilities?.android_execution ? "Enabled" : "Disabled until isolated worker verification"}</b>
+            </div>
           </div>
         </section>
       </div>
