@@ -1,7 +1,7 @@
 # BharatSim — Known Limitations
 
 **Date:** 2026-11-21  
-**Candidate branch:** `d4f3605711aa51929b8148a4fee296768085776f`
+**Candidate branch:** `5b751f88ca8679e5cd32fbdc3eab289451f6aab0`
 
 - Production readiness is HTTP 503: DB and private Storage unavailable, Android worker not configured.
 - Arbitrary APK execution is intentionally disabled.
