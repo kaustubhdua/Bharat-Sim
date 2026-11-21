@@ -362,3 +362,12 @@ def test_scenario_spec_identity_ignores_model_wording(monkeypatch):
 def test_fenced_model_json_is_accepted():
     content = "```json" + chr(10) + model_reply()["content"] + chr(10) + "```"
     assert testspec.parse_model_output(content).matched_scenario == "upi-pending-retry"
+
+
+def test_fixproof_verdict_is_consistent_across_repeated_candidate_runs():
+    verdicts = []
+    for attempt in range(3):
+        original = run(f"original-{attempt}", "sha-original", scenario_block(False, False, True))
+        candidate = run(f"candidate-{attempt}", "sha-fixed", scenario_block(True, True, True))
+        verdicts.append(testspec.fixproof(original, candidate)["verdict"])
+    assert verdicts == ["FIXED_AND_VERIFIED"] * 3
