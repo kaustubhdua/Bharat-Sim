@@ -68,9 +68,9 @@ export default function CompareRunsView({ runs: allRuns, onBack }: CompareRunsVi
             <ArrowLeft size={14} /> Back to dashboard
           </button>
           <div className="section-kicker">COMPARATIVE TELEMETRY</div>
-          <h2>Baseline vs. Constrained Anomaly Regression</h2>
+          <h2>Baseline vs. Constrained Run Comparison</h2>
           <p>
-            Compare two completed runs: cold start, janky frames and memory from each run's persona leg. Every run also has its own baseline on the run page.
+            Compare measured startup, frame and memory metrics from two completed runs. The comparison uses transparent thresholds and reference-score heuristics; it is not a trained covariance model.
           </p>
         </div>
         <div className="panel-icon">
@@ -123,7 +123,7 @@ export default function CompareRunsView({ runs: allRuns, onBack }: CompareRunsVi
             onClick={() => void handleCompare()}
           >
             {loading ? <LoaderCircle size={15} className="spin" /> : <GitCompare size={15} />}
-            {loading ? "Computing Covariance Scores…" : "Execute Multivariate Anomaly Comparison"}
+            {loading ? "Comparing runs…" : "Compare completed runs"}
           </button>
         </div>
       </div>
@@ -140,12 +140,12 @@ export default function CompareRunsView({ runs: allRuns, onBack }: CompareRunsVi
               <h3>{result.verdict}</h3>
               <p>{result.details}</p>
               <small>
-                Multivariate statistical covariance divergence score: <b>{result.anomaly_score.toFixed(1)}</b> / 100
+                Heuristic anomaly score (0–100; not a probability): <b>{result.anomaly_score.toFixed(1)}</b> / 100
               </small>
             </div>
           </div>
 
-          <h3>Subsystem Metric Divergence</h3>
+          <h3>Metric changes</h3>
           <div className="anomaly-metric-grid">
             {result.anomalies.map((an) => (
               <div key={an.metric} className={"anomaly-card " + an.status}>
@@ -168,7 +168,7 @@ export default function CompareRunsView({ runs: allRuns, onBack }: CompareRunsVi
                 </div>
                 <div className="delta-bar">
                   <TrendingUp size={12} />
-                  <span>{an.delta_pct >= 0 ? `+${an.delta_pct}%` : `${an.delta_pct}%`} divergence</span>
+                  <span>{an.delta_pct >= 0 ? `+${an.delta_pct}%` : `${an.delta_pct}%`} change</span>
                 </div>
               </div>
             ))}
