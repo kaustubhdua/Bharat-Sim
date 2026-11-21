@@ -594,6 +594,7 @@ export default function App() {
                   onSelectPersona={setSelected}
                   busy={busy}
                   uploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.apk_upload === true}
+                  maxUploadMb={capabilities?.max_upload_mb ?? 150}
                   lockedReason={previewMode
                     ? "Sign in to register and execute private APK runs."
                     : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
