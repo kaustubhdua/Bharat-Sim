@@ -1207,7 +1207,7 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
             "validation_steps": validation,
             "status": "unconfirmed",
         }
-        # Enrich with ML classification & Sarvam AI developer explanation
+        # Enrich with ML classification & deterministic developer-guidance templates
         ev_sample = group["evidence"][0]["text"] if group["evidence"] else ""
         group["sarvam_explanation"] = explain_failure_with_sarvam(group["kind"], ev_sample, persona["name"])
         matched_confs = [m["confidence"] for m in ml_matches if m["category"] == group["kind"]]
