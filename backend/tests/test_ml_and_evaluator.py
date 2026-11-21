@@ -270,6 +270,7 @@ def test_run_comparison_rejects_missing_measured_metrics(monkeypatch):
 
 def test_capabilities_disable_unconfigured_provider_and_database_features(monkeypatch):
     monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.delenv("sarvam_api", raising=False)
     monkeypatch.setattr(main_module, "requires_persistent_database", lambda: True)
     monkeypatch.setattr(main_module, "database_is_available", lambda: False)
     monkeypatch.setattr(main_module, "worker_dispatch_configured", lambda: False)
