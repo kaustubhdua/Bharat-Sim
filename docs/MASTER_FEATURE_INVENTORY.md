@@ -41,7 +41,7 @@ This inventory is the judge-facing source of truth. “Implemented” means code
 - `BHARATSIM_WORKER_ENGINE=smoke` (default): legacy install/launch/logcat smoke worker. It does not provide the full engine's packet-loss/reset/outage behavior.
 - `BHARATSIM_WORKER_ENGINE=engine`: full baseline-vs-persona engine. Its host proxy affects only app traffic routed through Android's system proxy. Reports with no proxy connections must not claim network conditions affected the app.
 - CPU throttling is unsupported in both modes. RAM constraints are provisioning-dependent and must be evidenced from the actual emulator.
-- A worker process on a developer laptop or generic shared VM is not a production sandbox.
+- A personal laptop worker is scoped to one account, but it still runs on the user's host. It is not a per-job VM/microVM sandbox or a substitute for a restricted production worker host.
 
 ## 3. Current verified repository evidence
 
