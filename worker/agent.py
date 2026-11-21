@@ -37,6 +37,7 @@ from worker.condition_applicator import reset_target_safely
 
 RUNNER = ROOT / "worker" / "runner.py"
 MAX_RESPONSE_BYTES = 300_000
+MAX_APK_BYTES = 500 * 1024 * 1024
 
 
 def log_worker(level: str, message: str) -> None:
@@ -112,8 +113,8 @@ def download_apk(base_url: str, token: str, job: dict[str, Any], target: Path) -
             if not chunk:
                 break
             total += len(chunk)
-            if total > 150 * 1024 * 1024:
-                raise WorkerError("Downloaded APK exceeds the 150 MiB worker limit")
+            if total > MAX_APK_BYTES:
+                raise WorkerError("Downloaded APK exceeds the 500 MiB worker limit")
             digest.update(chunk)
             output.write(chunk)
     if total == 0:
