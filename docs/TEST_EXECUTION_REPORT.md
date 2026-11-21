@@ -3,7 +3,7 @@
 **Tested code SHA:** `4546d9330f24dacda803cbc887d7bd737dfd2f72` (subsequent documentation/README commits follow it)  
 **Branch:** `fix/accurate-capabilities-and-product-evidence`  
 **Date:** 2026-11-21 (IST)  
-**Latest docs-only head:** `86ea86eb9df8cfaa450ef8bbad7303aa5fcb239c`  
+**Candidate branch:** `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb`  
 
 ## Exact-SHA GitHub Actions evidence
 
@@ -37,7 +37,7 @@ No production account, APK upload, write, test execution or destructive operatio
 - Actual production Android worker and APK install/launch/telemetry: blocked by absent production worker.
 - Live two-tenant Supabase RLS test: not run against production.
 - Sarvam live Hindi/Tamil/Marathi translation and Bulbul speech: blocked until provider credential and successful live calls.
-- PDF/JSON generated report structure: PDF path not implemented; JSON paths exist but need full authenticated artifact acceptance.
+- Analysis PDF: implemented with Vitest checks for PDF signature, report/finding/evidence content and pagination. Those tests still need an exact latest-SHA passing CI result. Run-level PDF/persisted report library/share are incomplete; run JSON export requires authenticated artifact acceptance.
 - Accessibility/WCAG: no independent audit completed.
 - k6/performance: no controlled staging load test run.
 
