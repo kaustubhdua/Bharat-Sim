@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-11-21 (IST)  
 **Candidate branch:** `d4f3605711aa51929b8148a4fee296768085776f`  
-**Application code tested by green CI:** `4546d9330f24dacda803cbc887d7bd737dfd2f72`  
+**Application code tested by green CI:** `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb` (7/7 jobs); emulator smoke evidence on `d5684752e7f5202c83bb401bf651595290815188`  
 **Production URL:** https://bharat-sim-81g2.vercel.app  
 **Decision: NO-GO for public APK testing. Controlled preview only.**
 
@@ -36,7 +36,7 @@
 - **ML:** Heuristic/class-centroid code exists; independent holdout evaluation absent.
 - **Sarvam:** Provider credential required; no live output verified.
 - **Security:** Dependency audit only; tenant isolation and sandbox egress need independent acceptance.
-- **Reporting:** Analysis-level JSON and PDF export implementations exist. The new PDF export has dedicated artifact-content and pagination unit tests; persistent report library, run-level PDF and sharing remain incomplete. Exact latest-SHA E2E/integration status must be checked independently.
+- **Reporting:** Analysis-level JSON and PDF export implementations exist. PDF artifact-content and pagination tests are included in the passing frontend CI at `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb`; persistent report library, run-level PDF and sharing remain incomplete.
 - **Performance/accessibility:** No controlled load benchmark or full WCAG audit recorded.
 
 ## Manual infrastructure actions required
