@@ -70,8 +70,8 @@ export default function Sidebar({
             <Smartphone size={14} />
           </div>
           <div className="workspace-copy">
-            <b>Production Workspace</b>
-            <small>{previewMode ? "Guest Preview" : session?.user?.email || "Enterprise Tier"}</small>
+            <b>BharatSim Workspace</b>
+            <small>{previewMode ? "Guest Preview" : session?.user?.email || "Workspace session"}</small>
           </div>
         </div>
       )}
