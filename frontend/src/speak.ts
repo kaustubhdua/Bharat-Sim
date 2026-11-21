@@ -23,7 +23,13 @@ export type TestSpec = {
   matched_scenario: string | null;
   safety: { flags: string[]; classification: string };
   clarifications_needed: string[];
-  execution: { eligible: boolean; mode: "scenario" | "generic" | "blocked" | "needs_clarification"; scenario_id: string | null; persona_id: string; reason: string };
+  execution: {
+    eligible: boolean; mode: "scenario" | "generic" | "blocked" | "needs_clarification"; scenario_id: string | null;
+    persona_id: string; custom_persona?: Record<string, unknown> | null; reason: string;
+  };
+  symptom?: string;
+  symptom_label?: string;
+  symptom_checkable?: boolean;
   interpreter: { provider: string; model: string | null; request_id: string | null; latency_ms: number | null; fallback: boolean; fallback_reason?: string; redacted_input?: boolean };
 };
 
@@ -124,8 +130,28 @@ export function runScenarioPayload(spec: TestSpec | null, scenarioId: string | n
           conditions: spec.conditions,
           assertions: spec.assertions,
           matched_scenario: spec.matched_scenario,
-          request_text: spec.request_text
+          request_text: spec.request_text,
+          symptom: spec.symptom || "other"
         }
       : null
   };
+}
+
+export type Diagnosis = {
+  problem: string;
+  reproduction: { symptom: string; symptom_label: string; verdict: "REPRODUCED" | "NOT_REPRODUCED" | "CANNOT_CHECK" | "BLOCKED"; summary: string; symptom_source?: string; evidence: { id: string; fact: string }[] };
+  diagnosis: { why: string; fix_steps: string[]; code_hint: string; confidence: "low" | "medium" | "high" } | null;
+  cited_evidence?: { id: string; fact: string }[];
+  language_code?: string;
+  translated_text: string | null;
+  translation_failed?: boolean;
+  interpreter?: { provider: string; model: string; request_id: string | null; latency_ms: number };
+};
+
+export function diagnoseRun(runId: string, languageCode: string, problem?: string): Promise<Diagnosis> {
+  return api<Diagnosis>("/api/v1/runs/" + encodeURIComponent(runId) + "/diagnose", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(problem ? { problem, language_code: languageCode } : { language_code: languageCode })
+  });
 }
