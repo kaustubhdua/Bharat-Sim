@@ -41,7 +41,7 @@ See [worker/README.md](worker/README.md), [docs/ANDROID_NETWORK_SHAPING.md](docs
 ### Speak-to-Test and Sarvam
 - Text and optional voice requests can be converted into a validated scenario plan.
 - Executable scenario IDs are allowlisted server-side; the included BharatPay APKs are controlled fixtures.
-- Real Sarvam interpretation, translation and Bulbul speech require a server-side `SARVAM_API_KEY`. Fallback behavior must be labelled as fallback, not presented as live provider output.
+- Real Sarvam interpretation, translation and Bulbul speech require a server-side `SARVAM_API_KEY` (the legacy lowercase `sarvam_api` alias is also supported). Fallback behavior must be labelled as fallback, not presented as live provider output.
 - The BharatPay fixture journey is not a payment gateway integration and does not move real money.
 
 ### Persistence, upload and worker protocol
