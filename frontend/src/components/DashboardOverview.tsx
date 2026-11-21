@@ -238,11 +238,15 @@ export default function DashboardOverview({
             </div>
             <div className="status-grid-item">
               <small>ML Classifier</small>
-              <b className="text-success">Centroid Vector v2 (Active)</b>
+              <b className={capabilities?.ml_classifier === true ? "text-success" : "text-danger"}>
+                {capabilities?.ml_classifier === true ? "TF-IDF centroid classifier available" : "Classifier unavailable"}
+              </b>
             </div>
             <div className="status-grid-item">
               <small>Sarvam AI Bulbul</small>
-              <b className="text-success">TTS & Translation Enabled</b>
+              <b className={capabilities?.sarvam_translation === true && capabilities?.sarvam_audio_tts === true ? "text-success" : "text-danger"}>
+                {capabilities?.sarvam_translation === true && capabilities?.sarvam_audio_tts === true ? "Provider configured" : "Not configured"}
+              </b>
             </div>
           </div>
 
