@@ -1371,7 +1371,7 @@ def health_ready():
         "configured" if storage_configured
         else "server_storage_credential_missing" if not STORAGE_API_KEY
         else "supabase_url_missing" if not SUPABASE_URL.startswith("https://")
-        else "bucket_missing"
+        else "storage_not_enabled"
     )
     auth_required = production or AUTH_REQUIRED
     storage_required = requires_persistent_database()
