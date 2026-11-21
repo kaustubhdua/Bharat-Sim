@@ -39,6 +39,41 @@ class ProbeParsingTests(unittest.TestCase):
         self.assertIsNone(journey.parse_probe_text("Network probe failed: SocketTimeoutException"))
 
 
+    def test_click_re_resolves_after_stale_element_reference(self):
+        with (
+            patch.object(journey, "find_element", side_effect=["old-element", "fresh-element"]) as find,
+            patch.object(journey, "request", side_effect=[
+                RuntimeError("WebDriver stale element reference"),
+                {"value": None},
+            ]) as request,
+            patch.object(journey.time, "monotonic", return_value=0),
+            patch.object(journey.time, "sleep"),
+        ):
+            journey.click_fresh_element("session-1", "accessibility id", "primary-action")
+
+        self.assertEqual(find.call_count, 2)
+        self.assertEqual(request.call_args_list, [
+            call("POST", "/session/session-1/element/old-element/click", {}),
+            call("POST", "/session/session-1/element/fresh-element/click", {}),
+        ])
+
+    def test_text_read_re_resolves_after_stale_element_reference(self):
+        with (
+            patch.object(journey, "find_element", side_effect=["old-element", "fresh-element"]) as find,
+            patch.object(journey, "request", side_effect=[
+                RuntimeError("WebDriver stale element reference"),
+                {"value": "Primary action completed"},
+            ]) as request,
+            patch.object(journey.time, "monotonic", return_value=0),
+            patch.object(journey.time, "sleep"),
+        ):
+            value = journey.read_fresh_element_text("session-1", "accessibility id", "journey-status")
+
+        self.assertEqual(value, "Primary action completed")
+        self.assertEqual(find.call_count, 2)
+        self.assertEqual(request.call_count, 2)
+
+
 class ProxyPathTests(unittest.TestCase):
     def test_preflight_enables_network_and_requires_healthy_proxy(self):
         with (
