@@ -175,3 +175,29 @@ The latest main line now includes per-user laptop workers:
 - The supervisor restarts the emulator/worker and defaults to `BHARATSIM_WORKER_ENGINE=engine`.
 
 This is a useful judge/demo path for a user's own laptop and owner-scoped jobs. It does **not** establish per-job isolation from the laptop owner, host compromise resistance, default-deny egress, or production multi-tenant safety. The installers currently download the repository's main-branch worker bundle; pinned release provenance, installer checksums/signatures, update/rollback and full Windows/macOS/Linux acceptance remain follow-up work. Keep public arbitrary APK execution disabled until the separate production isolation gates pass.
+
+
+## Addendum — fresh read-only production configuration check (22 Nov 2026)
+
+The Vercel Production environment-variable inventory was re-read without decrypting any secret values. The connected Supabase project list and the active `common 1` database were also inspected read-only.
+
+### Vercel environment metadata
+- `VITE_SUPABASE_URL` points to `https://gpkyzastnibffyuxhtix.supabase.co`.
+- The connected Supabase account's project list does not contain project ref `gpkyzastnibffyuxhtix`; the only `ACTIVE_HEALTHY` project in that list is `common 1` (`hkyieaovolkethovyenb`). Do not assume they are the same project.
+- Sensitive `BHARATSIM_DATABASE_URL` and `SUPABASE_URL` entries exist, but their values were not decrypted, so the server-side database and Storage project targets remain unverified.
+- No `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` entry appears in the complete Vercel environment listing. The backend sets `STORAGE_ENABLED` only when `SUPABASE_URL`, one of those server-side keys and the bucket name are present. Therefore the visible Production configuration does not currently demonstrate that signed private Storage uploads can be enabled.
+- The Production environment has a sensitive `sarvam_api` variable. Code in `backend/app/sarvam.py` explicitly supports this lowercase compatibility alias as well as `SARVAM_API_KEY`; however, the value was not decrypted, so its validity, quota and provider availability remain unverified.
+- `BHARATSIM_ENV=production`, `BHARATSIM_AUTH_REQUIRED=true`, `BHARATSIM_STORAGE_BUCKET=bharatsim-private`, and the fail-closed flags are present as plain environment metadata. Public APK execution, worker isolation attestation and worker egress restriction are all `false`.
+
+### Active connected Supabase project — read-only observations
+The active `common 1` project is shared by `bharatsim` and `genomeguard`. Its migration history contains only four BharatSim migrations, while the repository now contains nine. Missing migrations:
+
+1. `20261121190000_bharatsim_custom_persona`
+2. `20261121200000_bharatsim_workers_claiming_status`
+3. `20261121230000_bharatsim_run_scenario`
+4. `20261122000000_bharatsim_large_apk_parts`
+5. `20261122010000_bharatsim_personal_workers`
+
+The live `bharatsim.runs` table is missing `persona_json`, `apk_meta_json` and `scenario_json`; the live `bharatsim.workers` table has only `id`, `last_seen`, `status` and `current_run_id`, and is missing personal-worker ownership/key metadata. The shared project's private `bharatsim-private` bucket exists with a 150 MiB object limit and APK/ZIP/octet-stream MIME types, but it contains zero objects; `bharatsim.runs` also contains zero rows. This is not evidence of a successful production upload/run journey.
+
+**No migrations, Storage objects, user rows, Vercel environment variables or secrets were changed.** The shared project must not be migrated without the owner confirming that it is the intended target and providing a backup/restore plan.
