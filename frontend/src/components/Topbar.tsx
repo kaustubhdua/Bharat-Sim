@@ -62,6 +62,9 @@ export default function Topbar({
       </div>
 
       <div className="top-actions">
+        <a className="api-docs-link" href="/docs" target="_blank" rel="noreferrer" aria-label="API documentation">
+          API docs
+        </a>
         {/* Evaluator Quick Tour Shortcut Button */}
         <button
           type="button"
