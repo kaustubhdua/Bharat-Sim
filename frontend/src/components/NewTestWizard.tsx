@@ -197,7 +197,7 @@ export default function NewTestWizard({
               <div className="upload-placeholder">
                 <Upload size={32} />
                 <b>Drag and drop your Android APK here, or click to browse</b>
-                <p>Supports .apk packages up to 100 MB. Binary signature is validated before upload.</p>
+                <p>Supports .apk packages up to 150 MB. Binary signature is validated before upload.</p>
               </div>
             )}
           </div>
@@ -250,7 +250,7 @@ export default function NewTestWizard({
                     <b>{p.down_kbps} kbps</b>
                   </div>
                   <div>
-                    <small>Packet Drop</small>
+                    <small>Packet Loss Target · Unsupported</small>
                     <b>{p.packet_loss_pct}%</b>
                   </div>
                 </div>
