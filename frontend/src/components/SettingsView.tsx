@@ -9,8 +9,11 @@ import {
 } from "lucide-react";
 import { useTheme } from "../theme";
 import { readSession } from "../auth";
+import type { Capabilities } from "../api";
 
-export default function SettingsView() {
+type SettingsViewProps = { capabilities: Capabilities | null; apiStatus: string };
+
+export default function SettingsView({ capabilities, apiStatus }: SettingsViewProps) {
   const { theme, toggleTheme } = useTheme();
   const session = readSession();
   const [sarvamLang, setSarvamLang] = useState<string>(() => {
@@ -115,15 +118,15 @@ export default function SettingsView() {
             </div>
             <div className="info-row">
               <span>User UUID:</span>
-              <code>{session?.user?.id || "preview-tenant-id"}</code>
+              <code>{session?.user?.id || "Not available in guest preview"}</code>
             </div>
             <div className="info-row">
               <span>Daily Run Quota:</span>
-              <b>10 runs / UTC day (2 active concurrent)</b>
+              <b>Not exposed by the current API</b>
             </div>
             <div className="info-row">
               <span>Row-Level Security:</span>
-              <span className="badge-tag success">ENFORCED (PostgreSQL RLS)</span>
+              <span className="badge-tag">{capabilities?.database_persistence === true ? "Database available; tenant isolation still requires live verification" : "Not verifiable while production database is unavailable"}</span>
             </div>
           </div>
         </section>
@@ -138,19 +141,19 @@ export default function SettingsView() {
           <div className="info-rows">
             <div className="info-row">
               <span>API Gateway:</span>
-              <code>{import.meta.env.VITE_API_BASE_URL || "Same-origin (FastAPI)"}</code>
+              <code>{apiStatus === "offline" ? "Unavailable" : import.meta.env.VITE_API_BASE_URL || "Same-origin (FastAPI)"}</code>
             </div>
             <div className="info-row">
               <span>ML Classifier:</span>
-              <span className="badge-tag success">Centroid Vector v2 (Active)</span>
+              <span className={"badge-tag " + (capabilities?.ml_classifier ? "success" : "")}>{capabilities?.ml_classifier ? "TF-IDF centroid classifier available" : "Classifier unavailable"}</span>
             </div>
             <div className="info-row">
               <span>Sarvam Bulbul TTS:</span>
-              <span className="badge-tag success">bulbul:v1 (Online)</span>
+              <span className={"badge-tag " + (capabilities?.sarvam_audio_tts ? "success" : "")}>{capabilities?.sarvam_audio_tts ? "Provider configured" : "Not configured (SARVAM_API_KEY required)"}</span>
             </div>
             <div className="info-row">
               <span>Artifact Storage:</span>
-              <b>Private Supabase Storage Bucket</b>
+              <b>{capabilities?.apk_upload ? "Private APK storage available" : "Unavailable (production storage not configured)"}</b>
             </div>
           </div>
         </section>
