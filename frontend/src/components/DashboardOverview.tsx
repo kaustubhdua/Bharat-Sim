@@ -254,7 +254,7 @@ export default function DashboardOverview({
             <ShieldCheck size={16} />
             <span>
               {capabilities?.notes?.[0] ||
-                "Tenant isolation and PostgreSQL Row-Level Security active across all private APK runs."}
+                "Live capability details are unavailable. Database readiness, tenant isolation and worker execution have not been verified."}
             </span>
           </div>
         </section>
