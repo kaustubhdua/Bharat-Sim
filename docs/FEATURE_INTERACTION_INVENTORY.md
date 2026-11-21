@@ -1,54 +1,58 @@
-# BharatSim — feature interaction inventory
+# BharatSim — Feature Interaction Inventory
 
-**Baseline:** main `5ab14c89b6159c07ba538c1c5c5ddbc44ba8a49c`  
-**Audit date:** 2026-11-21
+**Audited main:** `2c754dcb428fdbacc67da18d41fad3c1d0745c83`  
+**Working branch:** `fix/accurate-capabilities-and-product-evidence`  
+**Rule:** A control is complete only when its behaviour, backend dependency, success state and failure state are real and testable. Fixture data is not execution evidence.
 
-This inventory records the interactive surface discovered in the current React application. It is not a claim that production credentials or infrastructure are configured.
+| Route / surface | Control | Behaviour / dependency | Current state |
+|---|---|---|---|
+| Public landing `/landing` | Product tour link from sign-in | Public route through AuthGate | Implemented on this branch |
+| Public landing | Start Testing | Navigates to `/new-test`; AuthGate requires sign-in | Implemented; upload remains capability-gated |
+| Public landing | Explore Planner | Enters explicit UI-only guest preview and navigates to overview | Implemented on this branch |
+| Overview `/` | Persona cards | Selects API profile for planner/configuration | Implemented; built-in profiles are labelled when API is offline |
+| Overview | APK upload entry | Opens test wizard | Implemented; disabled if private storage/database capability is false |
+| Overview | Readiness score | Displays latest analysis score | No score is shown before a real report exists |
+| Overview | Run counts / worker status | Uses API runs and worker heartbeat data | API-backed; offline/empty states shown |
+| Test wizard `/new-test` | APK file picker / drag-drop | Validates file, extracts metadata/checksum, prepares upload | Implemented; production upload disabled while storage/database are unavailable |
+| Test wizard | Worker interaction count / telemetry switches | Current run-registration API does not accept per-run overrides | Read-only defaults with explanatory copy; not represented as configurable |
+| Test wizard | Start test | Registers run and uploads APK | Capability-gated; no production execution until storage and isolated worker exist |
+| Comparison `/compare` | Baseline / constrained selectors | Selects two completed runs | This branch filters both selectors to completed runs |
+| Comparison | Compare measured telemetry | Calls owner-scoped comparison API | Disabled when database capability is false; missing metrics are not imputed |
+| Settings `/settings` | Theme toggle | Shared ThemeProvider + localStorage | Implemented on this branch; topbar and settings share one state |
+| Settings | Language preference | Local browser preference | Implemented locally; server/account sync not implemented |
+| Settings | Account / RLS / quota / storage / worker / TTS status | Displays session and API capability data | Dynamic where API exposes data; production RLS and quota remain unverified/not exposed |
+| History `/runs` | Search/status filters | Filters loaded run list | Client-side filtering; server pagination/date/persona filters remain missing |
+| Run detail `/runs/:id` | Refresh / event polling | Reads run status and events | Implemented for existing run records |
+| Run detail | Download report JSON | Downloads persisted run report | Implemented where report exists |
+| Run detail | Delete | Confirms and deletes owner-scoped run | Implemented; active execution guarded |
+| Analysis `/analysis` | Logcat input / Analyze evidence | Calls stateless FastAPI log-analysis endpoint | Implemented; Playwright journey still has a failing result-screen assertion and is being instrumented |
+| Analysis | Finding expansion / JSON export | Shows evidence and downloads analysis JSON | Implemented |
+| Analysis | Translation | Calls Sarvam translation or configured fallback | Real provider requires server-side `SARVAM_API_KEY` |
+| Analysis / finding cards | Voice briefing | Checks `sarvam_audio_tts` capability before calling Bulbul endpoint | Disabled when provider is not configured; fixture WAV is never played as speech |
+| Evaluator tour | Load scenario | Loads curated fixture logcat into analyzer | Fixture-only; never represented as an executed APK |
+| Navigation | Sidebar / topbar / responsive drawer | Navigates routes and toggles shared theme | Implemented; full accessibility audit outstanding |
 
-| Surface | Control/action | Intended result | Backend/provider | Current state |
-|---|---|---|---|---|
-| Global shell | Brand | Navigate to overview | React Router | Implemented |
-| Global shell | Overview / Test runs / Log analysis | Navigate between existing routes | React Router | Implemented |
-| Global shell | API refresh | Reload personas, capabilities, runs and workers | FastAPI | Implemented |
-| Auth gate | Email/password sign-in | Establish Supabase session | Supabase Auth | Code implemented; live provider unverified |
-| Auth gate | Create account | Create user or prompt email confirmation | Supabase Auth | Code implemented; live provider unverified |
-| Auth gate | Public preview | Enter UI-only guest preview | Session storage | Implemented; private APIs intentionally locked |
-| Auth gate | Sign out | Revoke session best-effort and clear local session | Supabase Auth | Implemented |
-| Overview | Persona card selection | Select persona for planner/run | Personas API | Implemented |
-| Overview | APK selection and submit | Validate, upload and register run | FastAPI + private Storage | Capability-gated; production blocked by missing persistence/storage credentials in latest release evidence |
-| Overview | Risk planner | Generate risk-first plan | Planner API | Implemented; planning is not execution |
-| Overview | Logcat textarea and analyze | Analyze submitted logs and return findings | Analysis API | Implemented; private analysis requires auth |
-| Overview | Recent run link / View all | Open run detail/history | FastAPI + router | Implemented |
-| Overview | Evaluator quick tour | Load curated logcat fixture into analyzer | Evaluator scenarios API | Mounted on this branch; API envelope corrected; clearly labelled fixture, not an executed APK run |
-| Runs | Search | Filter loaded run records | Client-side | Implemented |
-| Runs | Status filter | Filter active/completed/failed records | Client-side | Implemented |
-| Runs | Open run | Navigate to run evidence | FastAPI | Implemented |
-| Run detail | Refresh/poll | Refresh active run and lifecycle events | FastAPI | Implemented |
-| Run detail | Download report | Download worker report JSON | FastAPI | Implemented |
-| Run detail | Delete | Confirm and delete eligible owner-scoped run | FastAPI | Implemented; active execution guarded |
-| Run detail | Compare runs | Compare completed baseline and constrained runs | FastAPI + persisted telemetry | Main implementation had a broken query/tenant/metric/response contract; corrected on this branch to use owner-scoped `result_json` and measured metrics only |
-| Analysis | Export JSON | Download current analysis report | Browser Blob | Implemented |
-| Analysis | Finding expansion | Inspect evidence and recommendations | React state/component | Implemented |
-| Analysis | Sarvam language selector | Choose Hindi/Tamil/Marathi | Local state | Implemented |
-| Analysis | Translate report | Translate condensed report summary | FastAPI + Sarvam | Conditional on server API key; deterministic fallback exists for selected summaries |
-| Analysis | Play voice briefing | Generate and play translated speech | FastAPI Bulbul TTS | API/player contract fixed on this branch; real speech requires `SARVAM_API_KEY`; silent fixture is never played as speech |
-| Theme | Light/dark toggle | Persist theme and apply before paint | Local storage + root theme attribute | Implemented on this branch; awaiting CI |
-| Missing | PDF export | Generate downloadable PDF | Not implemented | Missing |
-| Missing | Password reset/email resend | Recover/verify account | No complete flow found | Missing |
-| Missing | Settings/profile/security/notifications | Save account preferences | No settings route/API found | Missing |
-| Missing | Server pagination/date/persona filters | Query history at scale | No complete API/UI flow found | Missing |
-| Missing | Dedicated apps/APK library | Browse, inspect and manage uploaded APKs | No separate resource screen found | Missing |
-| Missing | Dedicated findings/reports resources | Browse and filter persisted findings/reports | No separate resource screen found | Missing |
+## Known missing or blocked interactions
 
-## Evidence rules
+| Feature | Why it is not complete |
+|---|---|
+| PDF export | No production PDF generation/download path |
+| Password reset / verification resend UX | No complete dedicated recovery flow |
+| Dedicated findings resource page | Findings currently appear within analysis/run evidence |
+| Dedicated reports resource page | No complete persisted report library |
+| Server-side history pagination/date/persona filters | Current history filtering is client-side |
+| Per-run worker overrides | Run-registration API does not accept interaction-count or telemetry toggles |
+| Persistent account settings | Theme/language are local; profile/security/notification preferences are not persisted server-side |
+| Production APK execution | Production database/storage/worker capabilities are false; arbitrary execution remains disabled |
+| Live Sarvam translation/TTS | Requires server-side provider credentials |
+| Independent ML validation | No held-out dataset or model registry/version governance |
+| Full accessibility conformance | No independent WCAG audit or screen-reader E2E suite |
 
-- Do not mark an action complete because a button exists; verify the API call and resulting persisted state.
-- Keep unsupported actions absent or clearly disabled with an explanation.
-- Do not show fabricated metrics, synthetic runs or invented worker activity.
-- Keep guest preview read-only for private resources.
-- Treat CI fixture execution separately from customer APK execution.
-- Test every supported flow at mobile and desktop widths, with keyboard-only navigation and reduced motion.
+## Evidence and safety rules
 
-## Branch remediation notes
-
-The current branch additionally corrects the comparison query to use `result_json`, scopes both run lookups to the authenticated owner, refuses fabricated telemetry defaults, requires completed runs and shared measured metrics, and aligns the comparison response shape with the UI. It fixes the Sarvam audio response contract and refuses silent fixture audio as a voice briefing. The evaluator tour now reads the API's `items` envelope and is mounted on Overview; scenario logs and metrics are explicitly marked as fixtures.
+- Never render a default readiness score, fabricated jank/PSS/network values, fake customer activity or synthetic worker heartbeat.
+- Persona values are requested configuration, not proof of applied device constraints.
+- Evaluator scenarios and landing previews are illustrative fixtures.
+- Comparison uses only completed owner-scoped runs and telemetry measured in both reports.
+- A 200 response from the SPA is not proof that the API, database, storage or worker is healthy.
+- Keep public APK execution disabled until worker isolation, tenant isolation, storage boundaries and default-deny egress are verified.
