@@ -16,6 +16,12 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
+    const activateDemo = () => setDemoMode(true);
+    window.addEventListener("bharatsim:demo-mode", activateDemo);
+    return () => window.removeEventListener("bharatsim:demo-mode", activateDemo);
+  }, []);
+
+  useEffect(() => {
     if (!authConfigured) return;
     let active = true;
     const current = readSession();
