@@ -333,32 +333,6 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
         </section>
       )}
 
-      <section className="panel full-panel">
-        <div className="panel-heading">
-          <div>
-            <div className="section-kicker">JANJEEVAN SCENARIO PACKS</div>
-            <h2>Moments users cannot afford to lose</h2>
-            <p>Only packs with a controlled fixture and machine-checked assertions can run. The rest are listed with what they still need.</p>
-          </div>
-        </div>
-        <div className="pack-grid">
-          {packs.map((p) => (
-            <article key={p.id} className={"pack-card " + p.status}>
-              <div className="pack-top">
-                <small>{p.pack}</small>
-                <span className={"risk-badge " + (p.status === "executable" ? "low" : "medium")}>{p.status === "executable" ? "RUNS NOW" : "PLANNED"}</span>
-              </div>
-              <b>{p.title}</b>
-              <p>{p.user_problem}</p>
-              {p.status === "planned" && <small className="pack-reason">{p.reason}</small>}
-              {p.status === "executable" && p.assertions && (
-                <ul>{p.assertions.map((a) => <li key={a.id}>{a.label}</li>)}</ul>
-              )}
-            </article>
-          ))}
-          {packs.length === 0 && <p className="no-evidence">Scenario packs could not be loaded.</p>}
-        </div>
-      </section>
     </div>
   );
 }
