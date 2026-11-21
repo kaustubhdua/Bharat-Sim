@@ -2602,6 +2602,11 @@ svg { flex-shrink: 0; }
 }
 
 .wizard-persona-card {
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 10px;
