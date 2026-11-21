@@ -75,6 +75,7 @@ test("log analysis reports findings from submitted evidence and preserves source
   const response = await analysisResponse;
   expect(response.status(), await response.text()).toBe(200);
   await expect(page).toHaveURL(/\/analysis$/);
+  console.log("Analysis route diagnostic:", { url: page.url(), headings: await page.locator("h1,h2,h3").allTextContents(), body: (await page.locator("body").innerText()).slice(0, 1200) });
 
   await expect(page.getByRole("heading", { name: "Log analysis results" })).toBeVisible();
   await expect(page.getByText("Signals detected in supplied logs")).toBeVisible();
