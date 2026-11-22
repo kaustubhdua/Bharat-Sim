@@ -1,6 +1,10 @@
 # BharatSim — Production Android Worker Host Deployment Guide
 
-This guide details how to provision and connect a real Linux worker host with Android emulator and KVM hardware virtualization to the production BharatSim control plane (`https://bharat-sim-81g2.vercel.app`).
+This guide provisions a **single-worker controlled-beta host** with one persistent Android emulator and KVM. It is not a per-job VM/microVM sandbox and is not approved for public arbitrary APK execution.
+
+The bootstrap keeps `BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=false` by default and restricts `/dev/kvm` to the dedicated `kvm` group (mode 0660). Do not enable APK execution on this host for untrusted public uploads. Production public execution requires a separately reviewed per-job isolation layer, default-deny egress, quotas and teardown.
+
+Control plane: `https://bharat-sim-81g2.vercel.app`.
 
 ---
 
